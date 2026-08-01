@@ -347,19 +347,24 @@ function updateRail(activeIndex) {
     const dash = tick.firstElementChild
     if (!dash) return
 
+    // The resting state has to stay legible on its own: these are most of the
+    // rail most of the time, and at 14% they read as noise rather than as the
+    // shape of the document.
     if (distance > RAIL_REACH) {
-      dash.style.width = '5px'
-      dash.style.opacity = '0.14'
+      dash.style.width = '9px'
+      dash.style.opacity = '0.34'
       tick.classList.remove('is-active')
       return
     }
 
     // Linear taper: full width at the cursor, down to the resting width three
     // headings out. Deeper headings sit a little shorter at every step.
+    // Taper down to the resting values rather than to zero, so there is no
+    // visible step where the funnel ends.
     const falloff = 1 - distance / (RAIL_REACH + 1)
-    const reach = 26 - Math.min(depth, 4) * 2
-    dash.style.width = `${5 + falloff * reach}px`
-    dash.style.opacity = `${0.18 + falloff * 0.82}`
+    const reach = 24 - Math.min(depth, 4) * 2
+    dash.style.width = `${9 + falloff * reach}px`
+    dash.style.opacity = `${0.34 + falloff * 0.66}`
     tick.classList.toggle('is-active', distance === 0)
   })
 }

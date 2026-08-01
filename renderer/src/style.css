@@ -421,11 +421,11 @@ img[data-blocked] {
 
 .rail-tick i {
   display: block;
-  width: 5px;
+  width: 9px;
   height: 2px;
   border-radius: 1px;
   background: var(--secondary);
-  opacity: 0.14;
+  opacity: 0.34;
   transition:
     width 200ms cubic-bezier(0.2, 0, 0, 1),
     opacity 200ms ease,
@@ -439,7 +439,7 @@ img[data-blocked] {
 
 /* Hovering the strip promises it does something; scrubbing kills the easing
    so the marks keep up with the pointer. */
-.rail:hover .rail-tick i { opacity: 0.4; }
+.rail:hover .rail-tick i { opacity: 0.62; }
 .rail.is-scrubbing .rail-tick i { transition: none; }
 
 /* The rail overlaps the reading column, so give the text somewhere to be. */
