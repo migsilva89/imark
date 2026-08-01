@@ -380,3 +380,47 @@ img[data-blocked] {
   h2 { break-after: avoid; }
   pre, table, .mermaid-block { break-inside: avoid; }
 }
+
+/* ------------------------------------------------------------------ rail */
+
+/* Quick Look has no room for a sidebar, so the table of contents collapses
+   into a column of ticks pinned to the left edge. Hidden everywhere else. */
+.rail {
+  display: none;
+  position: fixed;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  max-height: 82vh;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 5;
+}
+
+:root[data-preview='true'] .rail { display: flex; }
+
+.rail-tick {
+  width: 5px;
+  height: 2px;
+  flex: none;
+  border-radius: 1px;
+  background: var(--secondary);
+  opacity: 0.14;
+  transition:
+    width 200ms cubic-bezier(0.2, 0, 0, 1),
+    opacity 200ms ease,
+    background-color 200ms ease;
+}
+
+.rail-tick.is-active {
+  background: var(--accent);
+  height: 3px;
+}
+
+/* The rail overlaps the reading column, so give the text somewhere to be. */
+:root[data-preview='true'] body {
+  padding-left: calc(var(--step) * 12);
+}

@@ -211,7 +211,7 @@ async function renderMermaid(root, theme) {
       block.classList.add('is-rendered')
     } catch (error) {
       block.classList.add('is-error')
-      block.innerHTML = `<div class="diagram-error"><strong>Diagrama inválido</strong><pre>${escapeHtml(
+      block.innerHTML = `<div class="diagram-error"><strong>Invalid diagram</strong><pre>${escapeHtml(
         error?.message ?? error,
       )}</pre></div>`
     }
@@ -250,6 +250,62 @@ function buildToc(root) {
     })),
   })
   return headings
+}
+
+/* ------------------------------------------------------------------ rail */
+
+// A slim column of ticks standing in for the sidebar in Quick Look, where
+// there is no room for one. Every heading gets a tick; the three either side
+// of where you are taper away, so the eye is pulled to the current section
+// without losing the shape of the whole document.
+const RAIL_REACH = 3
+
+let railTicks = []
+
+function buildRail(headings) {
+  const existing = document.querySelector('.rail')
+  if (existing) existing.remove()
+  railTicks = []
+  if (headings.length < 2) return
+
+  const rail = document.createElement('nav')
+  rail.className = 'rail'
+  rail.setAttribute('aria-hidden', 'true')
+
+  for (const heading of headings) {
+    const tick = document.createElement('span')
+    tick.className = 'rail-tick'
+    // Deeper headings start narrower, so the rail also hints at structure.
+    tick.dataset.level = heading.tagName.slice(1)
+    rail.appendChild(tick)
+    railTicks.push(tick)
+  }
+
+  document.body.appendChild(rail)
+}
+
+function updateRail(activeIndex) {
+  if (!railTicks.length) return
+
+  railTicks.forEach((tick, index) => {
+    const distance = Math.abs(index - activeIndex)
+    const depth = Number(tick.dataset.level || 2)
+
+    if (distance > RAIL_REACH) {
+      tick.style.width = '5px'
+      tick.style.opacity = '0.14'
+      tick.classList.remove('is-active')
+      return
+    }
+
+    // Linear taper: full width at the cursor, down to the resting width three
+    // headings out. Deeper headings sit a little shorter at every step.
+    const falloff = 1 - distance / (RAIL_REACH + 1)
+    const reach = 26 - Math.min(depth, 4) * 2
+    tick.style.width = `${5 + falloff * reach}px`
+    tick.style.opacity = `${0.18 + falloff * 0.82}`
+    tick.classList.toggle('is-active', distance === 0)
+  })
 }
 
 /* -------------------------------------------------------- code copy button */
@@ -306,6 +362,7 @@ async function render({ markdown, path, theme }) {
   addCopyButtons(root)
   renderMath(root)
   activeHeadings = buildToc(root)
+  buildRail(activeHeadings)
   await renderMermaid(root, theme)
   if (token !== renderToken) return
 
@@ -328,12 +385,13 @@ let scrollQueued = false
 
 function updateActiveHeading() {
   if (!activeHeadings.length) return
-  let current = activeHeadings[0]
-  for (const heading of activeHeadings) {
-    if (heading.getBoundingClientRect().top <= 80) current = heading
+  let index = 0
+  for (let i = 0; i < activeHeadings.length; i += 1) {
+    if (activeHeadings[i].getBoundingClientRect().top <= 80) index = i
     else break
   }
-  bridge({ type: 'active', id: current.id })
+  updateRail(index)
+  bridge({ type: 'active', id: activeHeadings[index].id })
 }
 
 window.addEventListener(
