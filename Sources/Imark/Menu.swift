@@ -1,0 +1,87 @@
+import AppKit
+
+/// SwiftPM executables get no menu bar for free, so the whole thing is built
+/// here. Shortcuts mirror the table in docs/DESIGN.md.
+enum Menu {
+    static func install() {
+        let main = NSMenu()
+
+        let appItem = NSMenuItem()
+        main.addItem(appItem)
+        appItem.submenu = appMenu()
+
+        let fileItem = NSMenuItem()
+        main.addItem(fileItem)
+        fileItem.submenu = fileMenu()
+
+        let editItem = NSMenuItem()
+        main.addItem(editItem)
+        editItem.submenu = editMenu()
+
+        let viewItem = NSMenuItem()
+        main.addItem(viewItem)
+        viewItem.submenu = viewMenu()
+
+        let windowItem = NSMenuItem()
+        main.addItem(windowItem)
+        let window = NSMenu(title: "Window")
+        window.addItem(withTitle: "Minimize", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
+        window.addItem(withTitle: "Zoom", action: #selector(NSWindow.performZoom(_:)), keyEquivalent: "")
+        windowItem.submenu = window
+        NSApp.windowsMenu = window
+
+        NSApp.mainMenu = main
+    }
+
+    private static func appMenu() -> NSMenu {
+        let menu = NSMenu(title: "Imark")
+        menu.addItem(withTitle: "About Imark", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
+        menu.addItem(.separator())
+        let hide = menu.addItem(withTitle: "Hide Imark", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+        hide.target = NSApp
+        menu.addItem(.separator())
+        let quit = menu.addItem(withTitle: "Quit Imark", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        quit.target = NSApp
+        return menu
+    }
+
+    private static func fileMenu() -> NSMenu {
+        let menu = NSMenu(title: "File")
+        menu.addItem(withTitle: "Open…", action: #selector(AppDelegate.openDocument(_:)), keyEquivalent: "o")
+        menu.addItem(.separator())
+        menu.addItem(withTitle: "Close", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+        menu.addItem(.separator())
+        let reveal = menu.addItem(withTitle: "Reveal in Finder", action: #selector(DocumentWindowController.revealInFinder(_:)), keyEquivalent: "r")
+        reveal.keyEquivalentModifierMask = [.command, .shift]
+        menu.addItem(withTitle: "Print…", action: #selector(DocumentWindowController.printDocument(_:)), keyEquivalent: "p")
+        return menu
+    }
+
+    private static func editMenu() -> NSMenu {
+        let menu = NSMenu(title: "Edit")
+        menu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        menu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        menu.addItem(.separator())
+        menu.addItem(withTitle: "Find…", action: #selector(DocumentWindowController.performFind(_:)), keyEquivalent: "f")
+        let next = menu.addItem(withTitle: "Find Next", action: #selector(DocumentWindowController.findNext(_:)), keyEquivalent: "g")
+        next.keyEquivalentModifierMask = [.command]
+        let previous = menu.addItem(withTitle: "Find Previous", action: #selector(DocumentWindowController.findPrevious(_:)), keyEquivalent: "g")
+        previous.keyEquivalentModifierMask = [.command, .shift]
+        return menu
+    }
+
+    private static func viewMenu() -> NSMenu {
+        let menu = NSMenu(title: "View")
+        menu.addItem(withTitle: "Toggle Sidebar", action: #selector(DocumentWindowController.toggleSidebar(_:)), keyEquivalent: "\\")
+        menu.addItem(.separator())
+        menu.addItem(withTitle: "Bigger Text", action: #selector(DocumentWindowController.increaseText(_:)), keyEquivalent: "+")
+        menu.addItem(withTitle: "Smaller Text", action: #selector(DocumentWindowController.decreaseText(_:)), keyEquivalent: "-")
+        menu.addItem(withTitle: "Actual Size", action: #selector(DocumentWindowController.resetText(_:)), keyEquivalent: "0")
+        menu.addItem(.separator())
+        menu.addItem(withTitle: "Back", action: #selector(DocumentWindowController.goBack(_:)), keyEquivalent: "[")
+        menu.addItem(withTitle: "Forward", action: #selector(DocumentWindowController.goForward(_:)), keyEquivalent: "]")
+        menu.addItem(.separator())
+        menu.addItem(withTitle: "Reload", action: #selector(DocumentWindowController.reloadDocument(_:)), keyEquivalent: "r")
+        return menu
+    }
+}

@@ -1,0 +1,101 @@
+import AppKit
+
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    // Keyed by nothing on purpose: a window's document changes as you follow
+    // links, so identity has to be asked for rather than remembered.
+    private var controllers: [DocumentWindowController] = []
+
+    private var welcome: WelcomeWindowController?
+    private var cascadePoint = NSPoint.zero
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        Menu.install()
+        Settings.applyThemeToApp()
+        NSApp.activate(ignoringOtherApps: true)
+        // Launch Services delivers documents just after this callback, so give
+        // it a beat before deciding the app was opened empty — otherwise the
+        // welcome window flashes on every double-click.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+            self?.showWelcomeIfEmpty()
+        }
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if !flag { showWelcomeIfEmpty() }
+        return true
+    }
+
+    func applicationOpenUntitledFile(_ sender: NSApplication) -> Bool {
+        showWelcomeIfEmpty()
+        return true
+    }
+
+    private func showWelcomeIfEmpty() {
+        guard controllers.isEmpty else { return }
+        if let welcome {
+            welcome.showWindow(nil)
+            return
+        }
+        let controller = WelcomeWindowController()
+        controller.onOpen = { [weak self] urls in
+            for url in urls { self?.open(url) }
+        }
+        welcome = controller
+        controller.showWindow(nil)
+    }
+
+    private func dismissWelcome() {
+        welcome?.close()
+        welcome = nil
+    }
+
+    /// Launch Services hands us documents here — Finder double-click, drag onto
+    /// the Dock icon, and `open -a Imark file.md` all land in this method.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls { open(url) }
+    }
+
+    func applicationShouldOpenUntitledFile(_ sender: NSApplication) -> Bool { true }
+
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+
+    // MARK: - Windows
+
+    func open(_ url: URL) {
+        let key = url.resolvingSymlinksInPath().standardizedFileURL
+        dismissWelcome()
+
+        // Opening the same file twice brings the existing window forward
+        // instead of stacking duplicates (F2).
+        if let existing = controllers.first(where: { $0.url == key }) {
+            existing.showWindow(nil)
+            existing.window?.makeKeyAndOrderFront(nil)
+            return
+        }
+
+        let controller = DocumentWindowController(url: key)
+        controller.onClose = { [weak self] in
+            self?.controllers.removeAll { $0 === controller }
+        }
+        controllers.append(controller)
+
+        // Every document window restores the same autosaved frame, so without
+        // this a second document lands exactly on top of the first and looks
+        // like nothing happened.
+        if controllers.count > 1, let window = controller.window {
+            cascadePoint = window.cascadeTopLeft(from: cascadePoint)
+        }
+        controller.showWindow(nil)
+        controller.window?.makeKeyAndOrderFront(nil)
+        NSDocumentController.shared.noteNewRecentDocumentURL(key)
+    }
+
+    @objc func openDocument(_ sender: Any?) {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = true
+        panel.canChooseDirectories = false
+        panel.allowedContentTypes = MarkdownType.contentTypes
+        guard panel.runModal() == .OK else { return }
+        for url in panel.urls { open(url) }
+    }
+}

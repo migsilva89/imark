@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="pt" data-theme="light" data-width="normal">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- Nothing may be loaded from the network; the scheme handler serves both. -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; img-src imark: data:; style-src 'unsafe-inline' imark:; font-src data: imark:; script-src imark:;"
+    />
+    <link rel="stylesheet" href="imark://app/bundle.css" />
+    <title>Imark</title>
+  </head>
+  <body>
+    <main id="content"></main>
+    <script src="imark://app/bundle.js"></script>
+  </body>
+</html>

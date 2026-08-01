@@ -1,0 +1,382 @@
+@import 'katex/dist/katex.min.css';
+
+/* Tokens mirror the table in docs/DESIGN.md. Change them there first. */
+:root {
+  --bg: #ffffff;
+  --text: #1d1d1f;
+  --secondary: #6e6e73;
+  --accent: #7a6bd8;
+  --accent-soft: #ebe7f9;
+  --code-bg: #f7f7f8;
+  --border: #e5e5ea;
+  --diagram: #8b7fd4;
+
+  --syn-keyword: #8b5cf6;
+  --syn-string: #3e9f5c;
+  --syn-comment: #9a9aa0;
+  --syn-number: #b45309;
+  --syn-line: #b0b0b5;
+
+  --measure: 72ch;
+  --step: 4px;
+  --radius: 10px;
+
+  --font-body: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+  --font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace;
+  --size-body: 16px;
+}
+
+:root[data-theme='dark'] {
+  --bg: #0f0f10;
+  --text: #ededed;
+  --secondary: #98989d;
+  --accent: #8b7be8;
+  --accent-soft: #2c2748;
+  --code-bg: #161617;
+  --border: #2a2a2c;
+  --diagram: #9b8be8;
+
+  --syn-keyword: #a78bfa;
+  --syn-string: #4ade80;
+  --syn-comment: #6e6e73;
+  --syn-number: #fbbf24;
+  --syn-line: #4a4a4e;
+}
+
+:root[data-width='narrow'] { --measure: 60ch; }
+:root[data-width='wide'] { --measure: 90ch; }
+:root[data-width='full'] { --measure: none; }
+
+* { box-sizing: border-box; }
+
+html {
+  background: var(--bg);
+  /* Native scrollbars only; the chrome around this view is real AppKit. */
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  padding: calc(var(--step) * 8) calc(var(--step) * 8) calc(var(--step) * 24);
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: var(--size-body);
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+#content {
+  max-width: var(--measure);
+  margin: 0 auto;
+}
+
+/* --------------------------------------------------------------- headings */
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.012em;
+  margin: calc(var(--step) * 10) 0 calc(var(--step) * 4);
+  scroll-margin-top: calc(var(--step) * 6);
+}
+
+h1 { font-size: 32px; letter-spacing: -0.02em; }
+h2 { font-size: 24px; }
+h3 { font-size: 19px; }
+h4 { font-size: 16px; }
+h5, h6 { font-size: 15px; color: var(--secondary); }
+
+h1:first-child, h2:first-child { margin-top: 0; }
+
+/* A hairline under H2 gives the eye a section break without a heavy rule. */
+h2 {
+  padding-bottom: calc(var(--step) * 2);
+  border-bottom: 1px solid var(--border);
+}
+
+/* ------------------------------------------------------------------ text */
+
+p, ul, ol, dl, blockquote, table, pre { margin: 0 0 calc(var(--step) * 5); }
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+a:hover { border-bottom-color: var(--accent); }
+
+a.wikilink { border-bottom-style: dashed; }
+
+a.wikilink[data-missing='true'] {
+  color: #d0342c;
+  border-bottom-color: color-mix(in srgb, #d0342c 50%, transparent);
+  cursor: default;
+}
+
+strong { font-weight: 600; }
+
+mark {
+  background: var(--accent-soft);
+  color: inherit;
+  border-radius: 3px;
+  padding: 0 3px;
+}
+
+/* Search hits: all of them tinted, the current one loud. */
+mark.find {
+  background: color-mix(in srgb, #f5a524 45%, transparent);
+  padding: 0 1px;
+  border-radius: 2px;
+  transition: background 120ms ease;
+}
+
+mark.find.is-active {
+  background: #f5a524;
+  color: #1d1d1f;
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: calc(var(--step) * 10) 0;
+}
+
+ul, ol { padding-left: calc(var(--step) * 6); }
+li { margin-bottom: calc(var(--step) * 1.5); }
+li::marker { color: var(--secondary); }
+
+blockquote {
+  padding-left: calc(var(--step) * 5);
+  border-left: 3px solid var(--border);
+  color: var(--secondary);
+}
+
+blockquote > :last-child { margin-bottom: 0; }
+
+/* ------------------------------------------------------------- task lists */
+
+.task-list-item { list-style: none; }
+
+.task-list-item input[type='checkbox'] {
+  margin-right: calc(var(--step) * 2);
+  margin-left: calc(var(--step) * -6);
+  accent-color: var(--accent);
+  vertical-align: baseline;
+}
+
+/* ----------------------------------------------------------------- tables */
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14.5px;
+  display: block;
+  overflow-x: auto;
+}
+
+th, td {
+  padding: calc(var(--step) * 2) calc(var(--step) * 3);
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+
+th {
+  font-weight: 600;
+  color: var(--secondary);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-bottom-width: 1.5px;
+}
+
+/* ------------------------------------------------------------------ code */
+
+code {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  background: var(--code-bg);
+  padding: 2px 5px;
+  border-radius: 5px;
+}
+
+.code-wrap {
+  position: relative;
+  margin-bottom: calc(var(--step) * 5);
+}
+
+pre {
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: calc(var(--step) * 4);
+  overflow-x: auto;
+  margin: 0;
+}
+
+pre code {
+  background: none;
+  padding: 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+
+.copy-btn {
+  position: absolute;
+  top: calc(var(--step) * 2);
+  right: calc(var(--step) * 2);
+  padding: 3px 9px;
+  font-family: var(--font-body);
+  font-size: 11.5px;
+  color: var(--secondary);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+  cursor: default;
+}
+
+.code-wrap:hover .copy-btn { opacity: 1; }
+.copy-btn:hover { color: var(--text); }
+
+/* Syntax colours are defined here rather than importing a highlight.js theme,
+   so light and dark stay on the same palette as the rest of the app. */
+.hljs-keyword, .hljs-selector-tag, .hljs-literal, .hljs-section, .hljs-doctag,
+.hljs-name, .hljs-strong { color: var(--syn-keyword); }
+.hljs-string, .hljs-attr, .hljs-symbol, .hljs-bullet, .hljs-addition,
+.hljs-quote { color: var(--syn-string); }
+.hljs-comment, .hljs-meta { color: var(--syn-comment); font-style: italic; }
+.hljs-number, .hljs-regexp, .hljs-link, .hljs-deletion { color: var(--syn-number); }
+.hljs-title, .hljs-class .hljs-title, .hljs-type { color: var(--text); font-weight: 600; }
+.hljs-built_in, .hljs-variable, .hljs-template-variable { color: var(--text); }
+.hljs-emphasis { font-style: italic; }
+
+/* ---------------------------------------------------------- front matter */
+
+.front-matter {
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: calc(var(--step) * 6) calc(var(--step) * 7);
+  margin-bottom: calc(var(--step) * 10);
+}
+
+.fm-title {
+  font-size: 34px;
+  margin: 0;
+  letter-spacing: -0.022em;
+}
+
+.fm-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--step) * 2);
+  margin: calc(var(--step) * 4) 0 0;
+}
+
+.fm-row {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--step) * 1.5);
+  padding: calc(var(--step) * 1.5) calc(var(--step) * 3);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 12.5px;
+}
+
+.fm-row dt { color: var(--secondary); }
+.fm-row dt::after { content: ':'; }
+.fm-row dd { margin: 0; color: var(--text); }
+
+.fm-chip + .fm-chip::before { content: ', '; color: var(--secondary); }
+
+/* -------------------------------------------------------------- diagrams */
+
+.mermaid-block {
+  margin: calc(var(--step) * 6) 0;
+  text-align: center;
+  overflow-x: auto;
+}
+
+.mermaid-block svg { max-width: 100%; height: auto; }
+
+.diagram-error {
+  text-align: left;
+  padding: calc(var(--step) * 4);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  color: var(--secondary);
+  font-size: 13px;
+}
+
+.diagram-error pre {
+  background: none;
+  border: 0;
+  padding: calc(var(--step) * 2) 0 0;
+  font-size: 12px;
+}
+
+/* ----------------------------------------------------------------- media */
+
+img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius);
+}
+
+/* Remote images never load — flag it rather than showing a broken icon. */
+img[data-blocked] {
+  display: inline-block;
+  min-width: 120px;
+  padding: calc(var(--step) * 4);
+  border: 1px dashed var(--border);
+  color: var(--secondary);
+  font-size: 12px;
+}
+
+/* ------------------------------------------------------------- footnotes */
+
+.footnotes {
+  margin-top: calc(var(--step) * 12);
+  padding-top: calc(var(--step) * 4);
+  border-top: 1px solid var(--border);
+  font-size: 14px;
+  color: var(--secondary);
+}
+
+/* ------------------------------------------------------------------ math */
+
+.katex { font-size: 1.05em; }
+.katex-display { overflow-x: auto; overflow-y: hidden; padding: 4px 0; }
+
+/* --------------------------------------------------- Quick Look preview */
+
+:root[data-preview='true'] body {
+  padding: calc(var(--step) * 6) calc(var(--step) * 6) calc(var(--step) * 10);
+  font-size: 14px;
+}
+
+:root[data-preview='true'] .copy-btn { display: none; }
+:root[data-preview='true'] a { pointer-events: none; }
+:root[data-preview='true'] .fm-title { font-size: 26px; }
+:root[data-preview='true'] h1 { font-size: 26px; }
+:root[data-preview='true'] h2 { font-size: 20px; }
+:root[data-preview='true'] h3 { font-size: 17px; }
+
+/* ----------------------------------------------------------------- print */
+
+@media print {
+  :root { --measure: none; }
+  body { padding: 0; background: #fff; color: #000; }
+  .copy-btn { display: none; }
+  pre, .front-matter { background: #fafafa; }
+  h2 { break-after: avoid; }
+  pre, table, .mermaid-block { break-inside: avoid; }
+}

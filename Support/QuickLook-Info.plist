@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleName</key>
+	<string>ImarkQuickLook</string>
+	<key>CFBundleDisplayName</key>
+	<string>Imark Quick Look</string>
+	<key>CFBundleIdentifier</key>
+	<string>pt.miguelsilva.imark.quicklook</string>
+	<key>CFBundleExecutable</key>
+	<string>ImarkQuickLook</string>
+	<key>CFBundlePackageType</key>
+	<string>XPC!</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<!-- pkd silently skips bundles that do not declare the platform. -->
+	<key>CFBundleSupportedPlatforms</key>
+	<array>
+		<string>MacOSX</string>
+	</array>
+	<key>DTPlatformName</key>
+	<string>macosx</string>
+	<key>DTSDKName</key>
+	<string>macosx26.5</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>14.0</string>
+
+	<key>NSExtension</key>
+	<dict>
+		<key>NSExtensionPointIdentifier</key>
+		<string>com.apple.quicklook.preview</string>
+		<key>NSExtensionPrincipalClass</key>
+		<string>ImarkPreviewViewController</string>
+		<key>NSExtensionAttributes</key>
+		<dict>
+			<key>QLSupportedContentTypes</key>
+			<array>
+				<string>net.daringfireball.markdown</string>
+				<string>pt.miguelsilva.imark.mdx</string>
+				<string>pt.miguelsilva.imark.qmd</string>
+			</array>
+			<key>QLSupportsSearchableItems</key>
+			<false/>
+		</dict>
+	</dict>
+</dict>
+</plist>
