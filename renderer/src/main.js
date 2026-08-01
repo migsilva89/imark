@@ -252,6 +252,46 @@ function buildToc(root) {
   return headings
 }
 
+/* ---------------------------------------------------------------- scroll */
+
+// The browser's own `behavior: 'smooth'` scales its duration with the distance
+// travelled, so a jump across a long document takes one or two seconds. This
+// starts at once and always lands in about a third of a second.
+let scrollAnimation = 0
+
+function glideTo(top) {
+  cancelAnimationFrame(scrollAnimation)
+
+  const from = window.scrollY
+  const to = Math.max(0, Math.min(top, document.body.scrollHeight - window.innerHeight))
+  const delta = to - from
+  if (Math.abs(delta) < 2) return window.scrollTo(0, to)
+
+  // Long jumps get a little longer, but never much: 260ms to 420ms.
+  const duration = Math.min(420, 260 + Math.abs(delta) * 0.06)
+  const start = performance.now()
+  // Quintic ease-out: leaves immediately, arrives without a bump.
+  const ease = (t) => 1 - Math.pow(1 - t, 5)
+
+  // If requestAnimationFrame is not running — WebKit stops it whenever it
+  // decides the view is not visible — land on the target anyway.
+  const failsafe = setTimeout(() => {
+    cancelAnimationFrame(scrollAnimation)
+    window.scrollTo(0, to)
+  }, duration + 120)
+
+  const step = (now) => {
+    const t = Math.min(1, (now - start) / duration)
+    window.scrollTo(0, from + delta * ease(t))
+    if (t < 1) {
+      scrollAnimation = requestAnimationFrame(step)
+    } else {
+      clearTimeout(failsafe)
+    }
+  }
+  scrollAnimation = requestAnimationFrame(step)
+}
+
 /* ------------------------------------------------------------------ rail */
 
 // A minimap for Quick Look, where there is no room for a sidebar. Every block
@@ -439,10 +479,13 @@ function attachRail(rail) {
   const goTo = (index, smooth) => {
     const target = railBlocks[index]
     if (!target) return
-    window.scrollTo({
-      top: target.getBoundingClientRect().top + window.scrollY - 24,
-      behavior: smooth ? 'smooth' : 'auto',
-    })
+    const top = target.getBoundingClientRect().top + window.scrollY - 24
+    // Dragging tracks the pointer one to one; a click gets the glide.
+    if (smooth) glideTo(top)
+    else {
+      cancelAnimationFrame(scrollAnimation)
+      window.scrollTo(0, top)
+    }
     railScrollIndex = index
   }
 
@@ -627,8 +670,7 @@ document.addEventListener('click', (event) => {
 function scrollToAnchor(id) {
   const target = document.getElementById(id)
   if (!target) return
-  const top = target.getBoundingClientRect().top + window.scrollY - 24
-  window.scrollTo({ top, behavior: 'smooth' })
+  glideTo(target.getBoundingClientRect().top + window.scrollY - 24)
 }
 
 /* ------------------------------------------------------------------ find */
