@@ -388,24 +388,37 @@ img[data-blocked] {
 .rail {
   display: none;
   position: fixed;
-  left: 10px;
-  top: 50%;
-  transform: translateY(-50%);
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 34px;
+  padding: calc(var(--step) * 7) 0;
   flex-direction: column;
+  justify-content: space-between;
   align-items: flex-start;
-  gap: 6px;
-  max-height: 82vh;
-  overflow: hidden;
-  pointer-events: none;
   z-index: 5;
+  cursor: pointer;
+  /* Stops a scrub from turning into a text selection halfway down. */
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 :root[data-preview='true'] .rail { display: flex; }
 
+/* Transparent row that owns the hit area; the dash inside is what you see. */
 .rail-tick {
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+  min-height: 9px;
+  width: 100%;
+  padding-left: 10px;
+}
+
+.rail-tick i {
+  display: block;
   width: 5px;
   height: 2px;
-  flex: none;
   border-radius: 1px;
   background: var(--secondary);
   opacity: 0.14;
@@ -415,12 +428,17 @@ img[data-blocked] {
     background-color 200ms ease;
 }
 
-.rail-tick.is-active {
+.rail-tick.is-active i {
   background: var(--accent);
   height: 3px;
 }
 
+/* Hovering the strip promises it does something; scrubbing kills the easing
+   so the marks keep up with the pointer. */
+.rail:hover .rail-tick i { opacity: 0.4; }
+.rail.is-scrubbing .rail-tick i { transition: none; }
+
 /* The rail overlaps the reading column, so give the text somewhere to be. */
 :root[data-preview='true'] body {
-  padding-left: calc(var(--step) * 12);
+  padding-left: calc(var(--step) * 13);
 }

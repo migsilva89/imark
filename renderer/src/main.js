@@ -272,16 +272,69 @@ function buildRail(headings) {
   rail.className = 'rail'
   rail.setAttribute('aria-hidden', 'true')
 
-  for (const heading of headings) {
-    const tick = document.createElement('span')
-    tick.className = 'rail-tick'
-    // Deeper headings start narrower, so the rail also hints at structure.
-    tick.dataset.level = heading.tagName.slice(1)
-    rail.appendChild(tick)
-    railTicks.push(tick)
+  headings.forEach((heading) => {
+    // The dash lives inside a taller transparent row so there is something
+    // big enough to actually hit with a pointer.
+    const slot = document.createElement('span')
+    slot.className = 'rail-tick'
+    slot.dataset.level = heading.tagName.slice(1)
+    slot.appendChild(document.createElement('i'))
+    rail.appendChild(slot)
+    railTicks.push(slot)
+  })
+
+  attachRailScrubbing(rail, headings)
+  document.body.appendChild(rail)
+}
+
+/* Click to jump, press and drag to scrub. */
+function attachRailScrubbing(rail, headings) {
+  let scrubbing = false
+
+  const nearest = (clientY) => {
+    let best = 0
+    let bestDistance = Infinity
+    railTicks.forEach((tick, index) => {
+      const box = tick.getBoundingClientRect()
+      const distance = Math.abs(clientY - (box.top + box.height / 2))
+      if (distance < bestDistance) {
+        bestDistance = distance
+        best = index
+      }
+    })
+    return best
   }
 
-  document.body.appendChild(rail)
+  const goTo = (clientY, smooth) => {
+    const index = nearest(clientY)
+    const target = headings[index]
+    if (!target) return
+    const top = target.getBoundingClientRect().top + window.scrollY - 24
+    window.scrollTo({ top, behavior: smooth ? 'smooth' : 'auto' })
+    updateRail(index)
+  }
+
+  rail.addEventListener('pointerdown', (event) => {
+    scrubbing = true
+    rail.classList.add('is-scrubbing')
+    rail.setPointerCapture(event.pointerId)
+    // A press lands instantly; only a plain click gets the smooth ride.
+    goTo(event.clientY, false)
+    event.preventDefault()
+  })
+
+  rail.addEventListener('pointermove', (event) => {
+    if (scrubbing) goTo(event.clientY, false)
+  })
+
+  const release = (event) => {
+    if (!scrubbing) return
+    scrubbing = false
+    rail.classList.remove('is-scrubbing')
+    if (rail.hasPointerCapture?.(event.pointerId)) rail.releasePointerCapture(event.pointerId)
+  }
+  rail.addEventListener('pointerup', release)
+  rail.addEventListener('pointercancel', release)
 }
 
 function updateRail(activeIndex) {
@@ -291,9 +344,12 @@ function updateRail(activeIndex) {
     const distance = Math.abs(index - activeIndex)
     const depth = Number(tick.dataset.level || 2)
 
+    const dash = tick.firstElementChild
+    if (!dash) return
+
     if (distance > RAIL_REACH) {
-      tick.style.width = '5px'
-      tick.style.opacity = '0.14'
+      dash.style.width = '5px'
+      dash.style.opacity = '0.14'
       tick.classList.remove('is-active')
       return
     }
@@ -302,8 +358,8 @@ function updateRail(activeIndex) {
     // headings out. Deeper headings sit a little shorter at every step.
     const falloff = 1 - distance / (RAIL_REACH + 1)
     const reach = 26 - Math.min(depth, 4) * 2
-    tick.style.width = `${5 + falloff * reach}px`
-    tick.style.opacity = `${0.18 + falloff * 0.82}`
+    dash.style.width = `${5 + falloff * reach}px`
+    dash.style.opacity = `${0.18 + falloff * 0.82}`
     tick.classList.toggle('is-active', distance === 0)
   })
 }
