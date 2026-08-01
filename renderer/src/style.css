@@ -399,9 +399,9 @@ img[data-blocked] {
   flex-direction: column;
   justify-content: center;
   align-items: flex-start;
-  /* Pitch is row height + gap, and RAIL_PITCH in main.js must agree: the
-     pointer maps to a tick by arithmetic, not by measuring. */
-  gap: 3px;
+  /* Set per document by main.js, which also does the pointer-to-tick maths
+     from it — the two must agree. */
+  gap: var(--rail-gap, 3px);
   z-index: 6;
   cursor: pointer;
   user-select: none;
@@ -417,7 +417,7 @@ img[data-blocked] {
   display: flex;
   align-items: center;
   flex: none;
-  height: 8px;
+  height: 8px;   /* RAIL_ROW in main.js */
   width: 100%;
   padding-left: 11px;
 }

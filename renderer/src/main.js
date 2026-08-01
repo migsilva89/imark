@@ -294,14 +294,19 @@ function glideTo(top) {
 
 /* ------------------------------------------------------------------ rail */
 
-// A minimap for Quick Look, where there is no room for a sidebar. Every block
-// of content gets a tick, not just the headings — that is what gives the rail
-// the density to read as the shape of the document rather than as an outline.
-// Headings sit wider, so the structure still shows through.
+// The table of contents for Quick Look, where there is no room for a sidebar.
+// Only H1 to H3 get a tick: every mark has to be a place you can name, or the
+// rail is texture rather than navigation.
 
-const RAIL_PITCH = 11        // row height + gap, must match the CSS
+const RAIL_ROW = 8           // height of a tick's hit area
+const RAIL_SPAN = 0.72       // how much of the panel the rail should fill
+const RAIL_PITCH_RANGE = [11, 22]
 const RAIL_SIGMA = 2.6       // width of the funnel, in ticks
 const RAIL_AMPLITUDE = 30    // how much longer the mark at the centre grows
+
+// Set per document: few headings spread out, many pack in, so the rail is
+// neither a stub nor an overflowing column.
+let railPitch = RAIL_PITCH_RANGE[0]
 
 let railTicks = []
 let railBlocks = []
@@ -320,19 +325,18 @@ const headingLevel = (el) => (/^H[1-6]$/.test(el.tagName) ? Number(el.tagName[1]
 // Headings stand slightly proud of prose, but only slightly: if the resting
 // widths spread too far they compete with the funnel and the rail reads as
 // noise instead of as one moving shape.
-const restingWidth = (level) => (level === 0 ? 9 : 11 + Math.max(0, 4 - level))
+const restingWidth = (level) => 10 + Math.max(0, 3 - level) * 3
 
-const restingOpacity = (level) => (level === 0 ? 0.3 : 0.5)
+const restingOpacity = (level) => 0.34 + Math.max(0, 3 - level) * 0.06
 
 // A bell instead of a linear ramp with a cutoff: the taper has no edge, so the
 // funnel reads as one soft shape however fast you move.
 const falloffAt = (distance) => Math.exp(-(distance * distance) / (2 * RAIL_SIGMA * RAIL_SIGMA))
 
 function collectBlocks(root) {
-  const all = [...root.children].filter((el) => el.getBoundingClientRect().height > 0)
-  // As many ticks as the panel can hold, so the rail is always as detailed as
-  // there is room for.
-  const capacity = Math.max(16, Math.floor((window.innerHeight * 0.94) / RAIL_PITCH))
+  const all = [...root.querySelectorAll('h1, h2, h3')]
+  // As many ticks as the panel can hold at the tightest pitch.
+  const capacity = Math.max(12, Math.floor((window.innerHeight * 0.94) / RAIL_PITCH_RANGE[0]))
   if (all.length <= capacity) return all
   // Sample evenly instead of truncating: the rail has to stay proportional to
   // the whole document, or scrubbing lies about where you are.
@@ -349,9 +353,15 @@ function buildRail(root) {
   railHoverIndex = null
   if (railBlocks.length < 3) return
 
+  const [minPitch, maxPitch] = RAIL_PITCH_RANGE
+  railPitch = Math.round(
+    Math.min(maxPitch, Math.max(minPitch, (window.innerHeight * RAIL_SPAN) / railBlocks.length)),
+  )
+
   const rail = document.createElement('nav')
   rail.className = 'rail'
   rail.setAttribute('aria-hidden', 'true')
+  rail.style.setProperty('--rail-gap', `${railPitch - RAIL_ROW}px`)
 
   railBlocks.forEach((block, index) => {
     // The dash sits inside a taller transparent row, because a 2px mark is
@@ -394,33 +404,25 @@ function updateRail(centre) {
 const flatten = (el) => el.textContent.replace(/\s+/g, ' ').trim()
 
 function tipContent(index) {
-  const block = railBlocks[index]
-  if (!block) return null
+  const heading = railBlocks[index]
+  if (!heading) return null
 
-  let title = ''
-  for (let i = index; i >= 0; i -= 1) {
-    if (headingLevel(railBlocks[i])) {
-      title = flatten(railBlocks[i])
-      break
-    }
-  }
-
-  // On a heading the body would just repeat the title, so borrow the prose
-  // that follows it instead.
-  let body = flatten(block)
-  if (headingLevel(block)) {
-    body = ''
-    for (let i = index + 1; i < railBlocks.length && !headingLevel(railBlocks[i]); i += 1) {
-      body = flatten(railBlocks[i])
-      if (body) break
-    }
+  // Every tick is a heading now, so the title is the tick itself. The body has
+  // to come from the DOM rather than from railBlocks — the prose that follows
+  // is no longer in the list.
+  let body = ''
+  let sibling = heading.nextElementSibling
+  while (sibling && !/^H[1-6]$/.test(sibling.tagName)) {
+    body = flatten(sibling)
+    if (body) break
+    sibling = sibling.nextElementSibling
   }
 
   const position = railBlocks.length > 1 ? index / (railBlocks.length - 1) : 0
 
   return {
     label: `${Math.round(position * 100)}% in`,
-    title: title || flatten(railBlocks[0]).slice(0, 60) || 'Start',
+    title: flatten(heading),
     body,
   }
 }
@@ -472,7 +474,7 @@ function attachRail(rail) {
     const first = railTicks[0].getBoundingClientRect()
     // Ticks are evenly pitched, so arithmetic beats measuring all of them on
     // every pointer move.
-    const index = Math.round((clientY - (first.top + first.height / 2)) / RAIL_PITCH)
+    const index = Math.round((clientY - (first.top + first.height / 2)) / railPitch)
     return Math.min(Math.max(index, 0), railTicks.length - 1)
   }
 
