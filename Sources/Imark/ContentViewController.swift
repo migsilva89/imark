@@ -63,6 +63,11 @@ final class ContentViewController: NSViewController {
         findBar.material = .headerView
         findBar.blendingMode = .withinWindow
         findBar.state = .active
+        // A zero-height NSView still draws its subviews, so the search field
+        // leaked out over the toolbar before anyone pressed ⌘F.
+        findBar.wantsLayer = true
+        findBar.layer?.masksToBounds = true
+        findBar.isHidden = true
 
         searchField.placeholderString = "Find in document"
         searchField.sendsSearchStringImmediately = true
@@ -108,6 +113,7 @@ final class ContentViewController: NSViewController {
     var isFindVisible: Bool { findHeight.constant > 0 }
 
     func showFind() {
+        findBar.isHidden = false
         findHeight.constant = 40
         view.window?.makeFirstResponder(searchField)
         if !searchField.stringValue.isEmpty {
@@ -117,6 +123,7 @@ final class ContentViewController: NSViewController {
 
     @objc func closeFind() {
         findHeight.constant = 0
+        findBar.isHidden = true
         renderer.findClear()
         counter.stringValue = ""
         onFindClosed?()
