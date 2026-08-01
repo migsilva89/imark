@@ -11,20 +11,39 @@
 
 import AppKit
 
-let accent = NSColor(srgbRed: 0x7A / 255, green: 0x6B / 255, blue: 0xD8 / 255, alpha: 1)
-let background = NSColor(srgbRed: 0x1E / 255, green: 0x1E / 255, blue: 0x22 / 255, alpha: 1)
+// Off-white on near-black. Plain white on pure black is harsher than it looks
+// at 1024px, and reads as a hole in the Dock at 16px.
+let accent = NSColor(srgbRed: 0xF5 / 255, green: 0xF5 / 255, blue: 0xF7 / 255, alpha: 1)
+let background = NSColor(srgbRed: 0x13 / 255, green: 0x13 / 255, blue: 0x16 / 255, alpha: 1)
 
-/// All measurements are fractions of the canvas, so the geometry is identical
-/// at every size.
-enum Metric {
-    static let squircleInset = 0.098
-    static let cornerRatio = 0.2237      // macOS squircle, near enough
-    static let stem = 0.0605
-    static let circle = 0.0968           // 1.6 × stem
-    static let gap = 0.045
-    static let baselineWidth = 0.293
-    static let groupHeight = 0.42
-    static let opticalLift = 0.012       // the baseline is bottom-heavy
+/// Fractions of the canvas. They are not constant across sizes: a symbol that
+/// looks right at 512px has 1px limbs at 16px and dissolves. Small sizes get a
+/// bigger, chunkier mark with less padding — the same trick Apple's own icons
+/// use rather than scaling one drawing down.
+struct Metric {
+    let squircleInset: CGFloat
+    let stem: CGFloat
+    let gap: CGFloat
+    let baselineWidth: CGFloat
+    let groupHeight: CGFloat
+
+    static let cornerRatio: CGFloat = 0.2237   // macOS squircle, near enough
+    static let opticalLift: CGFloat = 0.012    // the baseline is bottom-heavy
+
+    var circle: CGFloat { stem * 1.6 }
+
+    static func forSize(_ size: CGFloat) -> Metric {
+        if size <= 32 {
+            return Metric(squircleInset: 0.055, stem: 0.115, gap: 0.058,
+                          baselineWidth: 0.44, groupHeight: 0.62)
+        }
+        if size <= 64 {
+            return Metric(squircleInset: 0.075, stem: 0.088, gap: 0.052,
+                          baselineWidth: 0.37, groupHeight: 0.52)
+        }
+        return Metric(squircleInset: 0.098, stem: 0.0605, gap: 0.045,
+                      baselineWidth: 0.293, groupHeight: 0.42)
+    }
 }
 
 func drawIcon(size: CGFloat) -> NSBitmapImageRep {
@@ -42,6 +61,8 @@ func drawIcon(size: CGFloat) -> NSBitmapImageRep {
         bitsPerPixel: 0
     )!
 
+    let m = Metric.forSize(size)
+
     NSGraphicsContext.saveGraphicsState()
     NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
     NSGraphicsContext.current?.imageInterpolation = .high
@@ -49,7 +70,7 @@ func drawIcon(size: CGFloat) -> NSBitmapImageRep {
     // AppKit draws from the bottom-left; the layout below reads top-down.
     func fromTop(_ y: CGFloat, _ height: CGFloat) -> CGFloat { size - y - height }
 
-    let inset = size * Metric.squircleInset
+    let inset = size * m.squircleInset
     let plate = NSRect(x: inset, y: inset, width: size - inset * 2, height: size - inset * 2)
     background.setFill()
     NSBezierPath(
@@ -58,14 +79,14 @@ func drawIcon(size: CGFloat) -> NSBitmapImageRep {
         yRadius: plate.width * Metric.cornerRatio
     ).fill()
 
-    let stem = size * Metric.stem
-    let circle = size * Metric.circle
-    let gap = size * Metric.gap
-    let baselineWidth = size * Metric.baselineWidth
+    let stem = size * m.stem
+    let circle = size * m.circle
+    let gap = size * m.gap
+    let baselineWidth = size * m.baselineWidth
     let baselineHeight = stem
-    let stemHeight = size * Metric.groupHeight - circle - baselineHeight - gap * 2
+    let stemHeight = size * m.groupHeight - circle - baselineHeight - gap * 2
 
-    var top = (size - size * Metric.groupHeight) / 2 - size * Metric.opticalLift
+    var top = (size - size * m.groupHeight) / 2 - size * Metric.opticalLift
     let centre = size / 2
 
     accent.setFill()
