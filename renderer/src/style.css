@@ -8,6 +8,7 @@
   --accent: #7a6bd8;
   --accent-soft: #ebe7f9;
   --code-bg: #f7f7f8;
+  --surface: #ffffff;
   --border: #e5e5ea;
   --diagram: #8b7fd4;
 
@@ -34,6 +35,7 @@
   --accent: #8b7be8;
   --accent-soft: #2c2748;
   --code-bg: #161617;
+  --surface: #1e1e21;
   --border: #2a2a2c;
   --diagram: #9b8be8;
 
@@ -391,16 +393,17 @@ img[data-blocked] {
   left: 0;
   top: 50%;
   transform: translateY(-50%);
-  width: 38px;
+  width: 40px;
   max-height: 94vh;
   overflow: hidden;
   flex-direction: column;
   justify-content: center;
   align-items: flex-start;
-  gap: 5px;
+  /* Pitch is row height + gap, and RAIL_PITCH in main.js must agree: the
+     pointer maps to a tick by arithmetic, not by measuring. */
+  gap: 3px;
   z-index: 6;
   cursor: pointer;
-  /* Stops a scrub from turning into a text selection halfway down. */
   user-select: none;
   -webkit-user-select: none;
 }
@@ -414,49 +417,65 @@ img[data-blocked] {
   display: flex;
   align-items: center;
   flex: none;
-  height: 10px;
+  height: 8px;
   width: 100%;
-  padding-left: 10px;
+  padding-left: 11px;
 }
 
 .rail-tick i {
   display: block;
-  width: 8px;
+  width: 9px;
   height: 2px;
   border-radius: 1px;
-  background: var(--secondary);
-  opacity: 0.26;
+  /* Monochrome, like the app icon — the accent is loud enough to pull the eye
+     away from the text it is meant to be indexing. */
+  background: var(--text);
+  opacity: 0.3;
   transition:
-    width 180ms cubic-bezier(0.2, 0, 0, 1),
-    opacity 180ms ease,
-    background-color 180ms ease;
+    width 260ms cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 220ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .rail-tick.is-active i {
-  background: var(--accent);
   height: 3px;
+  border-radius: 1.5px;
 }
 
-/* Scrubbing drops the easing so the marks keep pace with the pointer. */
-.rail.is-scrubbing .rail-tick i { transition: none; }
+/* Under the pointer the easing shortens rather than disappearing: none at all
+   reads as jitter, the full curve reads as lag. */
+.rail.is-scrubbing .rail-tick i {
+  transition:
+    width 90ms linear,
+    opacity 90ms linear;
+}
 
 /* ------------------------------------------------------------- rail tip */
 
 .rail-tip {
   position: fixed;
-  left: 44px;
-  max-width: 260px;
-  padding: calc(var(--step) * 3) calc(var(--step) * 4);
-  background: var(--code-bg);
+  left: 46px;
+  width: 276px;
+  padding: 15px 17px 16px;
+  /* Solid, not glassy. Anything translucent lets the document read straight
+     through the card and neither one is legible — and in a panel this small
+     the card is on top of text every single time. */
+  background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  box-shadow: 0 10px 30px rgb(0 0 0 / 0.28);
+  border-radius: 16px;
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.18),
+    0 12px 32px -8px rgb(0 0 0 / 0.34),
+    0 32px 64px -24px rgb(0 0 0 / 0.4);
   display: flex;
   flex-direction: column;
-  gap: calc(var(--step) * 1.5);
   opacity: 0;
-  transform: translateX(-4px);
-  transition: opacity 130ms ease, transform 130ms ease;
+  transform: translateX(-6px) scale(0.98);
+  transform-origin: left center;
+  transition:
+    opacity 160ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 200ms cubic-bezier(0.16, 1, 0.3, 1),
+    /* Glides along the rail instead of teleporting between ticks. */
+    top 220ms cubic-bezier(0.16, 1, 0.3, 1);
   pointer-events: none;
   z-index: 7;
 }
@@ -466,20 +485,42 @@ img[data-blocked] {
   transform: none;
 }
 
-.rail-tip strong {
-  font-size: 13px;
+.rail-tip em {
+  font-style: normal;
+  font-size: 10px;
   font-weight: 600;
-  line-height: 1.35;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--secondary);
+  opacity: 0.75;
+  margin-bottom: 7px;
+}
+
+.rail-tip strong {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.011em;
   color: var(--text);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .rail-tip span {
-  font-size: 12px;
-  line-height: 1.45;
+  margin-top: 7px;
+  font-size: 12.5px;
+  line-height: 1.5;
   color: var(--secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 /* The rail overlaps the reading column, so give the text somewhere to be. */
 :root[data-preview='true'] body {
-  padding-left: calc(var(--step) * 14);
+  padding-left: calc(var(--step) * 15);
 }

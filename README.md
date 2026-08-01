@@ -85,5 +85,17 @@ O ícone é desenhado por código a partir das regras em `docs/DESIGN.md`:
 swift Support/make-icon.swift
 ```
 
+## Ver o renderer sem abrir a app
+
+`Support/shoot.swift` carrega uma página local num WebView fora do ecrã e grava
+um PNG, para se poder iterar em CSS sem fotografar o ambiente de trabalho:
+
+```bash
+swift Support/shoot.swift file:///caminho/pagina.html saida.png "js opcional" "probe opcional" 420 1100
+```
+
+Os últimos dois argumentos recortam a fotografia. Ler o cabeçalho do ficheiro
+antes de o usar — há duas armadilhas com o compositor.
+
 O renderer é a única parte que sabe converter markdown. A app Swift trata de
 janelas, ficheiros e navegação, e fala com ele por mensagens.

@@ -259,37 +259,45 @@ function buildToc(root) {
 // the density to read as the shape of the document rather than as an outline.
 // Headings sit wider, so the structure still shows through.
 
-const RAIL_REACH = 3
-const RAIL_MAX_TICKS = 56
-
-const BLOCK_SELECTOR =
-  'h1, h2, h3, h4, h5, h6, p, ul, ol, dl, pre, table, blockquote, .mermaid-block, .front-matter, .code-wrap'
+const RAIL_PITCH = 11        // row height + gap, must match the CSS
+const RAIL_SIGMA = 2.6       // width of the funnel, in ticks
+const RAIL_AMPLITUDE = 30    // how much longer the mark at the centre grows
 
 let railTicks = []
 let railBlocks = []
 let railTip = null
 
+let railScrollIndex = 0
 // Where the funnel is centred. Normally that follows the scroll position, but
 // while the pointer is on the rail it follows the pointer instead — you get to
 // look around the document before deciding to go there.
-let railScrollIndex = 0
 let railHoverIndex = null
 
 const paintRail = () => updateRail(railHoverIndex ?? railScrollIndex)
 
 const headingLevel = (el) => (/^H[1-6]$/.test(el.tagName) ? Number(el.tagName[1]) : 0)
 
-const restingWidth = (level) => (level === 0 ? 8 : Math.max(12, 20 - level * 2))
+// Headings stand slightly proud of prose, but only slightly: if the resting
+// widths spread too far they compete with the funnel and the rail reads as
+// noise instead of as one moving shape.
+const restingWidth = (level) => (level === 0 ? 9 : 11 + Math.max(0, 4 - level))
 
-const restingOpacity = (level) => (level === 0 ? 0.26 : 0.44)
+const restingOpacity = (level) => (level === 0 ? 0.3 : 0.5)
+
+// A bell instead of a linear ramp with a cutoff: the taper has no edge, so the
+// funnel reads as one soft shape however fast you move.
+const falloffAt = (distance) => Math.exp(-(distance * distance) / (2 * RAIL_SIGMA * RAIL_SIGMA))
 
 function collectBlocks(root) {
-  const all = [...root.children].filter((el) => el.matches(BLOCK_SELECTOR))
-  if (all.length <= RAIL_MAX_TICKS) return all
+  const all = [...root.children].filter((el) => el.getBoundingClientRect().height > 0)
+  // As many ticks as the panel can hold, so the rail is always as detailed as
+  // there is room for.
+  const capacity = Math.max(16, Math.floor((window.innerHeight * 0.94) / RAIL_PITCH))
+  if (all.length <= capacity) return all
   // Sample evenly instead of truncating: the rail has to stay proportional to
   // the whole document, or scrubbing lies about where you are.
-  const step = all.length / RAIL_MAX_TICKS
-  return Array.from({ length: RAIL_MAX_TICKS }, (_, i) => all[Math.floor(i * step)])
+  const step = all.length / capacity
+  return Array.from({ length: capacity }, (_, i) => all[Math.floor(i * step)])
 }
 
 function buildRail(root) {
@@ -298,6 +306,7 @@ function buildRail(root) {
 
   railTicks = []
   railBlocks = collectBlocks(root)
+  railHoverIndex = null
   if (railBlocks.length < 3) return
 
   const rail = document.createElement('nav')
@@ -324,7 +333,7 @@ function buildRail(root) {
   document.body.appendChild(rail)
 }
 
-function updateRail(activeIndex) {
+function updateRail(centre) {
   railTicks.forEach((tick, index) => {
     const dash = tick.firstElementChild
     if (!dash) return
@@ -332,21 +341,11 @@ function updateRail(activeIndex) {
     const level = Number(tick.dataset.level || 0)
     const base = restingWidth(level)
     const rest = restingOpacity(level)
-    const distance = Math.abs(index - activeIndex)
+    const weight = falloffAt(index - centre)
 
-    if (distance > RAIL_REACH) {
-      dash.style.width = `${base}px`
-      dash.style.opacity = `${rest}`
-      tick.classList.remove('is-active')
-      return
-    }
-
-    // Taper down onto the resting values so there is no visible step where the
-    // funnel stops.
-    const falloff = 1 - distance / (RAIL_REACH + 1)
-    dash.style.width = `${base + falloff * 24}px`
-    dash.style.opacity = `${rest + falloff * (1 - rest)}`
-    tick.classList.toggle('is-active', distance === 0)
+    dash.style.width = `${base + weight * RAIL_AMPLITUDE}px`
+    dash.style.opacity = `${rest + weight * (1 - rest)}`
+    tick.classList.toggle('is-active', index === centre)
   })
 }
 
@@ -366,10 +365,9 @@ function tipContent(index) {
     }
   }
 
-  const own = flatten(block)
   // On a heading the body would just repeat the title, so borrow the prose
   // that follows it instead.
-  let body = own
+  let body = flatten(block)
   if (headingLevel(block)) {
     body = ''
     for (let i = index + 1; i < railBlocks.length && !headingLevel(railBlocks[i]); i += 1) {
@@ -378,21 +376,30 @@ function tipContent(index) {
     }
   }
 
+  const position = railBlocks.length > 1 ? index / (railBlocks.length - 1) : 0
+
   return {
+    label: `${Math.round(position * 100)}% in`,
     title: title || flatten(railBlocks[0]).slice(0, 60) || 'Start',
-    body: body.length > 150 ? `${body.slice(0, 150).trimEnd()}…` : body,
+    body,
   }
 }
 
 function showTip(index, tick) {
-  if (!railTip) return
+  if (!railTip || !tick) return
   const content = tipContent(index)
   if (!content) return
 
-  railTip.innerHTML = ''
+  railTip.replaceChildren()
+
+  const label = document.createElement('em')
+  label.textContent = content.label
+  railTip.appendChild(label)
+
   const heading = document.createElement('strong')
   heading.textContent = content.title
   railTip.appendChild(heading)
+
   if (content.body) {
     const body = document.createElement('span')
     body.textContent = content.body
@@ -401,12 +408,13 @@ function showTip(index, tick) {
 
   railTip.classList.add('is-visible')
 
-  // Anchor to the tick, then keep the whole card on screen.
+  // Anchor to the tick, then keep the whole card on screen. Height has to be
+  // read after the content lands or the first frame is positioned wrong.
   const box = tick.getBoundingClientRect()
   const height = railTip.offsetHeight
   const top = Math.min(
-    Math.max(8, box.top + box.height / 2 - height / 2),
-    window.innerHeight - height - 8,
+    Math.max(10, box.top + box.height / 2 - height / 2),
+    window.innerHeight - height - 10,
   )
   railTip.style.top = `${top}px`
 }
@@ -421,39 +429,44 @@ function attachRail(rail) {
   let scrubbing = false
 
   const nearest = (clientY) => {
-    let best = 0
-    let bestDistance = Infinity
-    railTicks.forEach((tick, index) => {
-      const box = tick.getBoundingClientRect()
-      const distance = Math.abs(clientY - (box.top + box.height / 2))
-      if (distance < bestDistance) {
-        bestDistance = distance
-        best = index
-      }
-    })
-    return best
+    const first = railTicks[0].getBoundingClientRect()
+    // Ticks are evenly pitched, so arithmetic beats measuring all of them on
+    // every pointer move.
+    const index = Math.round((clientY - (first.top + first.height / 2)) / RAIL_PITCH)
+    return Math.min(Math.max(index, 0), railTicks.length - 1)
   }
 
-  const goTo = (index) => {
+  const goTo = (index, smooth) => {
     const target = railBlocks[index]
     if (!target) return
-    window.scrollTo({ top: target.getBoundingClientRect().top + window.scrollY - 24 })
+    window.scrollTo({
+      top: target.getBoundingClientRect().top + window.scrollY - 24,
+      behavior: smooth ? 'smooth' : 'auto',
+    })
     railScrollIndex = index
   }
 
-  rail.addEventListener('pointermove', (event) => {
-    const index = nearest(event.clientY)
+  // Deliberately not coalesced through requestAnimationFrame: WebKit stops
+  // firing it whenever it decides the view is not visible, and a rail that
+  // freezes is worse than one that does a little extra work. Instead the work
+  // is skipped outright while the pointer stays within the same tick, which is
+  // most pointer moves.
+  const track = (clientY) => {
+    const index = nearest(clientY)
+    if (index === railHoverIndex) return
     railHoverIndex = index
     paintRail()
     showTip(index, railTicks[index])
-    if (scrubbing) goTo(index)
-  })
+    if (scrubbing) goTo(index, false)
+  }
+
+  rail.addEventListener('pointermove', (event) => track(event.clientY))
 
   rail.addEventListener('pointerdown', (event) => {
     scrubbing = true
     rail.classList.add('is-scrubbing')
     rail.setPointerCapture(event.pointerId)
-    goTo(nearest(event.clientY))
+    goTo(nearest(event.clientY), true)
     event.preventDefault()
   })
 
@@ -465,6 +478,7 @@ function attachRail(rail) {
   }
   rail.addEventListener('pointerup', release)
   rail.addEventListener('pointercancel', release)
+
   rail.addEventListener('pointerleave', () => {
     if (scrubbing) return
     railHoverIndex = null
