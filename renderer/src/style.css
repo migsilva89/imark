@@ -389,13 +389,15 @@ img[data-blocked] {
   display: none;
   position: fixed;
   left: 0;
-  top: 0;
-  bottom: 0;
+  top: 50%;
+  transform: translateY(-50%);
   width: 34px;
-  padding: calc(var(--step) * 7) 0;
+  max-height: 92vh;
+  overflow: hidden;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: center;
   align-items: flex-start;
+  gap: 5px;
   z-index: 5;
   cursor: pointer;
   /* Stops a scrub from turning into a text selection halfway down. */
@@ -409,8 +411,10 @@ img[data-blocked] {
 .rail-tick {
   display: flex;
   align-items: center;
-  flex: 1 1 auto;
-  min-height: 9px;
+  /* Fixed, not stretched — letting these grow spreads the ticks across the
+     whole panel and the funnel stops reading as one shape. */
+  flex: none;
+  height: 9px;
   width: 100%;
   padding-left: 10px;
 }
