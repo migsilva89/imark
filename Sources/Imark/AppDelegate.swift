@@ -90,6 +90,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSDocumentController.shared.noteNewRecentDocumentURL(key)
     }
 
+    @objc func makeDefaultHandler(_ sender: Any?) {
+        MarkdownType.makeImarkDefault { ok in
+            let alert = NSAlert()
+            alert.messageText = ok
+                ? "Imark is now the default for .md"
+                : "Couldn't change the default app"
+            alert.informativeText = ok
+                ? "Double-clicking a markdown file in the Finder opens it here."
+                : "Use Get Info on a .md file → Open with → Change All."
+            alert.alertStyle = ok ? .informational : .warning
+            alert.runModal()
+        }
+    }
+
     @objc func openDocument(_ sender: Any?) {
         let panel = NSOpenPanel()
         panel.allowsMultipleSelection = true

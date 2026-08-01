@@ -37,6 +37,13 @@ enum Menu {
         let menu = NSMenu(title: "Imark")
         menu.addItem(withTitle: "About Imark", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
         menu.addItem(.separator())
+        let makeDefault = menu.addItem(
+            withTitle: "Make Imark the Default for .md",
+            action: #selector(AppDelegate.makeDefaultHandler(_:)),
+            keyEquivalent: ""
+        )
+        makeDefault.target = NSApp.delegate
+        menu.addItem(.separator())
         let hide = menu.addItem(withTitle: "Hide Imark", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         hide.target = NSApp
         menu.addItem(.separator())

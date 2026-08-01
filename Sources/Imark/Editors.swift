@@ -48,7 +48,18 @@ enum Editors {
         return found
     }
 
+    /// The one the toolbar button goes to: whatever was picked last, as long as
+    /// it is still installed; otherwise the highest-ranked one found.
+    static func preferred(from editors: [Editor]) -> URL? {
+        if let stored = Settings.preferredEditor,
+           editors.contains(where: { $0.url == stored }) {
+            return stored
+        }
+        return editors.first?.url
+    }
+
     static func open(_ file: URL, with editor: URL) {
+        Settings.preferredEditor = editor
         NSWorkspace.shared.open(
             [file],
             withApplicationAt: editor,

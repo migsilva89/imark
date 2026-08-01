@@ -4,7 +4,7 @@ private extension NSToolbarItem.Identifier {
     static let find = NSToolbarItem.Identifier("find")
     static let text = NSToolbarItem.Identifier("text")
     static let export = NSToolbarItem.Identifier("export")
-    static let settings = NSToolbarItem.Identifier("settings")
+    static let openIn = NSToolbarItem.Identifier("openIn")
     static let theme = NSToolbarItem.Identifier("theme")
 }
 
@@ -20,7 +20,7 @@ extension DocumentWindowController: NSToolbarDelegate {
 
     public func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
         [.toggleSidebar, .sidebarTrackingSeparator, .flexibleSpace,
-         .find, .text, .theme, .export, .settings]
+         .find, .text, .theme, .export, .openIn]
     }
 
     public func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
@@ -55,11 +55,23 @@ extension DocumentWindowController: NSToolbarDelegate {
             item.toolTip = "Appearance"
             return item
 
-        case .settings:
+        case .openIn:
+            // A split button: the face opens the editor you used last, the
+            // chevron lets you pick another one.
             let item = NSMenuToolbarItem(itemIdentifier: identifier)
-            item.image = NSImage(systemSymbolName: "gearshape", accessibilityDescription: nil)
-            item.label = "Settings"
-            item.menu = settingsMenu()
+            let editors = Editors.installed(for: url)
+            let preferred = Editors.preferred(from: editors)
+            item.image = preferred.map(icon(for:))
+                ?? NSImage(systemSymbolName: "square.and.pencil", accessibilityDescription: nil)
+            item.label = "Open in"
+            item.toolTip = preferred.map { "Open in \($0.lastPathComponent.replacingOccurrences(of: ".app", with: ""))" }
+                ?? "Open in editor"
+            item.menu = editorsMenu()
+            item.showsIndicator = !editors.isEmpty
+            if preferred != nil {
+                item.target = self
+                item.action = #selector(openInPreferredEditor(_:))
+            }
             return item
 
         default:
@@ -101,18 +113,6 @@ extension DocumentWindowController: NSToolbarDelegate {
             menu.addItem(item)
         }
         for item in menu.items where item.action != nil { item.target = self }
-        return menu
-    }
-
-    private func settingsMenu() -> NSMenu {
-        let menu = NSMenu()
-
-        let openIn = NSMenuItem(title: "Open in", action: nil, keyEquivalent: "")
-        openIn.submenu = editorsMenu()
-        menu.addItem(openIn)
-
-        let reveal = menu.addItem(withTitle: "Reveal in Finder", action: #selector(revealInFinder(_:)), keyEquivalent: "")
-        reveal.target = self
         return menu
     }
 

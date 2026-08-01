@@ -85,14 +85,10 @@ final class WelcomeWindowController: NSWindowController {
     }
 
     @objc private func makeDefault() {
-        guard let markdown = UTType("net.daringfireball.markdown") else { return }
-        let app = Bundle.main.bundleURL
-        NSWorkspace.shared.setDefaultApplication(at: app, toOpen: markdown) { [weak self] error in
-            DispatchQueue.main.async {
-                self?.hint.stringValue = error == nil
-                    ? "Done — .md files now open in Imark."
-                    : "Couldn't set it. Use Get Info on a .md → Open with → Change All."
-            }
+        MarkdownType.makeImarkDefault { [weak self] ok in
+            self?.hint.stringValue = ok
+                ? "Done — .md files now open in Imark."
+                : "Couldn't set it. Use Get Info on a .md → Open with → Change All."
         }
     }
 

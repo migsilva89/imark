@@ -1,3 +1,4 @@
+import AppKit
 import UniformTypeIdentifiers
 
 enum MarkdownType {
@@ -13,5 +14,19 @@ enum MarkdownType {
 
     static func matches(_ url: URL) -> Bool {
         extensions.contains(url.pathExtension.lowercased())
+    }
+
+    /// Registers Imark as the handler for markdown, so the user does not have
+    /// to walk through Get Info → Open with → Change All.
+    static func makeImarkDefault(completion: @escaping (Bool) -> Void) {
+        guard let markdown = UTType("net.daringfireball.markdown") else {
+            return completion(false)
+        }
+        NSWorkspace.shared.setDefaultApplication(
+            at: Bundle.main.bundleURL,
+            toOpen: markdown
+        ) { error in
+            DispatchQueue.main.async { completion(error == nil) }
+        }
     }
 }
