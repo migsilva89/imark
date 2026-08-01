@@ -254,41 +254,170 @@ function buildToc(root) {
 
 /* ------------------------------------------------------------------ rail */
 
-// A slim column of ticks standing in for the sidebar in Quick Look, where
-// there is no room for one. Every heading gets a tick; the three either side
-// of where you are taper away, so the eye is pulled to the current section
-// without losing the shape of the whole document.
+// A minimap for Quick Look, where there is no room for a sidebar. Every block
+// of content gets a tick, not just the headings — that is what gives the rail
+// the density to read as the shape of the document rather than as an outline.
+// Headings sit wider, so the structure still shows through.
+
 const RAIL_REACH = 3
+const RAIL_MAX_TICKS = 56
+
+const BLOCK_SELECTOR =
+  'h1, h2, h3, h4, h5, h6, p, ul, ol, dl, pre, table, blockquote, .mermaid-block, .front-matter, .code-wrap'
 
 let railTicks = []
+let railBlocks = []
+let railTip = null
 
-function buildRail(headings) {
-  const existing = document.querySelector('.rail')
-  if (existing) existing.remove()
+// Where the funnel is centred. Normally that follows the scroll position, but
+// while the pointer is on the rail it follows the pointer instead — you get to
+// look around the document before deciding to go there.
+let railScrollIndex = 0
+let railHoverIndex = null
+
+const paintRail = () => updateRail(railHoverIndex ?? railScrollIndex)
+
+const headingLevel = (el) => (/^H[1-6]$/.test(el.tagName) ? Number(el.tagName[1]) : 0)
+
+const restingWidth = (level) => (level === 0 ? 8 : Math.max(12, 20 - level * 2))
+
+const restingOpacity = (level) => (level === 0 ? 0.26 : 0.44)
+
+function collectBlocks(root) {
+  const all = [...root.children].filter((el) => el.matches(BLOCK_SELECTOR))
+  if (all.length <= RAIL_MAX_TICKS) return all
+  // Sample evenly instead of truncating: the rail has to stay proportional to
+  // the whole document, or scrubbing lies about where you are.
+  const step = all.length / RAIL_MAX_TICKS
+  return Array.from({ length: RAIL_MAX_TICKS }, (_, i) => all[Math.floor(i * step)])
+}
+
+function buildRail(root) {
+  document.querySelector('.rail')?.remove()
+  document.querySelector('.rail-tip')?.remove()
+
   railTicks = []
-  if (headings.length < 2) return
+  railBlocks = collectBlocks(root)
+  if (railBlocks.length < 3) return
 
   const rail = document.createElement('nav')
   rail.className = 'rail'
   rail.setAttribute('aria-hidden', 'true')
 
-  headings.forEach((heading) => {
-    // The dash lives inside a taller transparent row so there is something
-    // big enough to actually hit with a pointer.
+  railBlocks.forEach((block, index) => {
+    // The dash sits inside a taller transparent row, because a 2px mark is
+    // impossible to hit with a pointer.
     const slot = document.createElement('span')
     slot.className = 'rail-tick'
-    slot.dataset.level = heading.tagName.slice(1)
+    slot.dataset.index = String(index)
+    slot.dataset.level = String(headingLevel(block))
     slot.appendChild(document.createElement('i'))
     rail.appendChild(slot)
     railTicks.push(slot)
   })
 
-  attachRailScrubbing(rail, headings)
+  railTip = document.createElement('aside')
+  railTip.className = 'rail-tip'
+  document.body.appendChild(railTip)
+
+  attachRail(rail)
   document.body.appendChild(rail)
 }
 
-/* Click to jump, press and drag to scrub. */
-function attachRailScrubbing(rail, headings) {
+function updateRail(activeIndex) {
+  railTicks.forEach((tick, index) => {
+    const dash = tick.firstElementChild
+    if (!dash) return
+
+    const level = Number(tick.dataset.level || 0)
+    const base = restingWidth(level)
+    const rest = restingOpacity(level)
+    const distance = Math.abs(index - activeIndex)
+
+    if (distance > RAIL_REACH) {
+      dash.style.width = `${base}px`
+      dash.style.opacity = `${rest}`
+      tick.classList.remove('is-active')
+      return
+    }
+
+    // Taper down onto the resting values so there is no visible step where the
+    // funnel stops.
+    const falloff = 1 - distance / (RAIL_REACH + 1)
+    dash.style.width = `${base + falloff * 24}px`
+    dash.style.opacity = `${rest + falloff * (1 - rest)}`
+    tick.classList.toggle('is-active', distance === 0)
+  })
+}
+
+/* ---------------------------------------------------------- rail tooltip */
+
+const flatten = (el) => el.textContent.replace(/\s+/g, ' ').trim()
+
+function tipContent(index) {
+  const block = railBlocks[index]
+  if (!block) return null
+
+  let title = ''
+  for (let i = index; i >= 0; i -= 1) {
+    if (headingLevel(railBlocks[i])) {
+      title = flatten(railBlocks[i])
+      break
+    }
+  }
+
+  const own = flatten(block)
+  // On a heading the body would just repeat the title, so borrow the prose
+  // that follows it instead.
+  let body = own
+  if (headingLevel(block)) {
+    body = ''
+    for (let i = index + 1; i < railBlocks.length && !headingLevel(railBlocks[i]); i += 1) {
+      body = flatten(railBlocks[i])
+      if (body) break
+    }
+  }
+
+  return {
+    title: title || flatten(railBlocks[0]).slice(0, 60) || 'Start',
+    body: body.length > 150 ? `${body.slice(0, 150).trimEnd()}…` : body,
+  }
+}
+
+function showTip(index, tick) {
+  if (!railTip) return
+  const content = tipContent(index)
+  if (!content) return
+
+  railTip.innerHTML = ''
+  const heading = document.createElement('strong')
+  heading.textContent = content.title
+  railTip.appendChild(heading)
+  if (content.body) {
+    const body = document.createElement('span')
+    body.textContent = content.body
+    railTip.appendChild(body)
+  }
+
+  railTip.classList.add('is-visible')
+
+  // Anchor to the tick, then keep the whole card on screen.
+  const box = tick.getBoundingClientRect()
+  const height = railTip.offsetHeight
+  const top = Math.min(
+    Math.max(8, box.top + box.height / 2 - height / 2),
+    window.innerHeight - height - 8,
+  )
+  railTip.style.top = `${top}px`
+}
+
+function hideTip() {
+  railTip?.classList.remove('is-visible')
+}
+
+/* --------------------------------------------------------- rail scrubbing */
+
+function attachRail(rail) {
   let scrubbing = false
 
   const nearest = (clientY) => {
@@ -305,26 +434,27 @@ function attachRailScrubbing(rail, headings) {
     return best
   }
 
-  const goTo = (clientY, smooth) => {
-    const index = nearest(clientY)
-    const target = headings[index]
+  const goTo = (index) => {
+    const target = railBlocks[index]
     if (!target) return
-    const top = target.getBoundingClientRect().top + window.scrollY - 24
-    window.scrollTo({ top, behavior: smooth ? 'smooth' : 'auto' })
-    updateRail(index)
+    window.scrollTo({ top: target.getBoundingClientRect().top + window.scrollY - 24 })
+    railScrollIndex = index
   }
+
+  rail.addEventListener('pointermove', (event) => {
+    const index = nearest(event.clientY)
+    railHoverIndex = index
+    paintRail()
+    showTip(index, railTicks[index])
+    if (scrubbing) goTo(index)
+  })
 
   rail.addEventListener('pointerdown', (event) => {
     scrubbing = true
     rail.classList.add('is-scrubbing')
     rail.setPointerCapture(event.pointerId)
-    // A press lands instantly; only a plain click gets the smooth ride.
-    goTo(event.clientY, false)
+    goTo(nearest(event.clientY))
     event.preventDefault()
-  })
-
-  rail.addEventListener('pointermove', (event) => {
-    if (scrubbing) goTo(event.clientY, false)
   })
 
   const release = (event) => {
@@ -335,37 +465,11 @@ function attachRailScrubbing(rail, headings) {
   }
   rail.addEventListener('pointerup', release)
   rail.addEventListener('pointercancel', release)
-}
-
-function updateRail(activeIndex) {
-  if (!railTicks.length) return
-
-  railTicks.forEach((tick, index) => {
-    const distance = Math.abs(index - activeIndex)
-    const depth = Number(tick.dataset.level || 2)
-
-    const dash = tick.firstElementChild
-    if (!dash) return
-
-    // The resting state has to stay legible on its own: these are most of the
-    // rail most of the time, and at 14% they read as noise rather than as the
-    // shape of the document.
-    if (distance > RAIL_REACH) {
-      dash.style.width = '9px'
-      dash.style.opacity = '0.34'
-      tick.classList.remove('is-active')
-      return
-    }
-
-    // Linear taper: full width at the cursor, down to the resting width three
-    // headings out. Deeper headings sit a little shorter at every step.
-    // Taper down to the resting values rather than to zero, so there is no
-    // visible step where the funnel ends.
-    const falloff = 1 - distance / (RAIL_REACH + 1)
-    const reach = 24 - Math.min(depth, 4) * 2
-    dash.style.width = `${9 + falloff * reach}px`
-    dash.style.opacity = `${0.34 + falloff * 0.66}`
-    tick.classList.toggle('is-active', distance === 0)
+  rail.addEventListener('pointerleave', () => {
+    if (scrubbing) return
+    railHoverIndex = null
+    paintRail()
+    hideTip()
   })
 }
 
@@ -425,7 +529,7 @@ async function render({ markdown, path, theme, preview }) {
   addCopyButtons(root)
   renderMath(root)
   activeHeadings = buildToc(root)
-  buildRail(activeHeadings)
+  buildRail(root)
   await renderMermaid(root, theme)
   if (token !== renderToken) return
 
@@ -453,8 +557,15 @@ function updateActiveHeading() {
     if (activeHeadings[i].getBoundingClientRect().top <= 80) index = i
     else break
   }
-  updateRail(index)
   bridge({ type: 'active', id: activeHeadings[index].id })
+
+  let block = 0
+  for (let i = 0; i < railBlocks.length; i += 1) {
+    if (railBlocks[i].getBoundingClientRect().top <= 90) block = i
+    else break
+  }
+  railScrollIndex = block
+  paintRail()
 }
 
 window.addEventListener(

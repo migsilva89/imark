@@ -383,22 +383,22 @@ img[data-blocked] {
 
 /* ------------------------------------------------------------------ rail */
 
-/* Quick Look has no room for a sidebar, so the table of contents collapses
-   into a column of ticks pinned to the left edge. Hidden everywhere else. */
+/* Quick Look has no room for a sidebar, so the document collapses into a
+   column of ticks pinned to the left edge. Hidden everywhere else. */
 .rail {
   display: none;
   position: fixed;
   left: 0;
   top: 50%;
   transform: translateY(-50%);
-  width: 34px;
-  max-height: 92vh;
+  width: 38px;
+  max-height: 94vh;
   overflow: hidden;
   flex-direction: column;
   justify-content: center;
   align-items: flex-start;
   gap: 5px;
-  z-index: 5;
+  z-index: 6;
   cursor: pointer;
   /* Stops a scrub from turning into a text selection halfway down. */
   user-select: none;
@@ -407,29 +407,29 @@ img[data-blocked] {
 
 :root[data-preview='true'] .rail { display: flex; }
 
-/* Transparent row that owns the hit area; the dash inside is what you see. */
+/* Transparent row that owns the hit area; the dash inside is what you see.
+   Fixed height, never stretched — letting these grow spreads the ticks over
+   the whole panel and the funnel stops reading as one shape. */
 .rail-tick {
   display: flex;
   align-items: center;
-  /* Fixed, not stretched — letting these grow spreads the ticks across the
-     whole panel and the funnel stops reading as one shape. */
   flex: none;
-  height: 9px;
+  height: 10px;
   width: 100%;
   padding-left: 10px;
 }
 
 .rail-tick i {
   display: block;
-  width: 9px;
+  width: 8px;
   height: 2px;
   border-radius: 1px;
   background: var(--secondary);
-  opacity: 0.34;
+  opacity: 0.26;
   transition:
-    width 200ms cubic-bezier(0.2, 0, 0, 1),
-    opacity 200ms ease,
-    background-color 200ms ease;
+    width 180ms cubic-bezier(0.2, 0, 0, 1),
+    opacity 180ms ease,
+    background-color 180ms ease;
 }
 
 .rail-tick.is-active i {
@@ -437,12 +437,49 @@ img[data-blocked] {
   height: 3px;
 }
 
-/* Hovering the strip promises it does something; scrubbing kills the easing
-   so the marks keep up with the pointer. */
-.rail:hover .rail-tick i { opacity: 0.62; }
+/* Scrubbing drops the easing so the marks keep pace with the pointer. */
 .rail.is-scrubbing .rail-tick i { transition: none; }
+
+/* ------------------------------------------------------------- rail tip */
+
+.rail-tip {
+  position: fixed;
+  left: 44px;
+  max-width: 260px;
+  padding: calc(var(--step) * 3) calc(var(--step) * 4);
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.28);
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--step) * 1.5);
+  opacity: 0;
+  transform: translateX(-4px);
+  transition: opacity 130ms ease, transform 130ms ease;
+  pointer-events: none;
+  z-index: 7;
+}
+
+.rail-tip.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+.rail-tip strong {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text);
+}
+
+.rail-tip span {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--secondary);
+}
 
 /* The rail overlaps the reading column, so give the text somewhere to be. */
 :root[data-preview='true'] body {
-  padding-left: calc(var(--step) * 13);
+  padding-left: calc(var(--step) * 14);
 }
