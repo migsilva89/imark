@@ -368,7 +368,6 @@ function buildRail(root) {
     // impossible to hit with a pointer.
     const slot = document.createElement('span')
     slot.className = 'rail-tick'
-    slot.dataset.index = String(index)
     slot.dataset.level = String(headingLevel(block))
     slot.appendChild(document.createElement('i'))
     rail.appendChild(slot)
@@ -578,7 +577,9 @@ async function render({ markdown, path, theme, preview }) {
   const root = content()
   const previousScroll = window.scrollY
 
-  root.innerHTML = renderFrontMatter(data) + md.render(body)
+  root.innerHTML = body.trim()
+    ? renderFrontMatter(data) + md.render(body)
+    : `${renderFrontMatter(data)}<p class="empty">This file is empty</p>`
   if (token !== renderToken) return
 
   // The highlight elements went out with the old DOM.

@@ -5,7 +5,6 @@ import UniformTypeIdentifiers
 /// to no window at all, which reads as a crash rather than as an empty state.
 final class WelcomeWindowController: NSWindowController {
     var onOpen: (([URL]) -> Void)?
-    var onClose: (() -> Void)?
 
     private let hint = NSTextField(labelWithString: "")
 

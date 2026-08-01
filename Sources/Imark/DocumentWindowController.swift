@@ -89,9 +89,13 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         load()
 
         watcher = FileWatcher(url: target) { [weak self] event in
+            guard let self else { return }
             switch event {
-            case .changed: self?.load()
-            case .vanished: self?.showVanished()
+            case .changed:
+                self.load()
+                self.content.flashReloaded()
+            case .vanished:
+                self.showVanished()
             }
         }
     }

@@ -10,13 +10,12 @@
   --code-bg: #f7f7f8;
   --surface: #ffffff;
   --border: #e5e5ea;
-  --diagram: #8b7fd4;
+  --diagram: #8b7fd4;   /* read from JS, for mermaid's theme */
 
   --syn-keyword: #8b5cf6;
   --syn-string: #3e9f5c;
   --syn-comment: #9a9aa0;
   --syn-number: #b45309;
-  --syn-line: #b0b0b5;
 
   --measure: 72ch;
   --step: 4px;
@@ -43,7 +42,6 @@
   --syn-string: #4ade80;
   --syn-comment: #6e6e73;
   --syn-number: #fbbf24;
-  --syn-line: #4a4a4e;
 }
 
 :root[data-width='narrow'] { --measure: 60ch; }
@@ -53,15 +51,19 @@
 * { box-sizing: border-box; }
 
 html {
-  background: var(--bg);
+  /* Left unpainted until Swift sets the theme on the first render: the web
+     view draws no background of its own, so the native window shows through
+     and there is no white flash before a dark document appears. */
+  background: transparent;
   /* Native scrollbars only; the chrome around this view is real AppKit. */
   -webkit-text-size-adjust: 100%;
 }
 
+html[data-theme] { background: var(--bg); }
+
 body {
   margin: 0;
   padding: calc(var(--step) * 8) calc(var(--step) * 8) calc(var(--step) * 24);
-  background: var(--bg);
   color: var(--text);
   font-family: var(--font-body);
   font-size: var(--size-body);
@@ -523,4 +525,15 @@ img[data-blocked] {
 /* The rail overlaps the reading column, so give the text somewhere to be. */
 :root[data-preview='true'] body {
   padding-left: calc(var(--step) * 15);
+}
+
+/* ------------------------------------------------------------ empty file */
+
+.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  color: var(--secondary);
+  font-size: 14px;
 }

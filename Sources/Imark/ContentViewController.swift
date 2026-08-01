@@ -15,6 +15,8 @@ final class ContentViewController: NSViewController {
     private let statusLeft = NSTextField(labelWithString: "")
     private let statusRight = NSTextField(labelWithString: "")
     private var findHeight: NSLayoutConstraint!
+    private var folder = ""
+    private var flashWork: DispatchWorkItem?
 
     override func loadView() {
         view = NSView()
@@ -110,8 +112,6 @@ final class ContentViewController: NSViewController {
         return button
     }
 
-    var isFindVisible: Bool { findHeight.constant > 0 }
-
     func showFind() {
         findBar.isHidden = false
         findHeight.constant = 40
@@ -185,8 +185,23 @@ final class ContentViewController: NSViewController {
     }
 
     func setStatus(path: URL) {
-        statusRight.stringValue = path.deletingLastPathComponent()
+        folder = path.deletingLastPathComponent()
             .path.replacingOccurrences(of: NSHomeDirectory(), with: "~")
+        flashWork?.cancel()
+        statusRight.stringValue = folder
+    }
+
+    /// Confirmation that the file is genuinely being watched. Without it a
+    /// silent re-render is indistinguishable from nothing happening.
+    func flashReloaded() {
+        statusRight.stringValue = "Updated just now"
+        flashWork?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.statusRight.stringValue = self.folder
+        }
+        flashWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5, execute: work)
     }
 }
 
