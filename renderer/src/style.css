@@ -359,7 +359,7 @@ img[data-blocked] {
 /* --------------------------------------------------- Quick Look preview */
 
 :root[data-preview='true'] body {
-  padding: calc(var(--step) * 6) calc(var(--step) * 6) calc(var(--step) * 10);
+  padding: calc(var(--step) * 10) calc(var(--step) * 6) calc(var(--step) * 10);
   font-size: 14px;
 }
 

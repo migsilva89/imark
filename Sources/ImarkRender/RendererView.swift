@@ -29,6 +29,7 @@ public final class RendererView: NSView {
     public var onMessage: ((RendererMessage) -> Void)?
 
     private let bridge = Bridge()
+    private var previewMode = false
 
     public override init(frame frameRect: NSRect) {
         let config = WKWebViewConfiguration()
@@ -73,6 +74,9 @@ public final class RendererView: NSView {
             "markdown": markdown,
             "path": path,
             "theme": isDarkMode ? "dark" : "light",
+            // Carried in the payload rather than sent separately: a standalone
+            // call lands before the page is ready and is silently dropped.
+            "preview": previewMode,
         ])
     }
 
@@ -99,6 +103,7 @@ public final class RendererView: NSView {
     /// Quick Look shows the same document in a much smaller panel: tighter
     /// margins, no copy buttons, nothing clickable.
     public func setPreviewMode() {
+        previewMode = true
         call("window.imark.setPreview", true)
     }
 

@@ -339,14 +339,16 @@ const content = () => document.getElementById('content')
 let activeHeadings = []
 let renderToken = 0
 
-async function render({ markdown, path, theme }) {
+async function render({ markdown, path, theme, preview }) {
   const token = ++renderToken
   docDir = path ? path.slice(0, path.lastIndexOf('/')) || '/' : '/'
   slugCounts.clear()
 
-  // The very first render carries the theme too — without this the page keeps
-  // the light default from index.html until something calls setTheme.
+  // The very first render carries the theme and the preview flag — without this
+  // the page keeps the defaults from index.html until something calls the
+  // setters, and in Quick Look those calls arrive before the page exists.
   if (theme) document.documentElement.dataset.theme = theme
+  if (preview) document.documentElement.dataset.preview = 'true'
 
   const { data, body } = splitFrontMatter(markdown ?? '')
   const root = content()
