@@ -16,6 +16,7 @@
   <img src="https://img.shields.io/badge/Swift-6-orange?style=flat-square" alt="Swift 6">
   <img src="https://img.shields.io/badge/network-none-brightgreen?style=flat-square" alt="No network access">
   <img src="https://img.shields.io/badge/size-13%20MB-lightgrey?style=flat-square" alt="13 MB">
+  <img src="https://img.shields.io/badge/licence-MIT-blue?style=flat-square" alt="MIT licence">
 </p>
 
 > [!NOTE]
@@ -260,8 +261,8 @@ travel with the binary, so [`THIRD-PARTY.md`](THIRD-PARTY.md) is generated from
 what esbuild actually put in the bundle, on every build, and the same list ships
 inside the app: **Imark › About Imark** shows it.
 
-Imark itself carries no licence yet, which means all rights reserved. Read it,
-but do not assume you may use it.
+Imark itself is [MIT](LICENSE) — use it, change it, redistribute it, just keep
+the copyright notice.
 
 ## Tools
 
