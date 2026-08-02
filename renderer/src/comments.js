@@ -95,40 +95,72 @@ function blockAbove(root, line) {
   return best
 }
 
-/// Wraps the nth occurrence of `quote` inside `block` without disturbing the
-/// markup already there. Returns the new element, or null when the quote is
-/// gone — which is how a note becomes orphaned.
+/// Every text node under a block, in order, so a quote can be looked for in the
+/// text the reader sees rather than in whatever pieces the markup happens to
+/// have cut it into.
+function textNodes(block) {
+  const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT)
+  const nodes = []
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) nodes.push(node)
+  return nodes
+}
+
+/// Wraps the nth occurrence of `quote` inside `block`. Returns the first piece
+/// of the wrap, or null when the quote is gone — which is how a note becomes
+/// orphaned.
+///
+/// The search runs over the block's text as one string and is then mapped back
+/// onto nodes, because a quote very often straddles markup: bold in the middle
+/// of a sentence, or a phrase inside a code block that the highlighter has cut
+/// into a dozen spans. Looking node by node found none of those and orphaned
+/// them without a word. Counting occurrences over the whole block also makes
+/// `nth=` mean the same thing here as it did when the note was written.
 function wrapQuote(block, quote, nth) {
   if (!quote) return null
 
-  const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT)
-  let seen = 0
+  const nodes = textNodes(block)
+  const whole = nodes.map((node) => node.data).join('')
 
-  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-    let from = 0
-    for (;;) {
-      const at = node.data.indexOf(quote, from)
-      if (at < 0) break
-      seen += 1
-      if (seen === nth) {
-        const range = document.createRange()
-        range.setStart(node, at)
-        range.setEnd(node, at + quote.length)
-        const anchor = document.createElement('span')
-        anchor.className = 'note-anchor'
-        // Throws when the quote straddles markup; an orphan is an honest
-        // outcome, a half-applied wrap is not.
-        try {
-          range.surroundContents(anchor)
-        } catch {
-          return null
-        }
-        return anchor
-      }
-      from = at + quote.length
-    }
+  let at = -1
+  for (let seen = 0; seen < nth; seen += 1) {
+    at = whole.indexOf(quote, at + 1)
+    if (at < 0) return null
   }
-  return null
+  const end = at + quote.length
+
+  // One piece per text node the quote passes through. Each piece sits wholly
+  // inside its node, which is the only case surroundContents accepts.
+  const pieces = []
+  let cursor = 0
+  for (const node of nodes) {
+    const start = cursor
+    cursor += node.data.length
+    if (cursor <= at || start >= end) continue
+    pieces.push({
+      node,
+      from: Math.max(0, at - start),
+      to: Math.min(node.data.length, end - start),
+    })
+  }
+
+  let first = null
+  for (const piece of pieces) {
+    if (piece.from === piece.to) continue
+    const range = document.createRange()
+    range.setStart(piece.node, piece.from)
+    range.setEnd(piece.node, piece.to)
+    const span = document.createElement('span')
+    span.className = 'note-anchor'
+    try {
+      range.surroundContents(span)
+    } catch {
+      // Wrapping one node cannot fail, but a malformed tree is not worth
+      // taking the whole render down for.
+      continue
+    }
+    first = first ?? span
+  }
+  return first
 }
 
 /// The dot and the card have to be positioned against the block, and a block
@@ -163,9 +195,11 @@ export function attachComments(root, comments) {
   for (const { note, block } of resolved) {
     if (!block) continue
     const anchor = wrapQuote(block, note.quote, note.nth)
-    if (anchor) {
-      anchor.dataset.note = note.id
-      if (note.colour) anchor.dataset.color = note.colour
+    // A quote split across markup becomes several spans; all of them have to
+    // answer to the same note, or clicking half a phrase would do nothing.
+    for (const piece of block.querySelectorAll('.note-anchor:not([data-note])')) {
+      piece.dataset.note = note.id
+      if (note.colour) piece.dataset.color = note.colour
     }
 
     const holder = holderFor(block)
@@ -415,13 +449,17 @@ export function buildNoteRail() {
   rail.setAttribute('aria-label', 'Comments')
 
   const height = document.documentElement.scrollHeight || 1
+  const tops = spread(
+    all.map((dot) => ((dot.getBoundingClientRect().top + window.scrollY) / height) * window.innerHeight),
+  )
+
   for (const [index, dot] of all.entries()) {
     const note = attachedNotes[index]
     const mark = document.createElement('button')
     mark.type = 'button'
     mark.className = dot.classList.contains('orphan') ? 'note-mark orphan' : 'note-mark'
     if (note?.colour) mark.dataset.color = note.colour
-    mark.style.top = `${((dot.getBoundingClientRect().top + window.scrollY) / height) * 100}%`
+    mark.style.top = `${tops[index]}px`
     mark.setAttribute('aria-label', note?.quote || 'Comment')
 
     // Hovering shows the note without going there; clicking goes there.
@@ -437,6 +475,24 @@ export function buildNoteRail() {
 
   document.body.appendChild(rail)
   document.documentElement.dataset.noteRail = 'true'
+}
+
+/// Two notes a few lines apart land on top of each other once the document is
+/// squeezed into the height of a window, and a merged blob is one mark that
+/// lies about how many there are. Push them apart just enough to stay separate,
+/// keeping the order and giving up rather than running off the bottom.
+const MARK_GAP = 12
+
+function spread(positions) {
+  const limit = window.innerHeight - MARK_GAP
+  const out = []
+  let previous = -Infinity
+  for (const wanted of positions) {
+    const placed = Math.min(Math.max(wanted, previous + MARK_GAP), limit)
+    out.push(placed)
+    previous = placed
+  }
+  return out
 }
 
 /* -------------------------------------------------------------- rail card */
