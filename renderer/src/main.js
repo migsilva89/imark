@@ -301,8 +301,11 @@ function glideTo(top) {
 const RAIL_ROW = 8           // height of a tick's hit area
 const RAIL_SPAN = 0.72       // how much of the panel the rail should fill
 const RAIL_PITCH_RANGE = [11, 22]
-const RAIL_SIGMA = 2.6       // width of the funnel, in ticks
-const RAIL_AMPLITUDE = 30    // how much longer the mark at the centre grows
+// Narrow on purpose. At 2.6 the third tick either side still grew by half and
+// the funnel read as a blunt bulge; at 1.15 only the immediate neighbours are
+// clearly bigger and everything past them settles back to rest.
+const RAIL_SIGMA = 1.15
+const RAIL_AMPLITUDE = 32    // how much longer the mark at the centre grows
 
 // Set per document: few headings spread out, many pack in, so the rail is
 // neither a stub nor an overflowing column.
