@@ -45,7 +45,10 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
             backing: .buffered,
             defer: false
         )
-        window.titlebarAppearsTransparent = false
+        // The document runs the full height of the window and slides under the
+        // toolbar, which carries its own blur. A solid strip cuts a reading
+        // window in two; a blurred one says there is more page up there.
+        window.titlebarAppearsTransparent = true
         // Obeys "prefer tabs when opening documents", which is somebody's
         // stated preference and not ours to override. It only governs windows
         // the system groups on its own: ⌘-clicking a file in the sidebar asks
@@ -91,6 +94,15 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
             name: NSWindow.didChangeOcclusionStateNotification,
             object: window
         )
+        // Settings belong to the app, not to a window. Applying them where they
+        // were changed left every other open document on the old value until it
+        // happened to re-render.
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(settingsChanged),
+            name: Settings.changed,
+            object: nil
+        )
 
         buildToolbar()
 
@@ -116,8 +128,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
             (NSApp.delegate as? AppDelegate)?.open(url, asTabIn: window)
         }
 
-        content.renderer.setTextScale(Settings.textScale)
-        content.renderer.setWidth(Settings.width.rawValue)
+        applySettings()
         // Left, same as the preview panel: the rail lives inside the web view,
         // which already starts to the right of the sidebar, so it never collides
         // with it — and one consistent position beats one clever one.
@@ -294,7 +305,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
                 colour: colour,
                 after: block.end,
                 occurrence: selection.occurrence,
-                by: NSFullUserName(),
+                by: Settings.authorName,
                 on: Date(),
                 into: url,
                 expecting: stamp
@@ -447,6 +458,9 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         case #selector(toggleAllComments(_:)):
             item.state = reviewingComments ? .on : .off
             return noteCount > 0
+        case #selector(chooseWidth(_:)):
+            item.state = (item.representedObject as? String) == Settings.width.rawValue ? .on : .off
+            return true
         case #selector(nextComment(_:)), #selector(previousComment(_:)),
              #selector(exportComments(_:)):
             return noteCount > 0
@@ -476,10 +490,10 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         content.renderer.setWidth(width.rawValue)
     }
 
-    @objc func themeChanged(_ sender: NSSegmentedControl) {
-        let cases = Settings.Theme.allCases
-        guard cases.indices.contains(sender.selectedSegment) else { return }
-        Settings.theme = cases[sender.selectedSegment]
+    /// System → Light → Dark → System. The button announces the change, every
+    /// window hears it, and each one moves its own glyph.
+    @objc func cycleTheme(_ sender: Any?) {
+        Settings.theme = Settings.theme.next
         Settings.applyThemeToApp()
     }
 
@@ -537,6 +551,21 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     }
 
     // MARK: - NSWindowDelegate
+
+    @objc private func settingsChanged() { applySettings() }
+
+    /// Everything the page takes from the settings, in one place, so a window
+    /// opened now and a window opened an hour ago cannot disagree.
+    private func applySettings() {
+        content.renderer.palettes = (
+            light: Settings.palette.face(dark: false),
+            dark: Settings.palette.face(dark: true)
+        )
+        content.renderer.applyTheme()
+        content.renderer.setTextScale(Settings.textScale)
+        content.renderer.setWidth(Settings.width.rawValue)
+        refreshThemeButton()
+    }
 
     @objc private func visibilityChanged() {
         guard let window, !window.occlusionState.contains(.visible) else { return }

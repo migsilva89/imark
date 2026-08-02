@@ -36,7 +36,16 @@
   --size-body: 16px;
 }
 
-:root[data-theme='dark'] {
+/* A palette is a pair of these blocks and nothing else — Swift only ever sets
+   `data-theme` to `<name>-light` or `<name>-dark`, and mermaid reads the
+   computed variables. Adding a theme is two blocks here and a case in
+   Settings.Palette. `light` and `dark` stay as names for the Quick Look
+   extension, which asks for those two.
+
+   Classic's light face is :root itself, so it needs no block. Every other block
+   has to set every colour it moves, because anything left out falls back there. */
+:root[data-theme='dark'],
+:root[data-theme='classic-dark'] {
   --bg: #0f0f10;
   --text: #ededed;
   --secondary: #98989d;
@@ -58,6 +67,208 @@
   --syn-number: #fbbf24;
 }
 
+/* Warm, light. The accent moves off violet towards ink-brown: a cool violet on
+   a warm ground is the one combination that reads as a mistake. */
+:root[data-theme='warm-light'] {
+  --bg: #f6efe3;
+  --text: #33291d;
+  --secondary: #75695a;
+  --accent: #8a5a2b;
+  --accent-soft: #ecdcc6;
+  --code-bg: #efe6d6;
+  --surface: #fbf6ee;
+  --border: #ded1bc;
+  --diagram: #9a6a38;
+
+  --note: var(--accent);
+  --note-amber: #a06a12;
+  --note-green: #3f7a4a;
+  --note-blue: #3a6188;
+  --note-red: #a83f2e;
+
+  --syn-keyword: #855a9c;
+  --syn-string: #4a7a45;
+  --syn-comment: #9c9080;
+  --syn-number: #98601c;
+}
+
+/* Warm, dark. The same ground as the light face seen at night — brown-black
+   rather than neutral, so the pair reads as one theme and not as two. */
+:root[data-theme='warm-dark'] {
+  --bg: #14100c;
+  --text: #ece2d4;
+  --secondary: #9c8f7e;
+  --accent: #d99a5b;
+  --accent-soft: #3a2a19;
+  --code-bg: #1b1611;
+  --surface: #221b14;
+  --border: #33291f;
+  --diagram: #e0a76b;
+
+  --note: var(--accent);
+  --note-amber: #e8b56a;
+  --note-green: #9dbf7a;
+  --note-blue: #8fb3d9;
+  --note-red: #e08a72;
+
+  --syn-keyword: #e3a3c9;
+  --syn-string: #b5c46e;
+  --syn-comment: #7a6c5c;
+  --syn-number: #e8a95e;
+}
+
+/* Cool, light. Blue-white paper rather than plain white, with an ink-blue
+   accent — the counterpart to the night face below it. */
+:root[data-theme='cool-light'] {
+  --bg: #f7f9fc;
+  --text: #1a2230;
+  --secondary: #61708a;
+  --accent: #3b6ea5;
+  --accent-soft: #dfe9f5;
+  --code-bg: #eef2f8;
+  --surface: #ffffff;
+  --border: #d8e0ec;
+  --diagram: #4a7db5;
+
+  --note: var(--accent);
+  --note-amber: #a8730a;
+  --note-green: #2b7a4b;
+  --note-blue: #2b6cb0;
+  --note-red: #b8362a;
+
+  --syn-keyword: #6a4fbf;
+  --syn-string: #2f7a52;
+  --syn-comment: #8b95a8;
+  --syn-number: #a35a10;
+}
+
+/* Cool, dark. Deeper than Classic's night face and blue rather than neutral:
+   the same lightness reads as darker when it is cold, so the page recedes
+   without the text losing contrast. */
+:root[data-theme='cool-dark'] {
+  --bg: #0c1018;
+  --text: #dde3ee;
+  --secondary: #8b95a8;
+  --accent: #7aa2f7;
+  --accent-soft: #1b2740;
+  --code-bg: #121824;
+  --surface: #161d2b;
+  --border: #232c3d;
+  --diagram: #89b4fa;
+
+  --note: var(--accent);
+  --note-amber: #e0af68;
+  --note-green: #73d3a0;
+  --note-blue: #7dcfff;
+  --note-red: #f7768e;
+
+  --syn-keyword: #bb9af7;
+  --syn-string: #9ece6a;
+  --syn-comment: #5c6a86;
+  --syn-number: #ff9e64;
+}
+
+/* Forest, light. Green is the one hue the other themes leave alone, and it is
+   the only one that stays calm at full strength on a page of prose. */
+:root[data-theme='forest-light'] {
+  --bg: #f4f7f2;
+  --text: #1c2a1f;
+  --secondary: #5c7060;
+  --accent: #2f7d4f;
+  --accent-soft: #dcebe0;
+  --code-bg: #eaf1e9;
+  --surface: #ffffff;
+  --border: #d3e0d4;
+  --diagram: #3d8f5e;
+
+  --note: var(--accent);
+  --note-amber: #96700c;
+  --note-green: #2f7d4f;
+  --note-blue: #2f6a94;
+  --note-red: #a83f36;
+
+  --syn-keyword: #6d5aa8;
+  --syn-string: #2f7d4f;
+  --syn-comment: #85958a;
+  --syn-number: #8a6a1c;
+}
+
+/* Forest, dark. */
+:root[data-theme='forest-dark'] {
+  --bg: #0d1410;
+  --text: #dfe8e0;
+  --secondary: #8a9c8e;
+  --accent: #6cc48c;
+  --accent-soft: #17301f;
+  --code-bg: #121b15;
+  --surface: #16211a;
+  --border: #253026;
+  --diagram: #7cd39a;
+
+  --note: var(--accent);
+  --note-amber: #d8b06a;
+  --note-green: #6cc48c;
+  --note-blue: #79b4d8;
+  --note-red: #e08a80;
+
+  --syn-keyword: #b39ce0;
+  --syn-string: #8fd6a0;
+  --syn-comment: #6a7a6e;
+  --syn-number: #d8a86a;
+}
+
+/* High contrast, light. Black on white with the borders pushed up to where they
+   can actually be seen. Not a taste — the others are all mid-tone greys on
+   near-white, and that is the first thing to fail in bright sun or on tired
+   eyes. The syntax and note colours are darkened to match, because a palette
+   that only fixes the prose leaves half the page behind. */
+:root[data-theme='contrast-light'] {
+  --bg: #ffffff;
+  --text: #000000;
+  --secondary: #3a3a3a;
+  --accent: #0040c0;
+  --accent-soft: #dde4ff;
+  --code-bg: #f0f0f0;
+  --surface: #ffffff;
+  --border: #767676;
+  --diagram: #0040c0;
+
+  --note: var(--accent);
+  --note-amber: #8a5a00;
+  --note-green: #006622;
+  --note-blue: #0033aa;
+  --note-red: #aa0000;
+
+  --syn-keyword: #6600cc;
+  --syn-string: #006622;
+  --syn-comment: #4a4a4a;
+  --syn-number: #994400;
+}
+
+/* High contrast, dark. True black, true white. */
+:root[data-theme='contrast-dark'] {
+  --bg: #000000;
+  --text: #ffffff;
+  --secondary: #c8c8c8;
+  --accent: #7fb2ff;
+  --accent-soft: #001a4d;
+  --code-bg: #101010;
+  --surface: #141414;
+  --border: #8a8a8a;
+  --diagram: #7fb2ff;
+
+  --note: var(--accent);
+  --note-amber: #ffc04d;
+  --note-green: #5ee88a;
+  --note-blue: #7fc4ff;
+  --note-red: #ff8a80;
+
+  --syn-keyword: #c9a4ff;
+  --syn-string: #7fe89a;
+  --syn-comment: #a0a0a0;
+  --syn-number: #ffb84d;
+}
+
 :root[data-width='narrow'] { --measure: 60ch; }
 :root[data-width='wide'] { --measure: 90ch; }
 :root[data-width='full'] { --measure: none; }
@@ -77,7 +288,19 @@ html[data-theme] { background: var(--bg); }
 
 body {
   margin: 0;
-  padding: calc(var(--step) * 8) calc(var(--step) * 8) calc(var(--step) * 24);
+  /* The toolbar stands on the top of this page, so the first line starts below
+     it. Set by Swift from the window's safe area — a hard-coded number is wrong
+     the moment the toolbar changes height, which it does in full screen. */
+  /* Wider on the right than on the left: a note's dot hangs 24px past the end
+     of its block, and macOS lays its scrollbar over the last 15px of the
+     window. At an even margin the two met and the dots came out clipped —
+     which only showed at full width, where there is no leftover column to
+     hide in. */
+  padding:
+    calc(var(--step) * 8 + var(--top-inset, 0px))
+    calc(var(--step) * 12)
+    calc(var(--step) * 24)
+    calc(var(--step) * 8);
   color: var(--text);
   font-family: var(--font-body);
   font-size: var(--size-body);
@@ -378,7 +601,14 @@ img[data-blocked] {
 /* --------------------------------------------------- Quick Look preview */
 
 :root[data-preview='true'] body {
-  padding: calc(var(--step) * 10) calc(var(--step) * 6) calc(var(--step) * 10);
+  /* Same asymmetry as the window, and for the same reason: the dots are still
+     shown here — you cannot press them, but you can see there are notes — and
+     at an even margin they hung off the edge of the panel. */
+  padding:
+    calc(var(--step) * 10)
+    calc(var(--step) * 10)
+    calc(var(--step) * 10)
+    calc(var(--step) * 6);
   font-size: 14px;
 }
 
@@ -407,7 +637,10 @@ img[data-blocked] {
 .rail {
   display: none;
   position: fixed;
-  top: 50%;
+  /* Centred in what you can see, not in the window: the toolbar covers the top
+     of the page, so a rail centred on the viewport sits high and its first
+     ticks hide behind the bar. */
+  top: calc(50% + var(--top-inset, 0px) / 2);
   transform: translateY(-50%);
   width: 40px;
   max-height: 94vh;
@@ -415,9 +648,10 @@ img[data-blocked] {
   flex-direction: column;
   justify-content: center;
   align-items: flex-start;
-  /* Set per document by main.js, which also does the pointer-to-tick maths
-     from it — the two must agree. */
-  gap: var(--rail-gap, 3px);
+  /* Rows are contiguous rather than spaced: the whole rail is then one strip of
+     hit areas with no dead pixels between them, and the pointer-to-row maths in
+     main.js is exactly `y / row height`. Set per document from there. */
+  gap: 0;
   z-index: 6;
   cursor: pointer;
   user-select: none;
@@ -435,7 +669,7 @@ img[data-blocked] {
   display: flex;
   align-items: center;
   flex: none;
-  height: 8px;   /* RAIL_ROW in main.js */
+  height: var(--rail-row, 11px);   /* set per document by main.js */
   width: 100%;
 }
 
@@ -736,6 +970,9 @@ img[data-blocked] {
    next", and splitting them across the window made you look in two places. The
    marks sit where the notes are in the document rather than spread evenly —
    three notes clustered in one section is worth seeing. */
+/* Left at the top of the viewport because the marks inside are positioned in
+   viewport coordinates, read off the outline ticks. Keeping them clear of the
+   toolbar is `placeMarks`' job, not this one's. */
 .note-rail {
   position: fixed;
   top: 0;

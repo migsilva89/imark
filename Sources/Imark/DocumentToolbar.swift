@@ -21,12 +21,16 @@ extension DocumentWindowController: NSToolbarDelegate {
     }
 
     public func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
+        // Actions you take while reading, and the appearance. Two things left:
+        // the AA menu, a second copy of View › Bigger/Smaller/Actual Size, which
+        // already have ⌘+, ⌘− and ⌘0; and the shortcuts cheat sheet, which is
+        // read once or twice ever and was already sitting in Help under ⌘/.
+        // Reading the document, then changing how it looks, then taking it
+        // somewhere else. Find sits with the appearance rather than leading the
+        // row: it is a thing you do to the page in front of you, not a way out
+        // of it.
         [.toggleSidebar, .sidebarTrackingSeparator, .flexibleSpace,
-         // Shortcuts leads its own group, with a gap after it: it is the one
-         // button that explains the others, and sitting next to Share made it
-         // look like part of exporting.
-         .shortcuts, .space,
-         .find, .comments, .text, .theme, .export, .openIn]
+         .comments, .theme, .find, .export, .openIn]
     }
 
     public func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
@@ -45,6 +49,11 @@ extension DocumentWindowController: NSToolbarDelegate {
         let image = NSImage(systemSymbolName: symbol, accessibilityDescription: "Comments")
         item.image = on ? image?.withSymbolConfiguration(.init(paletteColors: [.imarkAccent])) : image
         item.toolTip = on ? "Hide All Comments (⇧⌘C)" : "Show All Comments (⇧⌘C)"
+    }
+
+    func refreshThemeButton() {
+        let item = window?.toolbar?.items.first { $0.itemIdentifier == .theme }
+        (item?.view as? ThemeButton)?.show(Settings.theme)
     }
 
     /// Greyed out on a document with nothing to show. A button that only ever
@@ -89,18 +98,10 @@ extension DocumentWindowController: NSToolbarDelegate {
                           tip: "Print or Save as PDF (⌘P)",
                           action: #selector(printDocument(_:)))
 
-        case .text:
-            let item = NSMenuToolbarItem(itemIdentifier: identifier)
-            item.image = NSImage(systemSymbolName: "textformat.size", accessibilityDescription: nil)
-            item.label = "Text"
-            item.menu = textMenu()
-            return item
-
         case .theme:
             let item = NSToolbarItem(itemIdentifier: identifier)
-            item.view = themeControl()
+            item.view = ThemeButton(target: self, action: #selector(cycleTheme(_:)))
             item.label = "Appearance"
-            item.toolTip = "Appearance"
             return item
 
         case .openIn:
@@ -143,36 +144,13 @@ extension DocumentWindowController: NSToolbarDelegate {
         return item
     }
 
-    private func textMenu() -> NSMenu {
-        let menu = NSMenu()
-        menu.addItem(withTitle: "Bigger", action: #selector(increaseText(_:)), keyEquivalent: "+")
-        menu.addItem(withTitle: "Smaller", action: #selector(decreaseText(_:)), keyEquivalent: "-")
-        menu.addItem(withTitle: "Actual Size", action: #selector(resetText(_:)), keyEquivalent: "0")
-        menu.addItem(.separator())
-
-        let header = NSMenuItem(title: "Column width", action: nil, keyEquivalent: "")
-        header.isEnabled = false
-        menu.addItem(header)
-
-        for width in Settings.Width.allCases {
-            let item = NSMenuItem(title: width.label, action: #selector(chooseWidth(_:)), keyEquivalent: "")
-            item.representedObject = width.rawValue
-            item.state = Settings.width == width ? .on : .off
-            item.target = self
-            menu.addItem(item)
-        }
-        for item in menu.items where item.action != nil { item.target = self }
-        return menu
-    }
-
     private func editorsMenu() -> NSMenu {
         let menu = NSMenu()
         let editors = Editors.installed(for: url)
-        guard !editors.isEmpty else {
+        if editors.isEmpty {
             let empty = NSMenuItem(title: "No editors found", action: nil, keyEquivalent: "")
             empty.isEnabled = false
             menu.addItem(empty)
-            return menu
         }
         for editor in editors {
             let item = NSMenuItem(title: editor.name, action: #selector(openInEditor(_:)), keyEquivalent: "")
@@ -181,6 +159,19 @@ extension DocumentWindowController: NSToolbarDelegate {
             item.target = self
             menu.addItem(item)
         }
+
+        // Below a rule, because it is the odd one out: every entry above hands
+        // the file to something that will show you its contents, and this one
+        // shows you where it lives. Same command as ⇧⌘R — this menu is "where
+        // else does this file go", and the Finder is an answer to that.
+        menu.addItem(.separator())
+        let reveal = menu.addItem(
+            withTitle: "Reveal in Finder",
+            action: #selector(revealInFinder(_:)),
+            keyEquivalent: ""
+        )
+        reveal.image = icon(for: URL(fileURLWithPath: "/System/Library/CoreServices/Finder.app"))
+        reveal.target = self
         return menu
     }
 
@@ -190,22 +181,4 @@ extension DocumentWindowController: NSToolbarDelegate {
         return image
     }
 
-    /// Three-way appearance switch, because a radio list of menu items is a
-    /// clumsy way to flip between light and dark.
-    private func themeControl() -> NSSegmentedControl {
-        let symbols = ["circle.lefthalf.filled", "sun.max", "moon"]
-        let control = NSSegmentedControl(
-            images: symbols.map { NSImage(systemSymbolName: $0, accessibilityDescription: nil) ?? NSImage() },
-            trackingMode: .selectOne,
-            target: self,
-            action: #selector(themeChanged(_:))
-        )
-        control.segmentStyle = .texturedRounded
-        for (index, theme) in Settings.Theme.allCases.enumerated() {
-            control.setToolTip(theme.label, forSegment: index)
-            control.setWidth(34, forSegment: index)
-        }
-        control.selectedSegment = Settings.Theme.allCases.firstIndex(of: Settings.theme) ?? 0
-        return control
-    }
 }

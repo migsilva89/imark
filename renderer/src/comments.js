@@ -564,9 +564,13 @@ function outlineTicks() {
     })
 }
 
+/// Only used when there is no outline to line up with. Mapped into the part of
+/// the window you can actually see: the toolbar stands on the top of the page,
+/// and a mark up there would be behind it.
 const proportional = (all) => {
   const height = document.documentElement.scrollHeight || 1
-  return all.map((dot) => (where(dot) / height) * window.innerHeight)
+  const top = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--top-inset')) || 0
+  return all.map((dot) => top + (where(dot) / height) * (window.innerHeight - top))
 }
 
 /// How far apart two marks have to be to still read as two. Only the fallback

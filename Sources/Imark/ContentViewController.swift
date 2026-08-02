@@ -11,6 +11,10 @@ final class ContentViewController: NSViewController {
     var onShowComments: ((NSView) -> Void)?
 
     private let findBar = NSVisualEffectView()
+    /// Sits behind the toolbar and blurs whatever scrolls under it. Without it a
+    /// transparent titlebar puts buttons straight on top of prose.
+    private let header = NSVisualEffectView()
+    private var reportedInset: CGFloat = -1
     private let searchField = NSSearchField()
     private let counter = NSTextField(labelWithString: "")
     private let statusLeft = NSTextField(labelWithString: "")
@@ -26,25 +30,37 @@ final class ContentViewController: NSViewController {
         buildFindBar()
         let status = buildStatusBar()
 
-        for subview in [findBar, renderer, status] {
+        // Back to front: the document runs the full height and everything else
+        // sits over it. The header is what makes that readable — it blurs the
+        // text passing underneath so the toolbar has something to stand on.
+        for subview in [renderer, header, findBar, status] {
             subview.translatesAutoresizingMaskIntoConstraints = false
             view.addSubview(subview)
         }
 
+        header.material = .headerView
+        header.blendingMode = .withinWindow
+        header.state = .followsWindowActiveState
+
         findHeight = findBar.heightAnchor.constraint(equalToConstant: 0)
 
         NSLayoutConstraint.activate([
+            header.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            header.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            header.topAnchor.constraint(equalTo: view.topAnchor),
+            header.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+
             findBar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             findBar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            // Pinned below the toolbar, not behind it: the window title used to
-            // sit on top of the search field, and the document text slid under
-            // the toolbar whenever the sidebar was toggled.
+            // Still below the toolbar rather than behind it: the window title
+            // used to sit on top of the search field. Only the document is
+            // meant to pass underneath.
             findBar.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
             findHeight,
 
             renderer.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             renderer.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            renderer.topAnchor.constraint(equalTo: findBar.bottomAnchor),
+            renderer.topAnchor.constraint(equalTo: view.topAnchor),
             renderer.bottomAnchor.constraint(equalTo: status.topAnchor),
 
             status.leadingAnchor.constraint(equalTo: view.leadingAnchor),
@@ -52,6 +68,17 @@ final class ContentViewController: NSViewController {
             status.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             status.heightAnchor.constraint(equalToConstant: 24),
         ])
+    }
+
+    /// Tells the page how much of its own top the toolbar is standing on. Read
+    /// from the safe area rather than hard-coded: the toolbar is a different
+    /// height with and without a window title, and taller again in full screen.
+    override func viewDidLayout() {
+        super.viewDidLayout()
+        let inset = view.safeAreaInsets.top
+        guard inset != reportedInset else { return }
+        reportedInset = inset
+        renderer.setTopInset(inset)
 
         renderer.onMessage = { [weak self] message in
             if case .find(let count, let index) = message {

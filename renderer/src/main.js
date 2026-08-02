@@ -339,9 +339,15 @@ function glideTo(top) {
 // Only H1 to H3 get a tick: every mark has to be a place you can name, or the
 // rail is texture rather than navigation.
 
-const RAIL_ROW = 8           // height of a tick's hit area
 const RAIL_SPAN = 0.72       // how much of the panel the rail should fill
+// Between two headings. Every row is half of this, because a minor gradation
+// sits in each gap.
 const RAIL_PITCH_RANGE = [11, 22]
+// A minor row is a gradation, not a place: thin, faint, and it grows far less
+// than a heading when the funnel passes over it.
+const RAIL_MINOR_WIDTH = 5
+const RAIL_MINOR_OPACITY = 0.15
+const RAIL_MINOR_AMPLITUDE = 10
 // Narrow on purpose. At 2.6 the third tick either side still grew by half and
 // the funnel read as a blunt bulge; at 1.15 only the immediate neighbours are
 // clearly bigger and everything past them settles back to rest.
@@ -352,7 +358,10 @@ const RAIL_AMPLITUDE = 32    // how much longer the mark at the centre grows
 // neither a stub nor an overflowing column.
 let railPitch = RAIL_PITCH_RANGE[0]
 
+// Every row in the rail, majors and minors alike. Indices everywhere below are
+// row indices; `railSection` maps one back to the heading it belongs to.
 let railTicks = []
+let railSection = []
 let railBlocks = []
 let railTip = null
 
@@ -379,8 +388,9 @@ const falloffAt = (distance) => Math.exp(-(distance * distance) / (2 * RAIL_SIGM
 
 function collectBlocks(root) {
   const all = [...root.querySelectorAll('h1, h2, h3')]
-  // As many ticks as the panel can hold at the tightest pitch.
-  const capacity = Math.max(12, Math.floor((window.innerHeight * 0.94) / RAIL_PITCH_RANGE[0]))
+  // As many headings as the panel can hold at the tightest pitch. Halved
+  // against the row count, since each heading now brings a gradation with it.
+  const capacity = Math.max(12, Math.floor((window.innerHeight * 0.94) / RAIL_PITCH_RANGE[0] / 2))
   if (all.length <= capacity) return all
   // Sample evenly instead of truncating: the rail has to stay proportional to
   // the whole document, or scrubbing lies about where you are.
@@ -393,33 +403,45 @@ function buildRail(root) {
   document.querySelector('.rail-tip')?.remove()
 
   railTicks = []
+  railSection = []
   railBlocks = collectBlocks(root)
   railHoverIndex = null
   if (railBlocks.length < 3) return
 
+  // A row is half the distance between two headings: one heading, one gradation
+  // between it and the next. The last heading has nothing after it to bridge to.
+  const rows = railBlocks.length * 2 - 1
+  // The range is written in headings, so it is halved before it meets a count
+  // of rows. Clamping a row pitch with heading bounds and halving afterwards
+  // gives a rail half the height it should be.
   const [minPitch, maxPitch] = RAIL_PITCH_RANGE
-  railPitch = Math.round(
-    Math.min(maxPitch, Math.max(minPitch, (window.innerHeight * RAIL_SPAN) / railBlocks.length)),
-  )
+  railPitch = Math.min(maxPitch / 2, Math.max(minPitch / 2, (window.innerHeight * RAIL_SPAN) / rows))
 
   const rail = document.createElement('nav')
   rail.className = 'rail'
   rail.setAttribute('aria-hidden', 'true')
-  rail.style.setProperty('--rail-gap', `${railPitch - RAIL_ROW}px`)
+  rail.style.setProperty('--rail-row', `${railPitch}px`)
 
-  railBlocks.forEach((block, index) => {
+  const add = (block, index, minor) => {
     // The dash sits inside a taller transparent row, because a 2px mark is
     // impossible to hit with a pointer.
     const slot = document.createElement('span')
-    slot.className = 'rail-tick'
+    slot.className = minor ? 'rail-tick minor' : 'rail-tick'
     slot.dataset.level = String(headingLevel(block))
-    // Which heading this tick stands for. The notes rail lines its marks up
-    // with these, and needs to know where in the document each one starts —
-    // the tick's own position is a slot in a list, not a place.
-    if (block.id) slot.dataset.heading = block.id
+    // Which heading a row belongs to. A minor answers to the heading above it,
+    // so nothing on the rail is dead to the pointer — and the notes rail lines
+    // its marks up with the majors, which need to say where in the document
+    // they start. A tick's own position is a slot in a list, not a place.
+    if (block.id && !minor) slot.dataset.heading = block.id
     slot.appendChild(document.createElement('i'))
     rail.appendChild(slot)
     railTicks.push(slot)
+    railSection.push(index)
+  }
+
+  railBlocks.forEach((block, index) => {
+    add(block, index, false)
+    if (index < railBlocks.length - 1) add(block, index, true)
   })
 
   railTip = document.createElement('aside')
@@ -435,14 +457,19 @@ function updateRail(centre) {
     const dash = tick.firstElementChild
     if (!dash) return
 
+    const minor = tick.classList.contains('minor')
     const level = Number(tick.dataset.level || 0)
-    const base = restingWidth(level)
-    const rest = restingOpacity(level)
-    const weight = falloffAt(index - centre)
+    const base = minor ? RAIL_MINOR_WIDTH : restingWidth(level)
+    const rest = minor ? RAIL_MINOR_OPACITY : restingOpacity(level)
+    const amplitude = minor ? RAIL_MINOR_AMPLITUDE : RAIL_AMPLITUDE
+    // Measured in headings, not rows. The bell was tuned so that the tick
+    // either side grows and the third is back at rest; counting gradations
+    // would halve its reach and the funnel would crawl at half speed.
+    const weight = falloffAt((index - centre) / 2)
 
-    dash.style.width = `${base + weight * RAIL_AMPLITUDE}px`
+    dash.style.width = `${base + weight * amplitude}px`
     dash.style.opacity = `${rest + weight * (1 - rest)}`
-    tick.classList.toggle('is-active', index === centre)
+    tick.classList.toggle('is-active', index === centre && !minor)
   })
 }
 
@@ -509,7 +536,7 @@ function tipContent(index) {
 
 function showTip(index, tick) {
   if (!railTip || !tick) return
-  const content = tipContent(index)
+  const content = tipContent(railSection[index] ?? index)
   if (!content) return
 
   railTip.replaceChildren()
@@ -564,8 +591,11 @@ function attachRail(rail) {
     return Math.min(Math.max(index, 0), railTicks.length - 1)
   }
 
+  // A gradation takes you to the heading it sits under. It is not a place of
+  // its own, and a row that swallows a click is worse than one that is not
+  // there.
   const goTo = (index, smooth) => {
-    const target = railBlocks[index]
+    const target = railBlocks[railSection[index]]
     if (!target) return
     const top = target.getBoundingClientRect().top + window.scrollY - 24
     // Dragging tracks the pointer one to one; a click gets the glide.
@@ -731,7 +761,8 @@ function updateActiveHeading() {
     if (railBlocks[i].getBoundingClientRect().top <= 90) block = i
     else break
   }
-  railScrollIndex = block
+  // Headings sit on the even rows, gradations on the odd ones.
+  railScrollIndex = block * 2
   paintRail()
 }
 
@@ -979,6 +1010,13 @@ window.imark = {
   findClear: clearFind,
   setTextScale(scale) {
     document.documentElement.style.setProperty('--size-body', `${scale}px`)
+  },
+  /// How much of the top of the page the toolbar is standing on. Everything
+  /// pinned to the viewport has to start below it, not just the prose — a rail
+  /// that runs to the top edge runs under the toolbar.
+  setTopInset(points) {
+    document.documentElement.style.setProperty('--top-inset', `${points}px`)
+    buildNoteRail()
   },
   clearSelection() {
     window.getSelection()?.removeAllRanges()
