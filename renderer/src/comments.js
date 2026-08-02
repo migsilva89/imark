@@ -241,10 +241,7 @@ function buildCard(note, orphan) {
   card.hidden = true
 
   const head = document.createElement('header')
-  const who = document.createElement('span')
-  who.textContent = [note.by, formatDate(note.at)].filter(Boolean).join(' · ') || 'Note'
-  head.appendChild(who)
-  head.appendChild(cardActions(note))
+  head.textContent = [note.by, formatDate(note.at)].filter(Boolean).join(' · ') || 'Note'
   card.appendChild(head)
 
   if (orphan) {
@@ -261,18 +258,26 @@ function buildCard(note, orphan) {
   body.textContent = note.text
   card.appendChild(body)
 
+  card.appendChild(cardActions(note))
   return card
+}
+
+/// Drawn rather than typed. The Unicode pencil and cross are hairlines at this
+/// size and read as smudges; a stroked path is legible at 13px and takes the
+/// card's colour with it.
+const ICONS = {
+  edit: 'M11.4 2.6a1.7 1.7 0 0 1 2.4 2.4L6 12.8l-3.2.8.8-3.2z',
+  delete: 'M3 4.5h10M6.4 4.5V3h3.2v1.5M4.6 4.5l.5 8.4h5.8l.5-8.4',
 }
 
 /// Edit and delete live on the card itself. A note you can write but not take
 /// back is a trapdoor, and hiding the controls in a menu somewhere else would
-/// mean guessing which note the menu meant.
+/// mean guessing which note the menu meant. At the foot rather than in the
+/// header: beside the byline they squeezed the date onto a second line.
 function cardActions(note) {
-  const actions = document.createElement('span')
+  const actions = document.createElement('footer')
   actions.className = 'note-actions'
 
-  // Words rather than glyphs: at this size a pencil and a cross are a guess,
-  // and there is room for two short labels.
   for (const [command, label] of [
     ['edit', 'Edit'],
     ['delete', 'Delete'],
@@ -281,7 +286,11 @@ function cardActions(note) {
     button.type = 'button'
     button.className = `note-action note-${command}`
     button.title = `${label} this note`
-    button.textContent = label
+    button.setAttribute('aria-label', `${label} this note`)
+    button.innerHTML =
+      `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor"` +
+      ` stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">` +
+      `<path d="${ICONS[command]}"/></svg>`
     button.addEventListener('click', (event) => {
       event.preventDefault()
       event.stopPropagation()

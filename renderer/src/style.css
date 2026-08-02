@@ -629,9 +629,11 @@ img[data-blocked] {
 .note-card {
   position: absolute;
   top: 0;
-  right: calc(var(--step) * -8);
+  /* Stops short of the dots rather than reaching past them: the dot is what
+     opened the card and what closes it again, so it cannot be underneath it. */
+  right: calc(var(--step) * -2);
   width: 250px;
-  z-index: 5;
+  z-index: 8;
   padding: calc(var(--step) * 3);
   background: var(--surface);
   border: 1px solid var(--border);
@@ -689,18 +691,14 @@ img[data-blocked] {
   transform: none;
 }
 
-/* Edit and delete, on the card. Only visible once you are looking at the note,
-   so five open cards are not five pairs of buttons competing for attention. */
-.note-card header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: calc(var(--step) * 2);
-}
-
+/* Edit and delete, at the foot of the card. Only visible once you are looking
+   at the note, so five open cards are not five pairs of buttons competing for
+   attention. */
 .note-actions {
   display: flex;
+  justify-content: flex-end;
   gap: 2px;
+  margin-top: calc(var(--step) * 2);
   opacity: 0;
   transition: opacity 0.12s ease;
 }
@@ -711,18 +709,17 @@ img[data-blocked] {
 }
 
 .note-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
   border: 0;
   background: none;
   color: var(--secondary);
   cursor: pointer;
-  font: inherit;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  line-height: 1;
-  padding: 3px 5px;
-  border-radius: 4px;
+  border-radius: 6px;
 }
 
 .note-action:hover {
