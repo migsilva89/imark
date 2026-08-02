@@ -88,9 +88,10 @@ an exact one.
 Four ways to get at them, because they answer different questions. The count in
 the status bar opens **the list** — every note at once, out of the document, and
 clicking one jumps to it. `⌘⇧C` opens them all **in place**, each under its own
-block. `⌘'` and `⌘⇧'` **step** through one at a time. And a rail down the right
-edge marks **where** they are, placed where the notes actually fall in the
-document, so three clustered in one section is visible at a glance.
+block. `⌘'` and `⌘⇧'` **step** through one at a time. And a rail down the left
+edge, outboard of the outline, marks **where** they are — placed where the notes
+actually fall in the document, so three clustered in one section is visible at a
+glance.
 
 **File › Export Comments as Text…** writes a copy with every note turned into a
 blockquote, for the review the other person has to read on GitHub:
@@ -126,6 +127,7 @@ place would trade one for the other.
 - **Everything GitHub-flavoured** — tables, task lists, footnotes, front matter as a header card, syntax highlighting, Mermaid diagrams, KaTeX maths
 - **Find with a counter** — `⌘F` highlights every hit and tells you which one you are on
 - **Truly offline** — a content security policy blocks every request, and the KaTeX fonts are embedded in the bundle. Remote images do not load, on purpose
+- **Tabs** — several documents in one window, with everything macOS gives a tabbed app: `⌘⇧[` and `⌘⇧]`, drag a tab out to its own window, Merge All Windows
 - **Native throughout** — real AppKit windows, menus, appearance switching and printing, around a WebView that only ever renders
 
 ## Tech Stack

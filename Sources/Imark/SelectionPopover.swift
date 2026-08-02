@@ -280,7 +280,7 @@ final class SelectionPopover {
         scroll.heightAnchor.constraint(equalToConstant: 84).isActive = true
         scroll.widthAnchor.constraint(equalToConstant: 290).isActive = true
 
-        let hint = NSTextField(labelWithString: "⌘↵ to save · esc to cancel")
+        let hint = NSTextField(labelWithString: "↵ save · ⇧↵ line · esc")
         hint.font = .systemFont(ofSize: 10)
         hint.textColor = .tertiaryLabelColor
 
@@ -345,10 +345,13 @@ extension SelectionPopover.Target: NSTextViewDelegate {
     func textView(_ textView: NSTextView, doCommandBy selector: Selector) -> Bool {
         switch selector {
         case #selector(NSResponder.insertNewline(_:)):
-            // Return inserts a line; ⌘↵ saves. Modifiers are not reported here.
-            guard NSEvent.modifierFlags.contains(.command) else { return false }
+            // Return saves. A note is usually one sentence, and having to reach
+            // for ⌘↵ to finish one was the thing that felt wrong.
             saveComment()
             return true
+        case #selector(NSResponder.insertLineBreak(_:)):
+            // ⇧↵ is how you get a second line when you want one.
+            return false
         case #selector(NSResponder.cancelOperation(_:)):
             cancelComment()
             return true

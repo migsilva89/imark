@@ -46,7 +46,16 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
             defer: false
         )
         window.titlebarAppearsTransparent = false
-        window.tabbingMode = .disallowed
+        // EXPERIMENTAL. `.preferred` always tabs; `.automatic` would obey the
+        // system's "prefer tabs when opening documents", which defaults to full
+        // screen only — so it would look like nothing had changed. Shipping
+        // should probably be `.automatic`: overriding somebody's stated
+        // preference is rude, however good tabs are.
+        window.tabbingMode = .preferred
+        // Every document window joins the same group. Without an identifier
+        // macOS groups by class name, which happens to work here and would stop
+        // working the moment a second kind of window wanted tabs.
+        window.tabbingIdentifier = "ImarkDocument"
 
         super.init(window: window)
 
@@ -69,6 +78,18 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         window.center()
         window.setFrameAutosaveName("ImarkDocument")
         window.delegate = self
+
+        // A popover belongs to the document under it. Switching tabs hides the
+        // window but leaves the popover floating over whatever is now on top,
+        // still editing a note in a file you can no longer see. Occlusion is
+        // the right signal: a popover taking key status does not change it,
+        // while a tab going to the back does.
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(visibilityChanged),
+            name: NSWindow.didChangeOcclusionStateNotification,
+            object: window
+        )
 
         buildToolbar()
 
@@ -371,6 +392,12 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     /// Whatever is selected goes into the search field. Selecting a phrase and
     /// pressing ⌘F only ever meant one thing, and typing it again was the app
     /// ignoring what you had already told it.
+    /// Gives the tab bar its + button and ⌘T. Without it macOS shows tabs but
+    /// no way to open another one, which reads as a broken tab bar.
+    override func newWindowForTab(_ sender: Any?) {
+        (NSApp.delegate as? AppDelegate)?.openDocument(sender)
+    }
+
     @objc func performFind(_ sender: Any?) {
         selectionPopover.dismiss()
         content.showFind(with: selection?.text)
@@ -493,7 +520,14 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
 
     // MARK: - NSWindowDelegate
 
+    @objc private func visibilityChanged() {
+        guard let window, !window.occlusionState.contains(.visible) else { return }
+        selectionPopover.dismiss()
+        commentsList.dismiss()
+    }
+
     func windowWillClose(_ notification: Notification) {
+        NotificationCenter.default.removeObserver(self)
         watcher = nil
         onClose?()
     }

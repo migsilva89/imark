@@ -709,21 +709,23 @@ img[data-blocked] {
 
 /* ------------------------------------------------------- comments rail */
 
-/* Opposite edge to the outline. Marks sit where the notes are in the document,
-   not spread evenly — three notes clustered in one section is worth seeing. */
+/* Outboard of the outline, on the same edge. Both rails answer "where do I go
+   next", and splitting them across the window made you look in two places. The
+   marks sit where the notes are in the document rather than spread evenly —
+   three notes clustered in one section is worth seeing. */
 .note-rail {
   position: fixed;
   top: 0;
   bottom: 0;
-  right: 0;
-  width: 18px;
-  z-index: 6;
+  left: 0;
+  width: 14px;
+  z-index: 7;
   pointer-events: none;
 }
 
 .note-mark {
   position: absolute;
-  right: 6px;
+  left: 4px;
   width: 6px;
   height: 6px;
   padding: 0;
@@ -746,7 +748,10 @@ img[data-blocked] {
   border: 1px solid var(--secondary);
 }
 
-:root[data-note-rail] body { padding-right: calc(var(--step) * 6); }
+/* The outline rail steps aside to make room, and the text follows it. */
+:root[data-note-rail][data-rail='left'] .rail { left: 14px; }
+:root[data-note-rail][data-rail='left'] body { padding-left: calc(var(--step) * 18); }
+:root[data-note-rail]:not([data-rail]) body { padding-left: calc(var(--step) * 5); }
 
 /* Quick Look is a reading panel and nothing in it is clickable. */
 :root[data-preview='true'] .note-rail { display: none; }

@@ -20,6 +20,10 @@ hgh
 jhgfhfh
 -->
 
+<!-- imark quote="add cases" by="Miguel Silva" at="2026-08-02T20:20:00Z"
+bv
+-->
+
 ## v2.2.0 - 2022-03-15
 
 ### Fixed

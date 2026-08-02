@@ -79,14 +79,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         controllers.append(controller)
 
-        // Every document window restores the same autosaved frame, so without
-        // this a second document lands exactly on top of the first and looks
-        // like nothing happened.
-        if controllers.count > 1, let window = controller.window {
-            cascadePoint = window.cascadeTopLeft(from: cascadePoint)
-        }
         controller.showWindow(nil)
         controller.window?.makeKeyAndOrderFront(nil)
+
+        // Every document window restores the same autosaved frame, so without
+        // this a second document lands exactly on top of the first and looks
+        // like nothing happened. A window that joined a tab group has no frame
+        // of its own to move, so cascading it would fight the tab bar.
+        if controllers.count > 1, let window = controller.window, window.tabGroup == nil {
+            cascadePoint = window.cascadeTopLeft(from: cascadePoint)
+        }
         NSDocumentController.shared.noteNewRecentDocumentURL(key)
     }
 
