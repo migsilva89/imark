@@ -46,12 +46,13 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
             defer: false
         )
         window.titlebarAppearsTransparent = false
-        // EXPERIMENTAL. `.preferred` always tabs; `.automatic` would obey the
-        // system's "prefer tabs when opening documents", which defaults to full
-        // screen only — so it would look like nothing had changed. Shipping
-        // should probably be `.automatic`: overriding somebody's stated
-        // preference is rude, however good tabs are.
-        window.tabbingMode = .preferred
+        // Obeys "prefer tabs when opening documents", which is somebody's
+        // stated preference and not ours to override. It only governs windows
+        // the system groups on its own: ⌘-clicking a file in the sidebar asks
+        // for its tab outright, and that still works at every setting. What
+        // this gives up is Finder double-clicks tabbing for people who left
+        // the preference on its default of full screen only.
+        window.tabbingMode = .automatic
         // Every document window joins the same group. Without an identifier
         // macOS groups by class name, which happens to work here and would stop
         // working the moment a second kind of window wanted tabs.
