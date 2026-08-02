@@ -211,7 +211,8 @@ Sources/ImarkQuickLook/  the Quick Look extension
 Sources/ImarkRender/     the renderer both of them share
 renderer/                JavaScript source
 Resources/               build output — not edited by hand
-Support/                 Info.plist, entitlements, and the icon generator
+Support/                 Info.plist, entitlements, the icon generator, and tests
+testdata/                documents that exercise the renderer
 docs/                    design, flows and acceptance criteria
 ```
 
