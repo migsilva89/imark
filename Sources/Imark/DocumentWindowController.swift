@@ -63,9 +63,10 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
 
         content.renderer.setTextScale(Settings.textScale)
         content.renderer.setWidth(Settings.width.rawValue)
-        // Right edge, so it complements the outline on the left rather than
-        // competing with it.
-        content.renderer.setRail("right")
+        // Left, same as the preview panel: the rail lives inside the web view,
+        // which already starts to the right of the sidebar, so it never collides
+        // with it — and one consistent position beats one clever one.
+        content.renderer.setRail("left")
 
         show(url, pushingHistory: false)
 
