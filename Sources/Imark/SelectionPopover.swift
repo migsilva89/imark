@@ -1,5 +1,4 @@
 import AppKit
-import AVFoundation
 import ImarkRender
 import NaturalLanguage
 import Translation
@@ -12,12 +11,9 @@ import Translation
 /// that it happened. An action that succeeds in silence is indistinguishable
 /// from a button that does nothing.
 final class SelectionPopover {
-    var onCopyMarkdown: (() -> Void)?
-    var onFind: ((String) -> Void)?
     var onSaveComment: ((String) -> Void)?
 
     private let popover = NSPopover()
-    private let speech = AVSpeechSynthesizer()
     private let target = Target()
     private var text = ""
 
@@ -25,10 +21,8 @@ final class SelectionPopover {
     private lazy var actionsView = buildActions()
     private let composer = NSTextView()
     private let message = NSTextField(labelWithString: "")
-    private var speakButton: NSButton?
 
-    /// Where the selection is, kept so Look Up can point its panel at the words
-    /// rather than at wherever the mouse happens to be.
+    /// Where the selection is, so the composer can open over the note it edits.
     private weak var host: NSView?
     private var hostRect = NSRect.zero
     /// What the note being edited is anchored to, for the header of the composer.
@@ -39,7 +33,6 @@ final class SelectionPopover {
         popover.animates = false   // it tracks a selection; easing reads as lag
 
         target.owner = self
-        speech.delegate = target
 
         let controller = NSViewController()
         controller.view = container
@@ -80,10 +73,8 @@ final class SelectionPopover {
 
     func dismiss() {
         if popover.isShown { popover.performClose(nil) }
-        if speech.isSpeaking { speech.stopSpeaking(at: .immediate) }
         isComposing = false
         popover.behavior = .transient
-        updateSpeakButton()
         show(panel: actionsView)
     }
 
@@ -103,8 +94,8 @@ final class SelectionPopover {
         popover.contentSize = panel.fittingSize
     }
 
-    /// The whole point of the rebuild: say what happened, then get out of the
-    /// way. Copy used to succeed in complete silence.
+    /// Says what happened, then gets out of the way. An action that succeeds in
+    /// silence is indistinguishable from a button that does nothing.
     private func confirm(_ note: String, then close: Bool = true) {
         message.stringValue = note
         message.font = .systemFont(ofSize: 13)
@@ -130,13 +121,13 @@ final class SelectionPopover {
     // MARK: - Actions
 
     private func buildActions() -> NSView {
+        // Three, not seven. Copying and finding are already ⌘C and ⌘F, looking
+        // a word up is ⌃⌘D in every app on the system, and reading aloud was a
+        // button nobody was going to press. What is left is what only exists
+        // here or is genuinely faster from a selection.
         let actions: [(symbol: String, tip: String, action: Selector)] = [
             ("bubble.left", "Comment", #selector(Target.comment)),
-            ("doc.on.doc", "Copy Markdown", #selector(Target.copyMarkdown)),
-            ("magnifyingglass", "Find in document", #selector(Target.find)),
-            ("book", "Look Up", #selector(Target.lookUp)),
             ("character.book.closed", "Translate", #selector(Target.translate)),
-            ("speaker.wave.2", "Speak", #selector(Target.speak)),
             ("globe", "Search the web", #selector(Target.searchWeb)),
         ]
 
@@ -156,7 +147,6 @@ final class SelectionPopover {
             button.heightAnchor.constraint(equalToConstant: 26).isActive = true
             return button
         }
-        speakButton = buttons[5]
 
         let stack = NSStackView(views: buttons)
         stack.orientation = .horizontal
@@ -168,28 +158,14 @@ final class SelectionPopover {
     /// The buttons target a small forwarding object rather than the popover
     /// itself, so the button targets hold nothing strongly. One per popover —
     /// a shared one would mean two document windows fighting over it.
-    fileprivate final class Target: NSObject, AVSpeechSynthesizerDelegate {
+    fileprivate final class Target: NSObject {
         weak var owner: SelectionPopover?
 
         @objc func comment() {
             owner?.beginComposing()
         }
-        @objc func copyMarkdown() {
-            owner?.onCopyMarkdown?()
-            owner?.confirm("Copied")
-        }
-        @objc func find() {
-            owner.map { $0.onFind?($0.text) }
-            owner?.dismiss()
-        }
-        @objc func lookUp() {
-            owner?.lookUpSelection()
-        }
         @objc func translate() {
             owner?.translateSelection()
-        }
-        @objc func speak() {
-            owner?.speakSelection()
         }
         @objc func searchWeb() {
             owner?.search()
@@ -197,26 +173,9 @@ final class SelectionPopover {
         @objc func saveComment() { owner?.commitComment() }
         @objc func cancelComment() { owner?.dismiss() }
 
-        func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
-            owner?.updateSpeakButton()
-        }
-        func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
-            owner?.updateSpeakButton()
-        }
     }
 
-    // MARK: - Look up, translate, speak, search
-
-    /// `showDefinition` is the panel ⌃⌘D opens everywhere in macOS. The Services
-    /// route launched Dictionary.app instead — a whole other application coming
-    /// up behind the window, which from here looked like nothing happening.
-    private func lookUpSelection() {
-        guard let view = host else { return confirm("Can't look that up") }
-        let word = text
-        let point = NSPoint(x: hostRect.minX, y: hostRect.minY)
-        dismiss()
-        view.showDefinition(for: NSAttributedString(string: word), at: point)
-    }
+    // MARK: - Translate and search
 
     /// There is no "Translate" system service — the probe that found this had
     /// the button beeping into the void. The Translation framework does the work
@@ -266,36 +225,12 @@ final class SelectionPopover {
         show(panel: stack)
     }
 
-    private func speakSelection() {
-        // Pressing it again stops, rather than stacking a second voice on top.
-        if speech.isSpeaking {
-            speech.stopSpeaking(at: .immediate)
-            updateSpeakButton()
-            return
-        }
-        let utterance = AVSpeechUtterance(string: text)
-        utterance.voice = AVSpeechSynthesisVoice(language: Locale.current.identifier)
-        speech.speak(utterance)
-        updateSpeakButton()
-    }
-
-    /// Speaking is the one action with no visual result at all, so the button
-    /// itself carries the state.
-    fileprivate func updateSpeakButton() {
-        let symbol = speech.isSpeaking ? "stop.circle" : "speaker.wave.2"
-        speakButton?.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
-        speakButton?.toolTip = speech.isSpeaking ? "Stop speaking" : "Speak"
-    }
-
+    /// Opens a plain search URL rather than going through the system's search
+    /// service. The service hands the query to Safari whatever your default
+    /// browser is; a URL goes to whichever browser actually handles http.
     private func search() {
         let query = text.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-        // The service uses whatever search engine the user actually chose;
-        // only fall back to a hardcoded one if it is unavailable.
-        let board = NSPasteboard(name: .init("pt.miguelsilva.imark.selection"))
-        board.clearContents()
-        board.setString(text, forType: .string)
-        if !NSPerformService("Search With %WebSearchProvider@", board),
-           let url = URL(string: "https://duckduckgo.com/?q=\(query)") {
+        if let url = URL(string: "https://duckduckgo.com/?q=\(query)") {
             NSWorkspace.shared.open(url)
         }
         dismiss()

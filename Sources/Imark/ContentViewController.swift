@@ -115,8 +115,17 @@ final class ContentViewController: NSViewController {
     func showFind(with text: String? = nil) {
         findBar.isHidden = false
         findHeight.constant = 40
-        if let text, !text.isEmpty { searchField.stringValue = text }
+        // Newlines would make the field one long unsearchable line; a selection
+        // spanning paragraphs is still a reasonable thing to hand over.
+        if let text, !text.isEmpty {
+            searchField.stringValue = text
+                .replacingOccurrences(of: "\n", with: " ")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        }
         view.window?.makeFirstResponder(searchField)
+        // Selected, not just filled: if the guess is wrong, typing replaces it
+        // instead of appending to it.
+        searchField.currentEditor()?.selectAll(nil)
         if !searchField.stringValue.isEmpty {
             renderer.find(searchField.stringValue)
         }

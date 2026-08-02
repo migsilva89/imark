@@ -74,8 +74,6 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         content.onFindClosed = { [weak self] in
             self?.window?.makeFirstResponder(self?.content.renderer)
         }
-        selectionPopover.onCopyMarkdown = { [weak self] in self?.copySelectedMarkdown() }
-        selectionPopover.onFind = { [weak self] text in self?.content.showFind(with: text) }
         selectionPopover.onSaveComment = { [weak self] body in self?.saveComment(body) }
 
         sidebar.onSelectHeading = { [weak self] id in self?.content.renderer.scrollTo(anchor: id) }
@@ -233,28 +231,6 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
-    /// Copies the source that produced the selection, not the flattened text —
-    /// the whole point of the line map. Falls back to the plain text when the
-    /// selection is not inside a block we can locate.
-    private func copySelectedMarkdown() {
-        guard let selection else { return }
-        var copied = selection.text
-
-        if let block = selection.block,
-           let source = try? String(contentsOf: url, encoding: .utf8) {
-            let lines = source.components(separatedBy: .newlines)
-            let start = max(0, block.start)
-            let end = min(lines.count, block.end)
-            if start < end {
-                copied = lines[start..<end].joined(separator: "\n")
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-            }
-        }
-
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(copied, forType: .string)
-    }
-
     /// Writes the note into the file, immediately after the block the selection
     /// came from. This is the first thing Imark does that changes a document, so
     /// it goes through an atomic replace and refuses to write over a file that
@@ -381,7 +357,13 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         Settings.sidebarCollapsed = sidebarItem.isCollapsed
     }
 
-    @objc func performFind(_ sender: Any?) { content.showFind() }
+    /// Whatever is selected goes into the search field. Selecting a phrase and
+    /// pressing ⌘F only ever meant one thing, and typing it again was the app
+    /// ignoring what you had already told it.
+    @objc func performFind(_ sender: Any?) {
+        selectionPopover.dismiss()
+        content.showFind(with: selection?.text)
+    }
 
     @objc func toggleAllComments(_ sender: Any?) {
         guard noteCount > 0 else { return NSSound.beep() }

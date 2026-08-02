@@ -113,7 +113,7 @@ place would trade one for the other.
 ## Features
 
 - **Comments in the file** — select, comment, edit or delete, and the note lives in the document as an HTML comment, so it survives being emailed, committed, or opened in anything else. `⌘Z` undoes any of it, and they export as visible blockquotes when the review has to happen on GitHub
-- **Actions on a selection** — copy as Markdown rather than flattened text, look the words up, translate them on device, hear them read, or send them to the search engine you actually chose
+- **Actions on a selection** — comment on it, translate it on device, or search the web for it in your default browser
 - **Quick Look previews** — the space bar in the Finder renders the document, not raw text, using the same engine as the app
 - **Live reload** — saving in your editor updates the view in under 300ms, keeping your scroll position, and it survives the delete-and-rename that editors call an atomic save
 - **Foldable outline** — headings in the sidebar, with sections you can collapse; past twenty entries it opens folded, so a changelog is one row per version
@@ -156,7 +156,7 @@ That builds the JavaScript bundle, compiles the Swift, assembles `Imark.app`, si
 
 | | | | |
 |---|---|---|---|
-| `⌘O` | Open | `⌘F` | Find |
+| `⌘O` | Open | `⌘F` | Find, prefilled with the selection |
 | `⌘W` | Close window | `⌘G` / `⌘⇧G` | Next / previous hit |
 | `⌘\` | Toggle sidebar | `←` / `→` | Fold / unfold outline section |
 | `⌘[` / `⌘]` | Back / forward | `⌘R` | Reload |
