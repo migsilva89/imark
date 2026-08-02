@@ -292,6 +292,10 @@ private final class HeaderCell: NSTableCellView {
 }
 
 private final class ItemCell: NSTableCellView {
+    /// Every row here goes somewhere when clicked, and a row that goes
+    /// somewhere should say so before you press it.
+    override func resetCursorRects() { addCursorRect(bounds, cursor: .pointingHand) }
+
     private let onToggle: (() -> Void)?
 
     init(

@@ -15,7 +15,7 @@ public enum RendererMessage {
     case openExternal(URL)
     case selection(Selection)
     case selectionCleared
-    case comments(count: Int, reviewing: Bool)
+    case comments(notes: [NoteSummary], reviewing: Bool)
     case noteCommand(NoteCommand)
 }
 
@@ -36,6 +36,20 @@ public struct Selection {
     /// Which occurrence of this text inside the block it is, counting from one.
     /// Two notes on the same word would otherwise both anchor to the first.
     public let occurrence: Int
+}
+
+/// One note, flattened for listing. Built by the renderer, which has already
+/// parsed the file — a second parser in Swift would be a second parser to keep
+/// in step.
+public struct NoteSummary {
+    public let quote: String
+    public let author: String
+    /// Already formatted by the renderer, which is the only place that copes
+    /// with the shapes a hand-written timestamp comes in.
+    public let when: String
+    public let text: String
+    /// The quoted words are gone from the document; the note has no exact place.
+    public let orphan: Bool
 }
 
 /// Edit or delete, asked for from a note's own card.
@@ -311,8 +325,17 @@ public final class RendererView: NSView {
                 owner.onMessage?(.selectionCleared)
 
             case "comments":
+                let raw = body["items"] as? [[String: Any]] ?? []
                 owner.onMessage?(.comments(
-                    count: body["count"] as? Int ?? 0,
+                    notes: raw.map { item in
+                        NoteSummary(
+                            quote: item["quote"] as? String ?? "",
+                            author: item["by"] as? String ?? "",
+                            when: item["when"] as? String ?? "",
+                            text: item["text"] as? String ?? "",
+                            orphan: item["orphan"] as? Bool ?? false
+                        )
+                    },
                     reviewing: body["reviewing"] as? Bool ?? false
                 ))
 

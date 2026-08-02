@@ -676,9 +676,9 @@ async function render({ markdown, path, theme, preview, rail }) {
     : `${renderFrontMatter(data)}<p class="empty">This file is empty</p>`
   if (token !== renderToken) return
 
-  attachComments(root, comments)
+  const notes = attachComments(root, comments)
   restoreNoteState()
-  bridge({ type: 'comments', count: comments.length, reviewing: isReviewing() })
+  bridge({ type: 'comments', count: notes.length, reviewing: isReviewing(), items: notes })
 
   // The highlight elements went out with the old DOM.
   matches = []
@@ -980,7 +980,12 @@ window.imark = {
     }
   },
   setReviewing(on) {
-    bridge({ type: 'comments', count: applyReviewing(on), reviewing: on })
+    applyReviewing(on)
+    bridge({
+      type: 'comments',
+      count: document.querySelectorAll('.note-dot').length,
+      reviewing: on,
+    })
   },
   stepNote,
   exportComments: () => toVisibleText(lastSource),

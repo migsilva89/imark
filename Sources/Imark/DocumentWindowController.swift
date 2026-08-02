@@ -23,6 +23,8 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     private var undoStack: [(text: String, what: String)] = []
     /// Set while the composer is editing a note rather than writing a new one.
     private var editingNote: ClosedRange<Int>?
+    private let commentsList = CommentsList()
+    private var notes: [NoteSummary] = []
     private(set) var noteCount = 0
     private(set) var reviewingComments = false
 
@@ -75,6 +77,13 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
             self?.window?.makeFirstResponder(self?.content.renderer)
         }
         selectionPopover.onSaveComment = { [weak self] body in self?.saveComment(body) }
+        content.onShowComments = { [weak self] anchor in
+            guard let self else { return }
+            self.commentsList.show(self.notes, from: anchor)
+        }
+        commentsList.onSelect = { [weak self] index in
+            self?.content.renderer.revealNote(index)
+        }
 
         sidebar.onSelectHeading = { [weak self] id in self?.content.renderer.scrollTo(anchor: id) }
         sidebar.onSelectFile = { [weak self] url in self?.show(url, pushingHistory: true) }
@@ -221,10 +230,12 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         case .noteCommand(let command):
             perform(command)
 
-        case .comments(let count, let reviewing):
-            noteCount = count
+        case .comments(let found, let reviewing):
+            notes = found
+            noteCount = found.count
             reviewingComments = reviewing
-            content.setStatus(comments: count)
+            content.setStatus(comments: found.count)
+            if found.isEmpty { commentsList.dismiss() }
 
         case .ready, .rendered, .find:
             break

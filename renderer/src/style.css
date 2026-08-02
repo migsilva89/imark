@@ -167,6 +167,7 @@ blockquote > :last-child { margin-bottom: 0; }
 .task-list-item { list-style: none; }
 
 .task-list-item input[type='checkbox'] {
+  cursor: pointer;
   margin-right: calc(var(--step) * 2);
   margin-left: calc(var(--step) * -6);
   accent-color: var(--accent);
@@ -243,7 +244,7 @@ pre code {
   border-radius: 6px;
   opacity: 0;
   transition: opacity 120ms ease;
-  cursor: default;
+  cursor: pointer;
 }
 
 .code-wrap:hover .copy-btn { opacity: 1; }

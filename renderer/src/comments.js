@@ -137,13 +137,16 @@ function holderFor(block) {
   return holder
 }
 
+/// Returns the notes that found a home, in the order they appear, so Swift can
+/// list them without parsing the file a second time. A note whose block is gone
+/// is not in the list because it is not on screen either.
 export function attachComments(root, comments) {
-  if (!comments.length) return 0
+  if (!comments.length) return []
 
   // Resolved before anything is wrapped: wrapping changes root.children, and
   // two notes on the same paragraph would then fail to find it.
   const resolved = comments.map((note) => ({ note, block: blockAbove(root, note.line) }))
-  let attached = 0
+  const attached = []
 
   for (const { note, block } of resolved) {
     if (!block) continue
@@ -164,7 +167,15 @@ export function attachComments(root, comments) {
     if (stacked) dot.style.top = `${2 + stacked * 17}px`
     holder.appendChild(dot)
     holder.appendChild(buildCard(note, !anchor))
-    attached += 1
+    attached.push({
+      quote: note.quote,
+      by: note.by,
+      // Formatted here, not in Swift: a hand-written note can carry any shape
+      // of timestamp, and this is already the one place that copes with that.
+      when: formatDate(note.at),
+      text: note.text,
+      orphan: !anchor,
+    })
   }
 
   return attached
