@@ -163,6 +163,12 @@ That builds the JavaScript bundle, compiles the Swift, assembles `Imark.app`, si
 | `⌘+` / `⌘-` / `⌘0` | Text size | `⌘⇧R` | Reveal in Finder |
 | `⌘P` | Print or export PDF | `⌘⇧C` | Show all comments |
 | `⌘'` / `⌘⇧'` | Next / previous comment | `⌘Z` | Undo the last comment change |
+| `⌘/` | This table, in the app | | |
+
+`⌘/` opens the same list inside the app, built by reading the menu bar rather
+than from a copy of this table — which is also how it stays right on keyboards
+where macOS remaps the keys. On a Portuguese layout, Back and Forward are `⌘Ç`
+and `⌘~`, not `⌘[` and `⌘]`.
 
 ## FAQ
 

@@ -22,6 +22,16 @@ enum Menu {
         main.addItem(viewItem)
         viewItem.submenu = viewMenu()
 
+        let helpItem = NSMenuItem()
+        main.addItem(helpItem)
+        let help = NSMenu(title: "Help")
+        help.addItem(
+            withTitle: "Keyboard Shortcuts",
+            action: #selector(AppDelegate.showShortcuts(_:)),
+            keyEquivalent: "/"
+        )
+        helpItem.submenu = help
+
         let windowItem = NSMenuItem()
         main.addItem(windowItem)
         let window = NSMenu(title: "Window")

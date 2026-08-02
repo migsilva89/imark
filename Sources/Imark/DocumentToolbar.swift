@@ -7,6 +7,7 @@ private extension NSToolbarItem.Identifier {
     static let openIn = NSToolbarItem.Identifier("openIn")
     static let theme = NSToolbarItem.Identifier("theme")
     static let comments = NSToolbarItem.Identifier("comments")
+    static let shortcuts = NSToolbarItem.Identifier("shortcuts")
 }
 
 extension DocumentWindowController: NSToolbarDelegate {
@@ -21,6 +22,10 @@ extension DocumentWindowController: NSToolbarDelegate {
 
     public func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
         [.toggleSidebar, .sidebarTrackingSeparator, .flexibleSpace,
+         // Shortcuts leads its own group, with a gap after it: it is the one
+         // button that explains the others, and sitting next to Share made it
+         // look like part of exporting.
+         .shortcuts, .space,
          .find, .comments, .text, .theme, .export, .openIn]
     }
 
@@ -41,6 +46,16 @@ extension DocumentWindowController: NSToolbarDelegate {
         case .comments:
             return button(identifier, symbol: "bubble.left.and.bubble.right", label: "Comments",
                           action: #selector(toggleAllComments(_:)))
+
+        case .shortcuts:
+            // Target left nil so it walks the responder chain to the app
+            // delegate: the panel belongs to the app, not to one document.
+            let item = NSToolbarItem(itemIdentifier: identifier)
+            item.image = NSImage(systemSymbolName: "keyboard", accessibilityDescription: "Keyboard Shortcuts")
+            item.label = "Shortcuts"
+            item.toolTip = "Keyboard Shortcuts (⌘/)"
+            item.action = #selector(AppDelegate.showShortcuts(_:))
+            return item
 
         case .export:
             return button(identifier, symbol: "square.and.arrow.up", label: "Export",
