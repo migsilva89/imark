@@ -26,6 +26,12 @@ enum Editors {
         ("pro.writer.mac", "iA Writer"),
     ]
 
+    /// The list with no document in hand, for the preferences — which are about
+    /// markdown in general rather than about the file you happen to have open.
+    /// The path is a stand-in: Launch Services answers on the extension, and
+    /// never goes looking for the file.
+    static var installed: [Editor] { installed(for: URL(fileURLWithPath: "/Imark.md")) }
+
     static func installed(for url: URL) -> [Editor] {
         var found: [Editor] = []
         var seen = Set<URL>()

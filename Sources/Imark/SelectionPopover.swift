@@ -130,7 +130,9 @@ final class SelectionPopover {
         let actions: [(symbol: String, tip: String, action: Selector)] = [
             ("bubble.left", "Comment", #selector(Target.comment)),
             ("character.book.closed", "Translate", #selector(Target.translate)),
-            ("globe", "Search the web", #selector(Target.searchWeb)),
+            // Named rather than "Search the web": you chose the engine, so the
+            // button can say where the press is about to take you.
+            ("globe", "Search \(Settings.searchEngine.label)", #selector(Target.searchWeb)),
         ]
 
         let buttons = actions.map { spec -> NSButton in
@@ -232,8 +234,7 @@ final class SelectionPopover {
     /// service. The service hands the query to Safari whatever your default
     /// browser is; a URL goes to whichever browser actually handles http.
     private func search() {
-        let query = text.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-        if let url = URL(string: "https://duckduckgo.com/?q=\(query)") {
+        if let url = Settings.searchEngine.url(searching: text) {
             NSWorkspace.shared.open(url)
         }
         dismiss()
@@ -259,9 +260,10 @@ final class SelectionPopover {
 
     private func beginComposing(prefill: String = "") {
         isComposing = true
-        // A new note starts on the default; an edit keeps whatever it already
-        // was, which `compose(existing:colour:…)` has already put in `picked`.
-        if prefill.isEmpty { picked = .standard }
+        // A new note starts on whatever you set as your default; an edit keeps
+        // whatever it already was, which `compose(existing:colour:…)` has
+        // already put in `picked`.
+        if prefill.isEmpty { picked = Settings.noteColour }
         // A click elsewhere must not silently bin what is being typed.
         popover.behavior = .applicationDefined
 

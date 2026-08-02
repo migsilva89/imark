@@ -86,6 +86,14 @@ public final class RendererView: NSView {
     private var previewMode = false
     private var railSide: String?
 
+    /// Which palette to ask the page for on each side of the system's light and
+    /// dark switch. The names are `[data-theme]` values in the stylesheet, and
+    /// the defaults are the two the page has always had — so anything that does
+    /// not set these, Quick Look included, behaves exactly as before.
+    public var palettes: (light: String, dark: String) = ("light", "dark")
+
+    private var palette: String { isDarkMode ? palettes.dark : palettes.light }
+
     public override init(frame frameRect: NSRect) {
         let config = WKWebViewConfiguration()
         config.setURLSchemeHandler(SchemeHandler(), forURLScheme: SchemeHandler.scheme)
@@ -128,7 +136,7 @@ public final class RendererView: NSView {
         call("window.imark.render", [
             "markdown": markdown,
             "path": path,
-            "theme": isDarkMode ? "dark" : "light",
+            "theme": palette,
             // Carried in the payload rather than sent separately: a standalone
             // call lands before the page is ready and is silently dropped.
             "preview": previewMode,
@@ -137,7 +145,7 @@ public final class RendererView: NSView {
     }
 
     public func applyTheme() {
-        call("window.imark.setTheme", isDarkMode ? "dark" : "light")
+        call("window.imark.setTheme", palette)
     }
 
     public func scrollTo(anchor: String) {
@@ -146,6 +154,13 @@ public final class RendererView: NSView {
 
     public func markMissingWikiLinks(_ targets: [String]) {
         call("window.imark.markMissing", targets)
+    }
+
+    /// How much of the page's top edge the toolbar covers. The document runs the
+    /// full height of the window so it can scroll under a blurred bar; without
+    /// this the first line of every document would start out behind it.
+    public func setTopInset(_ points: Double) {
+        call("window.imark.setTopInset", points)
     }
 
     public func setTextScale(_ points: Double) {

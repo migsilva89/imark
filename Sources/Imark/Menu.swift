@@ -47,6 +47,13 @@ enum Menu {
         let menu = NSMenu(title: "Imark")
         menu.addItem(withTitle: "About Imark", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
         menu.addItem(.separator())
+        let settings = menu.addItem(
+            withTitle: "Settings…",
+            action: #selector(AppDelegate.showSettings(_:)),
+            keyEquivalent: ","
+        )
+        settings.target = NSApp.delegate
+        menu.addItem(.separator())
         let makeDefault = menu.addItem(
             withTitle: "Make Imark the Default for .md",
             action: #selector(AppDelegate.makeDefaultHandler(_:)),
@@ -101,6 +108,21 @@ enum Menu {
         menu.addItem(withTitle: "Bigger Text", action: #selector(DocumentWindowController.increaseText(_:)), keyEquivalent: "+")
         menu.addItem(withTitle: "Smaller Text", action: #selector(DocumentWindowController.decreaseText(_:)), keyEquivalent: "-")
         menu.addItem(withTitle: "Actual Size", action: #selector(DocumentWindowController.resetText(_:)), keyEquivalent: "0")
+
+        // The column width used to live only inside the toolbar's AA menu, which
+        // means it went with it. The menu bar is where macOS expects every
+        // command to be findable, and it is what ⌘/ reads to build its list.
+        let widths = NSMenu(title: "Column Width")
+        for width in Settings.Width.allCases {
+            let item = widths.addItem(
+                withTitle: width.label,
+                action: #selector(DocumentWindowController.chooseWidth(_:)),
+                keyEquivalent: ""
+            )
+            item.representedObject = width.rawValue
+        }
+        menu.addItem(withTitle: "Column Width", action: nil, keyEquivalent: "").submenu = widths
+
         menu.addItem(.separator())
         menu.addItem(withTitle: "Back", action: #selector(DocumentWindowController.goBack(_:)), keyEquivalent: "[")
         menu.addItem(withTitle: "Forward", action: #selector(DocumentWindowController.goForward(_:)), keyEquivalent: "]")
