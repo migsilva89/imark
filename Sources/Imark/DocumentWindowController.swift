@@ -10,6 +10,24 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     private let content = ContentViewController()
     private var sidebarItem: NSSplitViewItem!
 
+    private let selectionPopover = SelectionPopover()
+    private var selection: Selection?
+    /// The file as it was when we read it, and the moment we last wrote it
+    /// ourselves — one guards against clobbering somebody else's edit, the
+    /// other stops our own write from being announced as an outside change.
+    private var stamp: Comments.Stamp?
+    private var lastWrite = Date.distantPast
+    /// A snapshot of the whole document before each change, which is what makes
+    /// undo work the same for writing, editing and deleting a note. Documents
+    /// are capped at 5 MB and the stack at ten, so this stays small.
+    private var undoStack: [(text: String, what: String)] = []
+    /// Set while the composer is editing a note rather than writing a new one.
+    private var editingNote: ClosedRange<Int>?
+    private let commentsList = CommentsList()
+    private var notes: [NoteSummary] = []
+    private(set) var noteCount = 0
+    private(set) var reviewingComments = false
+
     private var watcher: FileWatcher?
     private var back: [URL] = []
     private var forward: [URL] = []
@@ -58,6 +76,15 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         content.onFindClosed = { [weak self] in
             self?.window?.makeFirstResponder(self?.content.renderer)
         }
+        selectionPopover.onSaveComment = { [weak self] body in self?.saveComment(body) }
+        content.onShowComments = { [weak self] anchor in
+            guard let self else { return }
+            self.commentsList.show(self.notes, from: anchor)
+        }
+        commentsList.onSelect = { [weak self] index in
+            self?.content.renderer.revealNote(index)
+        }
+
         sidebar.onSelectHeading = { [weak self] id in self?.content.renderer.scrollTo(anchor: id) }
         sidebar.onSelectFile = { [weak self] url in self?.show(url, pushingHistory: true) }
 
@@ -98,6 +125,10 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
             guard let self else { return }
             switch event {
             case .changed:
+                // Our own atomic save trips the watcher; announcing it as an
+                // outside change would be a lie and would fight the reload we
+                // are already doing.
+                guard Date().timeIntervalSince(self.lastWrite) > 1.0 else { return }
                 self.load()
                 self.content.flashReloaded()
             case .vanished:
@@ -120,6 +151,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
             text = prefix + "\n\n---\n\n> **Truncated.** Above 5 MB Imark shows only the beginning."
         }
 
+        stamp = Comments.Stamp(of: url)
         content.renderer.render(markdown: text, path: url.path)
     }
 
@@ -187,8 +219,131 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
                 NSSound.beep()
             }
 
+        case .selection(let found):
+            selection = found
+            selectionPopover.show(text: found.text, at: found.rect, in: content.renderer)
+
+        case .selectionCleared:
+            selection = nil
+            selectionPopover.dismiss()
+
+        case .noteCommand(let command):
+            perform(command)
+
+        case .comments(let found, let reviewing):
+            notes = found
+            noteCount = found.count
+            reviewingComments = reviewing
+            content.setStatus(comments: found.count)
+            if found.isEmpty { commentsList.dismiss() }
+
         case .ready, .rendered, .find:
             break
+        }
+    }
+
+    /// Writes the note into the file, immediately after the block the selection
+    /// came from. This is the first thing Imark does that changes a document, so
+    /// it goes through an atomic replace and refuses to write over a file that
+    /// moved underneath it.
+    private func saveComment(_ body: String) {
+        if let range = editingNote {
+            return updateComment(body, at: range)
+        }
+        guard let selection, let block = selection.block else {
+            selectionPopover.reportCommentFailure("Couldn't tell where that selection came from")
+            return
+        }
+        do {
+            snapshot("Comment")
+            let index = try Comments.insert(
+                quote: selection.text,
+                body: body,
+                after: block.end,
+                occurrence: selection.occurrence,
+                by: NSFullUserName(),
+                on: Date(),
+                into: url,
+                expecting: stamp
+            )
+            lastWrite = Date()
+            selectionPopover.dismiss()
+            content.renderer.clearSelection()
+            load()
+            // After the re-render, not before: the note does not exist in the
+            // DOM until the document has been rebuilt from the new file.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
+                self?.content.renderer.revealNote(index)
+            }
+        } catch {
+            undoStack.removeLast()
+            selectionPopover.reportCommentFailure(
+                (error as? LocalizedError)?.errorDescription ?? "Couldn't save the comment"
+            )
+        }
+    }
+
+    /// Edit and delete, asked for from the note's own card.
+    private func perform(_ command: NoteCommand) {
+        switch command.kind {
+        case .edit:
+            editingNote = command.lines
+            selectionPopover.quotedText = command.quote
+            selectionPopover.compose(existing: command.text, at: command.rect, in: content.renderer)
+
+        case .delete:
+            do {
+                snapshot("Delete Comment")
+                try Comments.remove(lines: command.lines, from: url, expecting: stamp)
+                finishWrite()
+            } catch {
+                undoStack.removeLast()
+                report(error, doing: "delete that comment")
+            }
+        }
+    }
+
+    private func updateComment(_ body: String, at range: ClosedRange<Int>) {
+        editingNote = nil
+        do {
+            snapshot("Edit Comment")
+            try Comments.update(lines: range, body: body, in: url, expecting: stamp)
+            selectionPopover.dismiss()
+            finishWrite()
+        } catch {
+            undoStack.removeLast()
+            selectionPopover.reportCommentFailure(
+                (error as? LocalizedError)?.errorDescription ?? "Couldn't save the comment"
+            )
+        }
+    }
+
+    private func snapshot(_ what: String) {
+        undoStack.append((text: (try? String(contentsOf: url, encoding: .utf8)) ?? "", what: what))
+        if undoStack.count > 10 { undoStack.removeFirst() }
+    }
+
+    private func finishWrite() {
+        lastWrite = Date()
+        load()
+    }
+
+    private func report(_ error: Error, doing what: String) {
+        let alert = NSAlert()
+        alert.messageText = "Couldn't \(what)"
+        alert.informativeText = (error as? LocalizedError)?.errorDescription
+            ?? error.localizedDescription
+        alert.alertStyle = .warning
+        if let window { alert.beginSheetModal(for: window) } else { alert.runModal() }
+    }
+
+    @objc func undoComment(_ sender: Any?) {
+        guard let last = undoStack.popLast() else { return NSSound.beep() }
+        do {
+            try Comments.restore(last.text, to: url)
+            finishWrite()
+        } catch {
+            report(error, doing: "undo that")
         }
     }
 
@@ -213,7 +368,47 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         Settings.sidebarCollapsed = sidebarItem.isCollapsed
     }
 
-    @objc func performFind(_ sender: Any?) { content.showFind() }
+    /// Whatever is selected goes into the search field. Selecting a phrase and
+    /// pressing ⌘F only ever meant one thing, and typing it again was the app
+    /// ignoring what you had already told it.
+    @objc func performFind(_ sender: Any?) {
+        selectionPopover.dismiss()
+        content.showFind(with: selection?.text)
+    }
+
+    @objc func toggleAllComments(_ sender: Any?) {
+        guard noteCount > 0 else { return NSSound.beep() }
+        reviewingComments.toggle()
+        content.renderer.setReviewingComments(reviewingComments)
+    }
+
+    @objc func nextComment(_ sender: Any?) {
+        noteCount > 0 ? content.renderer.stepNote(1) : NSSound.beep()
+    }
+
+    @objc func previousComment(_ sender: Any?) {
+        noteCount > 0 ? content.renderer.stepNote(-1) : NSSound.beep()
+    }
+
+    /// Greys the comment commands out in a document with no notes, and ticks
+    /// the toggle when review mode is on.
+    func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        switch item.action {
+        case #selector(undoComment(_:)):
+            // Named after what it will actually put back, so the menu never
+            // offers a vague "Undo" that might mean something else.
+            item.title = undoStack.last.map { "Undo \($0.what)" } ?? "Undo"
+            return !undoStack.isEmpty
+        case #selector(toggleAllComments(_:)):
+            item.state = reviewingComments ? .on : .off
+            return noteCount > 0
+        case #selector(nextComment(_:)), #selector(previousComment(_:)),
+             #selector(exportComments(_:)):
+            return noteCount > 0
+        default:
+            return true
+        }
+    }
 
     @objc func findNext(_ sender: Any?) { content.findNext() }
 
@@ -252,6 +447,32 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         info.rightMargin = 36
         content.renderer.printOperation(with: info)
             .runModal(for: window, delegate: nil, didRun: nil, contextInfo: nil)
+    }
+
+    /// Writes a copy with the notes turned into blockquotes. A copy, not the
+    /// document: HTML comments are the right home for a note between two people
+    /// who both use Imark, and useless for a review the other person has to read
+    /// on GitHub. Converting in place would trade one for the other.
+    @objc func exportComments(_ sender: Any?) {
+        guard noteCount > 0 else { return NSSound.beep() }
+        content.renderer.exportComments { [weak self] text in
+            guard let self, let text, let window = self.window else { return NSSound.beep() }
+
+            let panel = NSSavePanel()
+            panel.nameFieldStringValue = self.url.deletingPathExtension().lastPathComponent
+                + "-comments." + (self.url.pathExtension.isEmpty ? "md" : self.url.pathExtension)
+            panel.directoryURL = self.url.deletingLastPathComponent()
+            panel.message = "The comments become blockquotes. Your document is not changed."
+            panel.beginSheetModal(for: window) { response in
+                guard response == .OK, let target = panel.url else { return }
+                do {
+                    try text.write(to: target, atomically: true, encoding: .utf8)
+                    NSWorkspace.shared.activateFileViewerSelecting([target])
+                } catch {
+                    self.report(error, doing: "export the comments")
+                }
+            }
+        }
     }
 
     @objc func revealInFinder(_ sender: Any?) {

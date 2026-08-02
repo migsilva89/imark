@@ -1,0 +1,241 @@
+// Tests for the one thing in Imark that writes to your files.
+//
+//   swiftc -parse-as-library Sources/Imark/Comments.swift \
+//          Support/test-comments.swift -o /tmp/imark-test && /tmp/imark-test
+//
+// A script rather than a test target because Imark is an executable with a
+// hand-written main.swift, and `swift test` cannot import that.
+
+import Foundation
+
+@main
+enum CommentsTest {
+    static var failures = 0
+
+    static func check(_ name: String, _ condition: Bool, _ detail: @autoclosure () -> String = "") {
+        if condition {
+            print("OK   \(name)")
+        } else {
+            failures += 1
+            print("FAIL \(name)  \(detail())")
+        }
+    }
+
+    static let folder = URL(fileURLWithPath: NSTemporaryDirectory())
+        .appendingPathComponent("imark-comments-\(UUID().uuidString)")
+
+    static func fixture(_ text: String) -> URL {
+        let url = folder.appendingPathComponent("\(UUID().uuidString).md")
+        try! text.write(to: url, atomically: true, encoding: .utf8)
+        return url
+    }
+
+    static func read(_ url: URL) -> [String] {
+        try! String(contentsOf: url, encoding: .utf8).components(separatedBy: "\n")
+    }
+
+    static let date = Date(timeIntervalSince1970: 1_754_150_000)
+
+    static func main() throws {
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+
+        try placement()
+        try ordering()
+        try escaping()
+        try conflict()
+        try atomicity()
+        try manyInARow()
+        try deleting()
+        try editing()
+        try undoing()
+        try staleRanges()
+
+        try? FileManager.default.removeItem(at: folder)
+        print(failures == 0 ? "\nall good" : "\n\(failures) failing")
+        exit(failures == 0 ? 0 : 1)
+    }
+
+    // MARK: - Where the note lands
+
+    static func placement() throws {
+        let url = fixture("""
+        # Title
+
+        First paragraph.
+
+        Second paragraph.
+        """)
+        // "First paragraph." is lines 2..3 with an exclusive end, so 3.
+        let index = try Comments.insert(
+            quote: "First", body: "Why first?", after: 3, occurrence: 1,
+            by: "miguel", on: date, into: url, expecting: Comments.Stamp(of: url)
+        )
+        let lines = read(url)
+        check("lands right after the block", lines[4].hasPrefix("<!-- imark"), lines.joined(separator: "⏎"))
+        check("blank line before the note", lines[3].isEmpty)
+        check("original text untouched", lines[2] == "First paragraph." && lines.last == "Second paragraph.")
+        check("first note has index 0", index == 0)
+        check("quote and author written", lines[4].contains("quote=\"First\"") && lines[4].contains("by=\"miguel\""))
+        check("no nth for a first occurrence", !lines[4].contains("nth="))
+        check("body on its own line", lines[5] == "Why first?")
+        check("closed", lines[6] == "-->")
+    }
+
+    // MARK: - Which note is which
+
+    static func ordering() throws {
+        let url = fixture("One.\n\nTwo.\n\nThree.")
+        _ = try Comments.insert(quote: "One", body: "a", after: 1, occurrence: 1,
+                                by: "m", on: date, into: url, expecting: nil)
+        let second = try Comments.insert(quote: "Three", body: "c", after: 8, occurrence: 1,
+                                         by: "m", on: date, into: url, expecting: nil)
+        check("a later note counts the earlier one", second == 1, "got \(second)")
+
+        let middle = try Comments.insert(quote: "Two", body: "b", after: 6, occurrence: 1,
+                                         by: "m", on: date, into: url, expecting: nil)
+        check("a note between them counts only what precedes it", middle == 1, "got \(middle)")
+    }
+
+    // MARK: - Text that could break the block
+
+    static func escaping() throws {
+        let url = fixture("Text with \"quotes\" & ampersands.\n")
+        _ = try Comments.insert(
+            quote: "\"quotes\" & ampersands", body: "Ends with an arrow --> right here.",
+            after: 1, occurrence: 2, by: "m", on: date, into: url, expecting: nil
+        )
+        let text = try String(contentsOf: url, encoding: .utf8)
+        check("quotes escaped in the attribute", text.contains("quote=\"&quot;quotes&quot; &amp; ampersands\""))
+        check("nth written when it is needed", text.contains("nth=\"2\""))
+        check("--> neutralised so the block cannot close early", text.contains("--&gt;"))
+        check("only one closing marker", text.components(separatedBy: "-->").count == 2)
+    }
+
+    // MARK: - Somebody else got there first
+
+    static func conflict() throws {
+        let url = fixture("A paragraph.\n")
+        let stamp = Comments.Stamp(of: url)
+        Thread.sleep(forTimeInterval: 0.02)
+        try "A different paragraph.\n".write(to: url, atomically: true, encoding: .utf8)
+
+        var refused = false
+        do {
+            _ = try Comments.insert(quote: "A", body: "note", after: 1, occurrence: 1,
+                                    by: "m", on: date, into: url, expecting: stamp)
+        } catch Comments.Failure.fileChanged {
+            refused = true
+        }
+        check("refuses to write over an outside edit", refused)
+        check("and left the file alone",
+              try String(contentsOf: url, encoding: .utf8) == "A different paragraph.\n")
+    }
+
+    // MARK: - What the replace leaves behind
+
+    static func atomicity() throws {
+        let url = fixture("Body.\n")
+        let before = try FileManager.default.attributesOfItem(atPath: url.path)
+        _ = try Comments.insert(quote: "Body", body: "n", after: 1, occurrence: 1,
+                                by: "m", on: date, into: url, expecting: nil)
+        let after = try FileManager.default.attributesOfItem(atPath: url.path)
+        check("permissions preserved across the atomic replace",
+              before[.posixPermissions] as? Int == after[.posixPermissions] as? Int)
+        let leftovers = try FileManager.default.contentsOfDirectory(atPath: folder.path)
+            .filter { $0.contains("imark-") }
+        check("no temporary file left behind", leftovers.isEmpty, "\(leftovers)")
+    }
+
+    // MARK: - Taking a note back out
+
+    static func deleting() throws {
+        let url = fixture("""
+        Before.
+
+        <!-- imark quote="Before" by="m" at="x"
+        a note
+        -->
+
+        After.
+        """)
+        try Comments.remove(lines: 2...4, from: url, expecting: Comments.Stamp(of: url))
+        let text = try String(contentsOf: url, encoding: .utf8)
+        check("the note is gone", !text.contains("imark"))
+        check("the document is not", text.contains("Before.") && text.contains("After."))
+        check("no gap left where it was", !text.contains("\n\n\n"), text.debugDescription)
+    }
+
+    // MARK: - Rewriting one
+
+    static func editing() throws {
+        let url = fixture("""
+        Text.
+
+        <!-- imark quote="Text" by="nikus" at="2026-08-01T09:00Z" nth="2"
+        first thought
+        -->
+        """)
+        try Comments.update(lines: 2...4, body: "second thought", in: url,
+                            expecting: Comments.Stamp(of: url))
+        let lines = read(url)
+        check("the body is replaced", lines[3] == "second thought")
+        check("the anchor is untouched",
+              lines[2] == "<!-- imark quote=\"Text\" by=\"nikus\" at=\"2026-08-01T09:00Z\" nth=\"2\"",
+              lines[2])
+        check("still closed", lines[4] == "-->")
+
+        try Comments.update(lines: 2...4, body: "an arrow --> here", in: url, expecting: nil)
+        let text = try String(contentsOf: url, encoding: .utf8)
+        check("an edit escapes --> too", text.contains("--&gt;"))
+        check("and cannot close the block early", text.components(separatedBy: "-->").count == 2)
+    }
+
+    // MARK: - Putting it back
+
+    static func undoing() throws {
+        let url = fixture("A paragraph.\n")
+        let original = try String(contentsOf: url, encoding: .utf8)
+
+        _ = try Comments.insert(quote: "A", body: "note", after: 1, occurrence: 1,
+                                by: "m", on: date, into: url, expecting: nil)
+        check("the note went in", try String(contentsOf: url, encoding: .utf8) != original)
+
+        try Comments.restore(original, to: url)
+        check("undo puts the file back exactly",
+              try String(contentsOf: url, encoding: .utf8) == original)
+    }
+
+    // MARK: - A range that no longer points at a note
+
+    static func staleRanges() throws {
+        let url = fixture("Just a paragraph.\n\nAnd another.\n")
+        let before = try String(contentsOf: url, encoding: .utf8)
+
+        // The lines a note used to be on, after somebody deleted it by hand.
+        try Comments.remove(lines: 0...2, from: url, expecting: nil)
+        check("refuses to delete lines that are not a note",
+              try String(contentsOf: url, encoding: .utf8) == before)
+
+        try Comments.update(lines: 0...2, body: "hello", in: url, expecting: nil)
+        check("and refuses to rewrite them",
+              try String(contentsOf: url, encoding: .utf8) == before)
+
+        try Comments.remove(lines: 90...99, from: url, expecting: nil)
+        check("a range past the end of the file is harmless",
+              try String(contentsOf: url, encoding: .utf8) == before)
+    }
+
+    // MARK: - The acceptance criterion from the plan
+
+    static func manyInARow() throws {
+        let url = fixture("Paragraph one.\n\nParagraph two.\n")
+        for i in 0..<50 {
+            _ = try Comments.insert(quote: "Paragraph one", body: "note \(i)", after: 1,
+                                    occurrence: 1, by: "m", on: date, into: url, expecting: nil)
+        }
+        let text = try String(contentsOf: url, encoding: .utf8)
+        check("50 notes in a row, none lost", text.components(separatedBy: "<!-- imark").count == 51)
+        check("and the document itself is still there",
+              text.contains("Paragraph one.") && text.contains("Paragraph two."))
+    }
+}

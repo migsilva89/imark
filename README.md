@@ -7,7 +7,8 @@
 <p align="center">
   <strong>Native Markdown reader for macOS.</strong><br><br>
   Double-click a <code>.md</code> file and it opens rendered, reloads itself while you<br>
-  edit, and previews in the Finder with the space bar. Nothing leaves the machine.
+  edit, and previews in the Finder with the space bar. Comment on a phrase and the<br>
+  note goes into the file itself. Nothing leaves the machine.
 </p>
 
 <p align="center">
@@ -18,7 +19,7 @@
 </p>
 
 > [!NOTE]
-> Imark is a reader, not an editor. There is no text field and nothing to save — the *Open in* button hands the file to Cursor, VS Code, Sublime, Zed, or whatever else you have installed.
+> Imark reads; it does not edit. Comments are the one thing it writes, and they go into the document itself — see [Comments](#comments). For everything else the *Open in* button hands the file to Cursor, VS Code, Sublime, Zed, or whatever else you have installed.
 
 ## Screenshots
 
@@ -38,15 +39,83 @@ Down the left edge of every document — in a window and in the Finder's preview
 panel alike — sits one tick per heading. The marks taper around wherever you are
 in the document, and around wherever you point, whichever is more recent: move
 onto the rail and the funnel follows the pointer, so you can survey the whole
-file without moving the page. A card names the section and quotes its first
-line. Click to jump, or press and drag to scrub.
+file without moving the page. A card names the section, quotes its first line,
+and says whether anyone has commented on it. Click to jump, or press and drag to
+scrub.
 
 It exists because the preview panel has no room for a sidebar. It stayed in the
 window because reading a long document and knowing where you are in it turn out
 to be different jobs.
 
+## Comments
+
+<p align="center">
+  <img src=".github/assets/imark-comments.png" width="620" alt="A phrase underlined in the text, a dot in the margin, and a card floating over the right margin with the note">
+</p>
+
+Select a phrase, press the speech bubble, write. The quoted words get underlined,
+a dot appears in the margin, and clicking either opens the note. The card carries
+**Edit** and **Delete**, and `⌘Z` undoes any of it — writing, editing or deleting.
+
+The note is stored **inside the `.md` file**, as an HTML comment:
+
+```markdown
+Rows move in batches of 500, and the deadline is generous but achievable.
+
+<!-- imark quote="generous but achievable" by="miguel" at="2026-08-02T14:31Z"
+Achievable with which team? This needs a number, not an adjective.
+-->
+```
+
+Which means it travels with the document instead of living in a database only
+this app can read:
+
+| Where | What you see |
+|---|---|
+| **Imark** | the words underlined, a dot in the margin, the note on click |
+| **Cursor, VS Code, Vim** | the block above, verbatim, right under the paragraph |
+| **GitHub, any renderer** | nothing — HTML comments are invisible |
+| **`grep`, `cat`** | the note, with the quote it refers to beside it |
+
+The `quote=` is not only for the app. It is what makes the note legible in raw
+text: someone opening the file in Vim can see what it refers to without counting
+lines. If the quoted words are later edited away the note goes **orphan** — still
+visible, still attached to its block, marked as having lost its anchor. There is
+no fuzzy matching, because a note in the wrong place is worse than a note without
+an exact one.
+
+Four ways to get at them, because they answer different questions. The count in
+the status bar opens **the list** — every note at once, out of the document, and
+clicking one jumps to it. `⌘⇧C` opens them all **in place**, each under its own
+block. `⌘'` and `⌘⇧'` **step** through one at a time. And a rail down the right
+edge marks **where** they are, placed where the notes actually fall in the
+document, so three clustered in one section is visible at a glance.
+
+**File › Export Comments as Text…** writes a copy with every note turned into a
+blockquote, for the review the other person has to read on GitHub:
+
+```markdown
+Rows move in batches of 500, and the deadline is generous but achievable.
+
+> **miguel, 2 Aug 2026** on *“generous but achievable”*
+>
+> Achievable with which team? This needs a number, not an adjective.
+```
+
+A copy, not the document. HTML comments are the right home for a note between two
+people who both use Imark, and useless for a review on the web; converting in
+place would trade one for the other.
+
+> [!IMPORTANT]
+> This is the only feature that writes to your files. It writes to a temporary
+> file and moves it into place, refuses to save at all if the document changed
+> on disk since Imark read it, and keeps the last ten states of the document so
+> `⌘Z` can put any of them back.
+
 ## Features
 
+- **Comments in the file** — select, comment, edit or delete, and the note lives in the document as an HTML comment, so it survives being emailed, committed, or opened in anything else. `⌘Z` undoes any of it, and they export as visible blockquotes when the review has to happen on GitHub
+- **Actions on a selection** — comment on it, translate it on device, or search the web for it in your default browser
 - **Quick Look previews** — the space bar in the Finder renders the document, not raw text, using the same engine as the app
 - **Live reload** — saving in your editor updates the view in under 300ms, keeping your scroll position, and it survives the delete-and-rename that editors call an atomic save
 - **Foldable outline** — headings in the sidebar, with sections you can collapse; past twenty entries it opens folded, so a changelog is one row per version
@@ -89,12 +158,19 @@ That builds the JavaScript bundle, compiles the Swift, assembles `Imark.app`, si
 
 | | | | |
 |---|---|---|---|
-| `⌘O` | Open | `⌘F` | Find |
+| `⌘O` | Open | `⌘F` | Find, prefilled with the selection |
 | `⌘W` | Close window | `⌘G` / `⌘⇧G` | Next / previous hit |
 | `⌘\` | Toggle sidebar | `←` / `→` | Fold / unfold outline section |
 | `⌘[` / `⌘]` | Back / forward | `⌘R` | Reload |
 | `⌘+` / `⌘-` / `⌘0` | Text size | `⌘⇧R` | Reveal in Finder |
-| `⌘P` | Print or export PDF | | |
+| `⌘P` | Print or export PDF | `⌘⇧C` | Show all comments |
+| `⌘'` / `⌘⇧'` | Next / previous comment | `⌘Z` | Undo the last comment change |
+| `⌘/` | This table, in the app | | |
+
+`⌘/` opens the same list inside the app, built by reading the menu bar rather
+than from a copy of this table — which is also how it stays right on keyboards
+where macOS remaps the keys. On a Portuguese layout, Back and Forward are `⌘Ç`
+and `⌘~`, not `⌘[` and `⌘]`.
 
 ## FAQ
 
@@ -105,6 +181,19 @@ Launch it with no document open and click **Make Imark the default for .md**, or
 ### Why does the Quick Look extension need the network entitlement?
 
 It does not use the network. WebKit refuses to start its WebContent process inside a sandboxed app extension without `com.apple.security.network.client`, even when every byte is served from a local scheme. The panel stays blank without it, with no error and no log entry. See `docs/PLAN.md` for the rest of that afternoon.
+
+### What does `⌘Z` undo?
+
+The last change to the document — a note written, edited or deleted — up to ten
+deep. Each one is a snapshot of the whole file taken before the change, which is
+why undo behaves the same for all three. It only covers changes Imark made; edits
+from your own editor are your editor's to undo.
+
+### What happens if two people comment on the same words?
+
+The second note gets an `nth="2"` so it anchors to the right occurrence. Notes on
+the same paragraph stack down the margin rather than landing on top of each
+other.
 
 ### Can I sign it with my own Developer ID?
 
@@ -128,7 +217,7 @@ docs/                    design, flows and acceptance criteria
 
 The renderer is the only part that knows how to turn Markdown into anything. The Swift side handles windows, files and navigation, and talks to it in messages.
 
-Design and acceptance criteria live in [docs/DESIGN.md](docs/DESIGN.md); the build order and what each milestone had to satisfy is in [docs/PLAN.md](docs/PLAN.md).
+Design and acceptance criteria live in [docs/DESIGN.md](docs/DESIGN.md); the build order and what each milestone had to satisfy is in [docs/PLAN.md](docs/PLAN.md). Comments have their own pair — [docs/EDITOR.md](docs/EDITOR.md) for why they are stored the way they are, [docs/PLAN-COMMENTS.md](docs/PLAN-COMMENTS.md) for the order it was built in and what went wrong on the way.
 
 ## Tools
 
@@ -136,6 +225,14 @@ The icon is drawn in code from the rules in the design document:
 
 ```bash
 swift Support/make-icon.swift
+```
+
+Comments are the one thing that writes to your documents, so the file surgery has
+tests of its own:
+
+```bash
+swiftc -parse-as-library Sources/Imark/Comments.swift Support/test-comments.swift -o /tmp/imark-test && /tmp/imark-test
+node Support/test-export.mjs
 ```
 
 Two helpers exist for looking at the UI without photographing the whole desktop — `Support/shoot.swift` renders a page in an off-screen web view, and `Support/window-id.swift` resolves a window id so a screenshot can be taken of one window:

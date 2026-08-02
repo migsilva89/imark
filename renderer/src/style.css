@@ -167,6 +167,7 @@ blockquote > :last-child { margin-bottom: 0; }
 .task-list-item { list-style: none; }
 
 .task-list-item input[type='checkbox'] {
+  cursor: pointer;
   margin-right: calc(var(--step) * 2);
   margin-left: calc(var(--step) * -6);
   accent-color: var(--accent);
@@ -243,7 +244,7 @@ pre code {
   border-radius: 6px;
   opacity: 0;
   transition: opacity 120ms ease;
-  cursor: default;
+  cursor: pointer;
 }
 
 .code-wrap:hover .copy-btn { opacity: 1; }
@@ -548,4 +549,224 @@ img[data-blocked] {
   min-height: 60vh;
   color: var(--secondary);
   font-size: 14px;
+}
+
+/* ------------------------------------------------------------- comments */
+
+/* Wrapping every commented block is what lets the dot and the card be placed
+   against it — a table or a list will not take stray children of its own. */
+.note-holder {
+  position: relative;
+}
+
+.note-anchor {
+  background: var(--accent-soft);
+  border-bottom: 1.5px solid var(--accent);
+  border-radius: 2px;
+  padding: 0 1px;
+  cursor: pointer;
+}
+
+.note-dot {
+  position: absolute;
+  top: 2px;
+  right: calc(var(--step) * -6);
+  width: 11px;
+  height: 11px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  transition: transform 0.12s ease;
+  /* Above the card, which overlaps it — the dot is also how you close it. */
+  z-index: 6;
+}
+
+.note-dot:hover,
+.note-dot.open {
+  transform: scale(1.35);
+}
+
+/* An orphan has lost the words it pointed at. Hollow rather than hidden: the
+   note is still there and still worth reading, it just has no exact place. */
+.note-dot.orphan {
+  background: transparent;
+  border: 1.5px solid var(--secondary);
+}
+
+/* Floats over the right edge of the text rather than beside it. A reading
+   column is centred and rarely leaves 250px of clear margin, so a card that
+   insisted on free space would drop below the paragraph every time — which is
+   the permanent side column this was meant to avoid. */
+.note-card {
+  position: absolute;
+  top: 0;
+  right: calc(var(--step) * -8);
+  width: 250px;
+  z-index: 5;
+  padding: calc(var(--step) * 3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 6px 22px rgb(0 0 0 / 12%);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* Genuinely narrow — Quick Look, a split window — so overlapping would bury
+   the paragraph entirely. Sit under it instead. */
+.note-card.below {
+  right: auto;
+  position: static;
+  width: auto;
+  margin: calc(var(--step) * 3) 0;
+}
+
+.note-card header {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--secondary);
+  margin-bottom: calc(var(--step) * 2);
+}
+
+.note-card .note-text {
+  margin: 0;
+  white-space: pre-wrap;
+  font-size: 13px;
+}
+
+.note-card .note-orphan {
+  margin: 0 0 calc(var(--step) * 2);
+  padding-bottom: calc(var(--step) * 2);
+  border-bottom: 1px solid var(--border);
+  color: var(--secondary);
+  font-size: 12px;
+}
+
+/* Quick Look is a reading panel: show that a note is there, but the panel is
+   too narrow to open cards in and nothing in it is clickable anyway. */
+:root[data-preview='true'] .note-dot { pointer-events: none; }
+:root[data-preview='true'] .note-card { display: none; }
+
+/* Review mode: every note open at once, under the block it belongs to. Reads
+   the way the file itself reads in a plain-text editor. */
+:root[data-notes='all'] .note-card {
+  border-left: 2px solid var(--accent);
+  box-shadow: none;
+}
+
+:root[data-notes='all'] .note-dot {
+  transform: none;
+}
+
+/* Edit and delete, on the card. Only visible once you are looking at the note,
+   so five open cards are not five pairs of buttons competing for attention. */
+.note-card header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(var(--step) * 2);
+}
+
+.note-actions {
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.note-card:hover .note-actions,
+.note-card:focus-within .note-actions {
+  opacity: 1;
+}
+
+.note-action {
+  border: 0;
+  background: none;
+  color: var(--secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  line-height: 1;
+  padding: 3px 5px;
+  border-radius: 4px;
+}
+
+.note-action:hover {
+  background: var(--code-bg);
+  color: var(--text);
+}
+
+.note-delete:hover {
+  color: #d9544f;
+}
+
+/* ------------------------------------------------------- comments rail */
+
+/* Opposite edge to the outline. Marks sit where the notes are in the document,
+   not spread evenly — three notes clustered in one section is worth seeing. */
+.note-rail {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 18px;
+  z-index: 6;
+  pointer-events: none;
+}
+
+.note-mark {
+  position: absolute;
+  right: 6px;
+  width: 6px;
+  height: 6px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: 0.55;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+
+.note-mark:hover {
+  opacity: 1;
+  transform: scale(1.6);
+}
+
+.note-mark.orphan {
+  background: transparent;
+  border: 1px solid var(--secondary);
+}
+
+:root[data-note-rail] body { padding-right: calc(var(--step) * 6); }
+
+/* Quick Look is a reading panel and nothing in it is clickable. */
+:root[data-preview='true'] .note-rail { display: none; }
+
+/* Whether the section you are about to jump to has been commented on. The dot
+   is the same one that marks a note in the margin, so it reads as the same
+   thing rather than as a new kind of badge. */
+.rail-tip-notes {
+  font-style: normal;
+  margin-left: 7px;
+  color: var(--accent);
+}
+
+.rail-tip-notes::before {
+  content: '';
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  margin-right: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  vertical-align: 1px;
 }

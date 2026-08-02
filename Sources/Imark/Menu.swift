@@ -22,6 +22,16 @@ enum Menu {
         main.addItem(viewItem)
         viewItem.submenu = viewMenu()
 
+        let helpItem = NSMenuItem()
+        main.addItem(helpItem)
+        let help = NSMenu(title: "Help")
+        help.addItem(
+            withTitle: "Keyboard Shortcuts",
+            action: #selector(AppDelegate.showShortcuts(_:)),
+            keyEquivalent: "/"
+        )
+        helpItem.submenu = help
+
         let windowItem = NSMenuItem()
         main.addItem(windowItem)
         let window = NSMenu(title: "Window")
@@ -61,11 +71,18 @@ enum Menu {
         let reveal = menu.addItem(withTitle: "Reveal in Finder", action: #selector(DocumentWindowController.revealInFinder(_:)), keyEquivalent: "r")
         reveal.keyEquivalentModifierMask = [.command, .shift]
         menu.addItem(withTitle: "Print…", action: #selector(DocumentWindowController.printDocument(_:)), keyEquivalent: "p")
+        menu.addItem(
+            withTitle: "Export Comments as Text…",
+            action: #selector(DocumentWindowController.exportComments(_:)),
+            keyEquivalent: ""
+        )
         return menu
     }
 
     private static func editMenu() -> NSMenu {
         let menu = NSMenu(title: "Edit")
+        menu.addItem(withTitle: "Undo", action: #selector(DocumentWindowController.undoComment(_:)), keyEquivalent: "z")
+        menu.addItem(.separator())
         menu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
         menu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
         menu.addItem(.separator())
@@ -89,6 +106,25 @@ enum Menu {
         menu.addItem(withTitle: "Forward", action: #selector(DocumentWindowController.goForward(_:)), keyEquivalent: "]")
         menu.addItem(.separator())
         menu.addItem(withTitle: "Reload", action: #selector(DocumentWindowController.reloadDocument(_:)), keyEquivalent: "r")
+        menu.addItem(.separator())
+
+        let allComments = menu.addItem(
+            withTitle: "Show All Comments",
+            action: #selector(DocumentWindowController.toggleAllComments(_:)),
+            keyEquivalent: "c"
+        )
+        allComments.keyEquivalentModifierMask = [.command, .shift]
+        menu.addItem(
+            withTitle: "Next Comment",
+            action: #selector(DocumentWindowController.nextComment(_:)),
+            keyEquivalent: "'"
+        )
+        let previousComment = menu.addItem(
+            withTitle: "Previous Comment",
+            action: #selector(DocumentWindowController.previousComment(_:)),
+            keyEquivalent: "'"
+        )
+        previousComment.keyEquivalentModifierMask = [.command, .shift]
         return menu
     }
 }

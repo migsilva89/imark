@@ -8,11 +8,13 @@ final class ContentViewController: NSViewController {
 
     var onMessage: ((RendererMessage) -> Void)?
     var onFindClosed: (() -> Void)?
+    var onShowComments: ((NSView) -> Void)?
 
     private let findBar = NSVisualEffectView()
     private let searchField = NSSearchField()
     private let counter = NSTextField(labelWithString: "")
     private let statusLeft = NSTextField(labelWithString: "")
+    private let commentsButton = LinkButton(title: "", target: nil, action: nil)
     private let statusRight = NSTextField(labelWithString: "")
     private var findHeight: NSLayoutConstraint!
     private var folder = ""
@@ -112,10 +114,20 @@ final class ContentViewController: NSViewController {
         return button
     }
 
-    func showFind() {
+    func showFind(with text: String? = nil) {
         findBar.isHidden = false
         findHeight.constant = 40
+        // Newlines would make the field one long unsearchable line; a selection
+        // spanning paragraphs is still a reasonable thing to hand over.
+        if let text, !text.isEmpty {
+            searchField.stringValue = text
+                .replacingOccurrences(of: "\n", with: " ")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        }
         view.window?.makeFirstResponder(searchField)
+        // Selected, not just filled: if the guess is wrong, typing replaces it
+        // instead of appending to it.
+        searchField.currentEditor()?.selectAll(nil)
         if !searchField.stringValue.isEmpty {
             renderer.find(searchField.stringValue)
         }
@@ -157,9 +169,23 @@ final class ContentViewController: NSViewController {
             label.textColor = .tertiaryLabelColor
             label.lineBreakMode = .byTruncatingMiddle
             label.translatesAutoresizingMaskIntoConstraints = false
-            bar.addSubview(label)
         }
         statusRight.alignment = .right
+
+        // A button rather than part of the label: the count is the way into the
+        // list, and something you can click has to look like it.
+        commentsButton.isBordered = false
+        commentsButton.target = self
+        commentsButton.action = #selector(showComments)
+        commentsButton.setContentHuggingPriority(.required, for: .horizontal)
+        commentsButton.isHidden = true
+
+        let left = NSStackView(views: [statusLeft, commentsButton])
+        left.orientation = .horizontal
+        left.spacing = 10
+        left.translatesAutoresizingMaskIntoConstraints = false
+        bar.addSubview(left)
+        bar.addSubview(statusRight)
         bar.addSubview(separator)
 
         NSLayoutConstraint.activate([
@@ -167,22 +193,58 @@ final class ContentViewController: NSViewController {
             separator.trailingAnchor.constraint(equalTo: bar.trailingAnchor),
             separator.topAnchor.constraint(equalTo: bar.topAnchor),
 
-            statusLeft.leadingAnchor.constraint(equalTo: bar.leadingAnchor, constant: 14),
-            statusLeft.centerYAnchor.constraint(equalTo: bar.centerYAnchor),
+            left.leadingAnchor.constraint(equalTo: bar.leadingAnchor, constant: 14),
+            left.centerYAnchor.constraint(equalTo: bar.centerYAnchor),
 
             statusRight.trailingAnchor.constraint(equalTo: bar.trailingAnchor, constant: -14),
             statusRight.centerYAnchor.constraint(equalTo: bar.centerYAnchor),
             statusRight.leadingAnchor.constraint(
-                greaterThanOrEqualTo: statusLeft.trailingAnchor, constant: 16
+                greaterThanOrEqualTo: left.trailingAnchor, constant: 16
             ),
         ])
         return bar
     }
 
+    private var words = 0
+    private var minutes = 0
+    private var comments = 0
+
     func setStatus(words: Int, minutes: Int) {
+        self.words = words
+        self.minutes = minutes
+        refreshStatus()
+    }
+
+    func setStatus(comments: Int) {
+        self.comments = comments
+        refreshStatus()
+    }
+
+    /// The comment count carries the accent the notes are marked with, so the
+    /// status bar says *there is something to read here* at a glance instead of
+    /// hiding it in the same grey as the word count.
+    private func refreshStatus() {
         let formatted = words.formatted(.number.grouping(.automatic))
         statusLeft.stringValue = "\(formatted) words · \(minutes) min read"
+
+        commentsButton.isHidden = comments == 0
+        guard comments > 0 else { return }
+        commentsButton.attributedTitle = NSAttributedString(
+            string: comments == 1 ? "1 comment" : "\(comments) comments",
+            attributes: [
+                .font: NSFont.systemFont(ofSize: 11, weight: .medium),
+                .foregroundColor: NSColor.imarkAccent,
+                .underlineStyle: NSUnderlineStyle.single.rawValue,
+                .underlineColor: NSColor.imarkAccent.withAlphaComponent(0.4),
+            ]
+        )
+        commentsButton.toolTip = "Show every comment"
     }
+
+    @objc private func showComments() {
+        onShowComments?(commentsButton)
+    }
+
 
     func setStatus(path: URL) {
         folder = path.deletingLastPathComponent()
@@ -223,4 +285,11 @@ extension ContentViewController: NSSearchFieldDelegate {
             return false
         }
     }
+}
+
+
+/// Underlined and in the accent colour, so it reads as a link — and so it has
+/// to behave like one under the pointer too.
+private final class LinkButton: NSButton {
+    override func resetCursorRects() { addCursorRect(bounds, cursor: .pointingHand) }
 }

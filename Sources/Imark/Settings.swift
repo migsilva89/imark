@@ -76,6 +76,18 @@ enum Settings {
     }
 }
 
+extension NSColor {
+    /// The violet from the design tokens. It exists twice — here and as
+    /// `--accent` in the stylesheet — because the document is a web view and
+    /// the chrome around it is AppKit. docs/DESIGN.md holds the table both
+    /// copies answer to.
+    static let imarkAccent = NSColor(name: "imarkAccent") { appearance in
+        appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            ? NSColor(srgbRed: 0.545, green: 0.482, blue: 0.910, alpha: 1)   // #8b7be8
+            : NSColor(srgbRed: 0.478, green: 0.420, blue: 0.847, alpha: 1)   // #7a6bd8
+    }
+}
+
 private extension Double {
     func clamped(to range: ClosedRange<Double>) -> Double {
         Swift.min(Swift.max(self, range.lowerBound), range.upperBound)

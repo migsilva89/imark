@@ -12,6 +12,14 @@
 - `[meta]` bump deps `a1b2c3d`
 - `[Tests]` add cases `e4f5g6h`
 
+<!-- imark quote="deps" by="Miguel Silva" at="2026-08-02T13:24:26Z"
+hgh
+-->
+
+<!-- imark quote="meta] bump deps a1b2c3d" by="Miguel Silva" at="2026-08-02T13:24:35Z"
+jhgfhfh
+-->
+
 ## v2.2.0 - 2022-03-15
 
 ### Fixed

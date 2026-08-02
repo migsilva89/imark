@@ -11,6 +11,16 @@ import renderMathInElement from 'katex/contrib/auto-render'
 import mermaid from 'mermaid'
 
 import wikilink from './wikilink.js'
+import {
+  attachComments,
+  extractComments,
+  installCommentHandlers,
+  isReviewing,
+  restoreNoteState,
+  setReviewing as applyReviewing,
+  stepNote,
+  toVisibleText,
+} from './comments.js'
 import './style.css'
 
 const bridge = (payload) => {
@@ -90,17 +100,42 @@ md.use(anchor, { slugify, permalink: false, tabIndex: false })
   .use(mark)
   .use(wikilink)
 
+// Every block token knows which lines of the source produced it. Emitting that
+// into the DOM is what lets a selection on screen be turned back into a
+// position in the file — without it, writing anything next to a paragraph is
+// guesswork.
+// The front matter is stripped before parsing, so markdown-it counts from the
+// body while the file counts from the top. Everything it reports is short by
+// however many lines the front matter took.
+let lineOffset = 0
+
+const stampLines = (token) => {
+  if (!token.map) return
+  token.attrSet('data-line', `${token.map[0] + lineOffset},${token.map[1] + lineOffset}`)
+}
+
+const defaultRenderToken = md.renderer.renderToken.bind(md.renderer)
+md.renderer.renderToken = (tokens, idx, options) => {
+  if (tokens[idx].nesting !== -1) stampLines(tokens[idx])
+  return defaultRenderToken(tokens, idx, options)
+}
+
 // Fenced ```mermaid blocks are held aside and rendered after the HTML lands.
 const defaultFence = md.renderer.rules.fence.bind(md.renderer.rules)
 md.renderer.rules.fence = (tokens, idx, options, env, self) => {
   const token = tokens[idx]
   const info = (token.info || '').trim().split(/\s+/)[0]
+  // Built by hand rather than through renderToken, so the offset has to be
+  // applied here too — this is exactly where it was forgotten once already.
+  const lines = token.map
+    ? ` data-line="${token.map[0] + lineOffset},${token.map[1] + lineOffset}"`
+    : ''
   if (info === 'mermaid') {
-    return `<div class="mermaid-block" data-graph="${encodeURIComponent(token.content)}"></div>`
+    return `<div class="mermaid-block"${lines} data-graph="${encodeURIComponent(token.content)}"></div>`
   }
   const html = defaultFence(tokens, idx, options, env, self)
   const label = info || 'text'
-  return `<div class="code-wrap" data-lang="${label}">${html}</div>`
+  return `<div class="code-wrap"${lines} data-lang="${label}">${html}</div>`
 }
 
 // Rewrite relative hrefs/srcs so they resolve against the document's folder.
@@ -126,18 +161,22 @@ patchAttr(md.renderer.rules, 'link_open', 'href')
 /* ------------------------------------------------------- front matter */
 
 function splitFrontMatter(text) {
-  if (!text.startsWith('---')) return { data: null, body: text }
+  if (!text.startsWith('---')) return { data: null, body: text, offset: 0 }
   const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/.exec(text)
-  if (!match) return { data: null, body: text }
+  if (!match) return { data: null, body: text, offset: 0 }
   try {
     const data = parseYaml(match[1])
     if (data && typeof data === 'object') {
-      return { data, body: text.slice(match[0].length) }
+      return {
+        data,
+        body: text.slice(match[0].length),
+        offset: match[0].split('\n').length - 1,
+      }
     }
   } catch {
     /* malformed front matter is shown as-is */
   }
-  return { data: null, body: text }
+  return { data: null, body: text, offset: 0 }
 }
 
 const escapeHtml = (s) =>
@@ -403,7 +442,39 @@ function updateRail(centre) {
 
 /* ---------------------------------------------------------- rail tooltip */
 
-const flatten = (el) => el.textContent.replace(/\s+/g, ' ').trim()
+// A comment card lives inside the block it is attached to, so the plain text of
+// a block is not its text content any more — without this the preview quoted
+// somebody's note back as if it were the document.
+const flatten = (el) => {
+  const copy = el.cloneNode(true)
+  for (const note of copy.querySelectorAll('.note-card, .note-dot, .note-actions')) note.remove()
+  return copy.textContent.replace(/\s+/g, ' ').trim()
+}
+
+// A commented block is wrapped, so its neighbours are the wrapper's neighbours.
+const outermost = (el) =>
+  el.parentElement?.classList.contains('note-holder') ? el.parentElement : el
+
+const headingIn = (el) =>
+  /^H[1-6]$/.test(el.tagName) ? el : el.querySelector('h1, h2, h3, h4, h5, h6')
+
+/// How many notes fall under this heading, down to the next one at the same
+/// level or higher. The rail on the other edge says where the notes are; this
+/// says whether the section you are about to jump to has any, which is the
+/// question you have while reading the outline.
+function notesInSection(heading) {
+  const start = outermost(heading)
+  const level = headingLevel(heading)
+  let count = start.querySelectorAll('.note-dot').length
+
+  for (let node = start.nextElementSibling; node; node = node.nextElementSibling) {
+    const inner = headingIn(node)
+    const innerLevel = inner ? headingLevel(inner) : 0
+    if (innerLevel > 0 && innerLevel <= level) break
+    count += node.querySelectorAll('.note-dot').length
+  }
+  return count
+}
 
 function tipContent(index) {
   const heading = railBlocks[index]
@@ -413,8 +484,8 @@ function tipContent(index) {
   // to come from the DOM rather than from railBlocks — the prose that follows
   // is no longer in the list.
   let body = ''
-  let sibling = heading.nextElementSibling
-  while (sibling && !/^H[1-6]$/.test(sibling.tagName)) {
+  let sibling = outermost(heading).nextElementSibling
+  while (sibling && !headingIn(sibling)) {
     body = flatten(sibling)
     if (body) break
     sibling = sibling.nextElementSibling
@@ -426,6 +497,7 @@ function tipContent(index) {
     label: `${Math.round(position * 100)}% in`,
     title: flatten(heading),
     body,
+    notes: notesInSection(heading),
   }
 }
 
@@ -438,6 +510,12 @@ function showTip(index, tick) {
 
   const label = document.createElement('em')
   label.textContent = content.label
+  if (content.notes) {
+    const badge = document.createElement('i')
+    badge.className = 'rail-tip-notes'
+    badge.textContent = content.notes === 1 ? '1 comment' : `${content.notes} comments`
+    label.appendChild(badge)
+  }
   railTip.appendChild(label)
 
   const heading = document.createElement('strong')
@@ -565,8 +643,12 @@ const content = () => document.getElementById('content')
 let activeHeadings = []
 let renderToken = 0
 
+// Kept so comments can be exported without asking Swift to hand the file back.
+let lastSource = ''
+
 async function render({ markdown, path, theme, preview, rail }) {
   const token = ++renderToken
+  lastSource = markdown ?? ''
   docDir = path ? path.slice(0, path.lastIndexOf('/')) || '/' : '/'
   slugCounts.clear()
 
@@ -580,14 +662,23 @@ async function render({ markdown, path, theme, preview, rail }) {
   if (rail) document.documentElement.dataset.rail = rail
   else delete document.documentElement.dataset.rail
 
-  const { data, body } = splitFrontMatter(markdown ?? '')
+  const { data, body, offset } = splitFrontMatter(markdown ?? '')
+  lineOffset = offset
   const root = content()
   const previousScroll = window.scrollY
 
-  root.innerHTML = body.trim()
-    ? renderFrontMatter(data) + md.render(body)
+  // Taken out before parsing so the blocks can never show up as document text,
+  // and blanked rather than deleted so the line map stays honest.
+  const { body: clean, comments } = extractComments(body, offset)
+
+  root.innerHTML = clean.trim()
+    ? renderFrontMatter(data) + md.render(clean)
     : `${renderFrontMatter(data)}<p class="empty">This file is empty</p>`
   if (token !== renderToken) return
+
+  const notes = attachComments(root, comments)
+  restoreNoteState()
+  bridge({ type: 'comments', count: notes.length, reviewing: isReviewing(), items: notes })
 
   // The highlight elements went out with the old DOM.
   matches = []
@@ -647,6 +738,98 @@ window.addEventListener(
   },
   { passive: true },
 )
+
+/* ------------------------------------------------------------- selection */
+
+const lineRange = (el) => {
+  const raw = el?.getAttribute?.('data-line')
+  if (!raw) return null
+  const [start, end] = raw.split(',').map(Number)
+  return Number.isFinite(start) && Number.isFinite(end) ? { start, end } : null
+}
+
+function selectionInfo() {
+  const selection = window.getSelection()
+  if (!selection || selection.isCollapsed || selection.rangeCount === 0) return null
+
+  const text = selection.toString().trim()
+  if (!text) return null
+
+  const range = selection.getRangeAt(0)
+  const root = content()
+  if (!root.contains(range.commonAncestorContainer)) return null
+
+  // Text inside a note is not document text: it has no line of its own, and
+  // offering to comment on a comment is not a thing worth building.
+  const within =
+    range.commonAncestorContainer.nodeType === Node.ELEMENT_NODE
+      ? range.commonAncestorContainer
+      : range.commonAncestorContainer.parentElement
+  if (within?.closest('.note-card')) return null
+
+  const rect = range.getBoundingClientRect()
+  if (!rect.width && !rect.height) return null
+
+  const start =
+    range.startContainer.nodeType === Node.ELEMENT_NODE
+      ? range.startContainer
+      : range.startContainer.parentElement
+
+  // Two ranges: the tightest element that knows its lines, and the top-level
+  // block it belongs to. A comment is written after the block; the tighter one
+  // is what a quote should be looked for in.
+  let block = start
+  while (block && block.parentElement !== root && block.parentElement) {
+    // A commented block is wrapped, so the top-level element is one step
+    // further out than it used to be.
+    if (block.parentElement.classList.contains('note-holder')) break
+    block = block.parentElement
+  }
+
+  return {
+    type: 'selection',
+    text,
+    rect: { x: rect.left, y: rect.top, width: rect.width, height: rect.height },
+    inline: lineRange(start?.closest('[data-line]')),
+    block: lineRange(block),
+    // Which copy of these exact words inside the block this is. Written into
+    // the note as nth= so two comments on the same word stay apart.
+    occurrence: countBefore(block, range, text),
+  }
+}
+
+/// How many times the selected text already appeared in this block before the
+/// point where the selection starts, plus one.
+function countBefore(block, range, text) {
+  if (!block || !text) return 1
+  const before = document.createRange()
+  before.selectNodeContents(block)
+  try {
+    before.setEnd(range.startContainer, range.startOffset)
+  } catch {
+    return 1
+  }
+  return before.toString().split(text).length
+}
+
+let selectionTimer = 0
+let hadSelection = false
+
+document.addEventListener('selectionchange', () => {
+  clearTimeout(selectionTimer)
+  // Debounced: a drag fires this on every pixel, and the popover should appear
+  // when the hand stops, not chase it across the paragraph.
+  selectionTimer = setTimeout(() => {
+    const info = selectionInfo()
+    if (info) {
+      hadSelection = true
+      bridge(info)
+    } else if (hadSelection) {
+      hadSelection = false
+      bridge({ type: 'selectionCleared' })
+    }
+  }, 180)
+})
 
 /* ----------------------------------------------------------- link routing */
 
@@ -787,13 +970,37 @@ window.imark = {
   setTextScale(scale) {
     document.documentElement.style.setProperty('--size-body', `${scale}px`)
   },
+  clearSelection() {
+    window.getSelection()?.removeAllRanges()
+  },
   markMissing(targets) {
     const dead = new Set(targets)
     for (const link of document.querySelectorAll('a.wikilink')) {
       if (dead.has(link.dataset.wikilink)) link.dataset.missing = 'true'
     }
   },
+  setReviewing(on) {
+    applyReviewing(on)
+    bridge({
+      type: 'comments',
+      count: document.querySelectorAll('.note-dot').length,
+      reviewing: on,
+    })
+  },
+  stepNote,
+  exportComments: () => toVisibleText(lastSource),
+  /// Opens the note that was just written, so a comment lands visibly rather
+  /// than silently changing a file.
+  revealNote(index) {
+    const dots = [...document.querySelectorAll('.note-dot')]
+    const dot = dots[index] ?? dots[dots.length - 1]
+    if (!dot) return
+    dot.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    dot.click()
+  },
 }
+
+installCommentHandlers()
 
 // KaTeX is imported for its side-effect-free API; keep a reference so the
 // bundler cannot tree-shake the font-bearing CSS away.

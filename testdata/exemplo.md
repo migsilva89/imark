@@ -18,6 +18,10 @@ Texto de **teste** com _ênfase_ e um [link externo](https://example.com).
 
 Ligação wiki: [[notas-reuniao]] e [[exemplo|com etiqueta]].
 
+<!-- imark quote="Ligação" by="Miguel Silva" at="2026-08-02T13:25:02Z"
+bmn
+-->
+
 | Coluna | Valor |
 |---|---|
 | a | 1 |

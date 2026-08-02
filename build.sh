@@ -13,15 +13,27 @@ ROOT="$PWD"
 
 CONFIG="release"
 INSTALL=1
+# A side-by-side build with its own name and bundle id, so work in progress
+# never replaces the copy you actually use.
+DEV=0
 for arg in "$@"; do
 	case "$arg" in
 		--debug) CONFIG="debug" ;;
 		--no-install) INSTALL=0 ;;
+		--dev) DEV=1; CONFIG="debug" ;;
 		*) echo "opção desconhecida: $arg" >&2; exit 2 ;;
 	esac
 done
 
-APP="$ROOT/dist/Imark.app"
+if [ "$DEV" -eq 1 ]; then
+	APP_NAME="Imark Dev"
+	BUNDLE_ID="pt.miguelsilva.imark.dev"
+else
+	APP_NAME="Imark"
+	BUNDLE_ID="pt.miguelsilva.imark"
+fi
+
+APP="$ROOT/dist/$APP_NAME.app"
 INSTALL_DIR="${IMARK_INSTALL_DIR:-/Applications}"
 LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
 
@@ -49,7 +61,7 @@ BIN="$(swift build -c "$CONFIG" --arch arm64 --show-bin-path)"
 
 # --------------------------------------------------------------- assemble
 
-step "montar Imark.app"
+step "montar $APP_NAME.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" \
          "$APP/Contents/Resources" \
@@ -57,6 +69,16 @@ mkdir -p "$APP/Contents/MacOS" \
 
 cp "$BIN/Imark" "$APP/Contents/MacOS/Imark"
 cp "$ROOT/Support/Imark-Info.plist" "$APP/Contents/Info.plist"
+if [ "$DEV" -eq 1 ]; then
+	# Renamed and re-identified in place: two bundles with the same id would
+	# fight over Launch Services and you would never know which one opened.
+	/usr/libexec/PlistBuddy -c "Set :CFBundleName $APP_NAME" \
+		-c "Set :CFBundleDisplayName $APP_NAME" \
+		-c "Set :CFBundleIdentifier $BUNDLE_ID" \
+		"$APP/Contents/Info.plist" >/dev/null
+	# Handler rank is left alone: both builds stay "Alternate", so the dev copy
+	# shows up in Open With for testing without ever stealing the default.
+fi
 printf 'APPL????' > "$APP/Contents/PkgInfo"
 
 if [ -d "$ROOT/Resources" ]; then
@@ -71,6 +93,11 @@ fi
 APPEX="$APP/Contents/PlugIns/ImarkQuickLook.appex"
 cp "$BIN/ImarkQuickLook" "$APPEX/Contents/MacOS/ImarkQuickLook"
 cp "$ROOT/Support/QuickLook-Info.plist" "$APPEX/Contents/Info.plist"
+if [ "$DEV" -eq 1 ]; then
+	/usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $BUNDLE_ID.quicklook" \
+		-c "Set :CFBundleDisplayName $APP_NAME Quick Look" \
+		"$APPEX/Contents/Info.plist" >/dev/null
+fi
 
 # The extension is sandboxed and cannot count on reading the containing app's
 # Resources, so it gets its own copy of the renderer.
@@ -106,13 +133,13 @@ if [ "$INSTALL" -eq 1 ]; then
 	step "instalar em $INSTALL_DIR"
 	mkdir -p "$INSTALL_DIR"
 	# A stale copy confuses Launch Services more than a missing one.
-	rm -rf "${INSTALL_DIR:?}/Imark.app"
-	cp -R "$APP" "$INSTALL_DIR/Imark.app"
+	rm -rf "${INSTALL_DIR:?}/$APP_NAME.app"
+	cp -R "$APP" "$INSTALL_DIR/$APP_NAME.app"
 
 	step "registar no Launch Services"
-	"$LSREGISTER" -f "$INSTALL_DIR/Imark.app"
+	"$LSREGISTER" -f "$INSTALL_DIR/$APP_NAME.app"
 	echo "registado"
-	printf '\n\033[1;32m✓ Imark instalado em %s\033[0m\n' "$INSTALL_DIR/Imark.app"
+	printf '\n\033[1;32m✓ %s instalado em %s\033[0m\n' "$APP_NAME" "$INSTALL_DIR/$APP_NAME.app"
 else
 	printf '\n\033[1;32m✓ %s\033[0m\n' "$APP"
 fi

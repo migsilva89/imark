@@ -13,6 +13,56 @@ public enum RendererMessage {
     case openWiki(String)
     case openLocal(String)
     case openExternal(URL)
+    case selection(Selection)
+    case selectionCleared
+    case comments(notes: [NoteSummary], reviewing: Bool)
+    case noteCommand(NoteCommand)
+}
+
+/// A live selection in the document, and where it came from in the file.
+public struct Selection {
+    public struct Lines: Equatable {
+        public let start: Int
+        public let end: Int
+    }
+
+    public let text: String
+    /// In the renderer view's own coordinates, ready to anchor a popover to.
+    public let rect: NSRect
+    /// The tightest block that knows its lines — where a quote should be found.
+    public let inline: Lines?
+    /// The top-level block it belongs to — where a comment gets written.
+    public let block: Lines?
+    /// Which occurrence of this text inside the block it is, counting from one.
+    /// Two notes on the same word would otherwise both anchor to the first.
+    public let occurrence: Int
+}
+
+/// One note, flattened for listing. Built by the renderer, which has already
+/// parsed the file — a second parser in Swift would be a second parser to keep
+/// in step.
+public struct NoteSummary {
+    public let quote: String
+    public let author: String
+    /// Already formatted by the renderer, which is the only place that copes
+    /// with the shapes a hand-written timestamp comes in.
+    public let when: String
+    public let text: String
+    /// The quoted words are gone from the document; the note has no exact place.
+    public let orphan: Bool
+}
+
+/// Edit or delete, asked for from a note's own card.
+public struct NoteCommand {
+    public enum Kind: String { case edit, delete }
+
+    public let kind: Kind
+    /// The lines the block occupies in the file, both ends inclusive.
+    public let lines: ClosedRange<Int>
+    public let text: String
+    public let quote: String
+    /// Where to put the composer, in the renderer view's coordinates.
+    public let rect: NSRect
 }
 
 public struct TocEntry: Identifiable, Equatable {
@@ -125,9 +175,41 @@ public final class RendererView: NSView {
         call("window.imark.findStep", delta)
     }
 
+    public func clearSelection() {
+        webView.evaluateJavaScript("window.imark.clearSelection()")
+    }
+
+    /// Opens every note at once, for reading a document somebody commented on
+    /// rather than hunting the dots one by one.
+    public func setReviewingComments(_ on: Bool) {
+        call("window.imark.setReviewing", on)
+    }
+
+    /// The document with every note turned into a visible blockquote. Built in
+    /// the renderer because that is where the notes are already parsed — a
+    /// second parser in Swift would be a second parser to keep in step.
+    public func exportComments(_ done: @escaping (String?) -> Void) {
+        webView.evaluateJavaScript("window.imark.exportComments()") { value, _ in
+            done(value as? String)
+        }
+    }
+
+    /// Moves to the next (+1) or previous (-1) note, wrapping around.
+    public func stepNote(_ delta: Int) {
+        call("window.imark.stepNote", delta)
+    }
+
+    /// Scrolls to a note and opens it — a comment that changes the file without
+    /// visibly appearing is the same bug as a button that does nothing.
+    public func revealNote(_ index: Int) {
+        call("window.imark.revealNote", index)
+    }
+
+
     public func findClear() {
         webView.evaluateJavaScript("window.imark.findClear()")
     }
+
 
     private var isDarkMode: Bool {
         effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
@@ -215,6 +297,64 @@ public final class RendererView: NSView {
                     count: body["count"] as? Int ?? 0,
                     index: body["index"] as? Int ?? 0
                 ))
+
+            case "selection":
+                guard let text = body["text"] as? String,
+                      let raw = body["rect"] as? [String: Any],
+                      let x = raw["x"] as? Double, let y = raw["y"] as? Double,
+                      let w = raw["width"] as? Double, let h = raw["height"] as? Double
+                else { break }
+
+                let lines = { (key: String) -> Selection.Lines? in
+                    guard let v = body[key] as? [String: Any],
+                          let s = v["start"] as? Int, let e = v["end"] as? Int
+                    else { return nil }
+                    return Selection.Lines(start: s, end: e)
+                }
+
+                // The page measures from the top-left; AppKit views from the
+                // bottom-left unless flipped.
+                let height = owner.bounds.height
+                let rect = NSRect(x: x, y: height - y - h, width: w, height: h)
+                owner.onMessage?(.selection(Selection(
+                    text: text, rect: rect, inline: lines("inline"), block: lines("block"),
+                    occurrence: body["occurrence"] as? Int ?? 1
+                )))
+
+            case "selectionCleared":
+                owner.onMessage?(.selectionCleared)
+
+            case "comments":
+                let raw = body["items"] as? [[String: Any]] ?? []
+                owner.onMessage?(.comments(
+                    notes: raw.map { item in
+                        NoteSummary(
+                            quote: item["quote"] as? String ?? "",
+                            author: item["by"] as? String ?? "",
+                            when: item["when"] as? String ?? "",
+                            text: item["text"] as? String ?? "",
+                            orphan: item["orphan"] as? Bool ?? false
+                        )
+                    },
+                    reviewing: body["reviewing"] as? Bool ?? false
+                ))
+
+            case "noteCommand":
+                guard let raw = body["command"] as? String,
+                      let kind = NoteCommand.Kind(rawValue: raw),
+                      let start = body["line"] as? Int,
+                      let end = body["endLine"] as? Int, start <= end,
+                      let box = body["rect"] as? [String: Any],
+                      let x = box["x"] as? Double, let y = box["y"] as? Double,
+                      let w = box["width"] as? Double, let h = box["height"] as? Double
+                else { break }
+                owner.onMessage?(.noteCommand(NoteCommand(
+                    kind: kind,
+                    lines: start...end,
+                    text: body["text"] as? String ?? "",
+                    quote: body["quote"] as? String ?? "",
+                    rect: NSRect(x: x, y: owner.bounds.height - y - h, width: w, height: h)
+                )))
 
             case "wikilinks":
                 owner.onMessage?(.wikilinks(body["targets"] as? [String] ?? []))

@@ -113,6 +113,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    @objc func showShortcuts(_ sender: Any?) { ShortcutsPanel.toggle() }
+
     @objc func openDocument(_ sender: Any?) {
         let panel = NSOpenPanel()
         panel.allowsMultipleSelection = true
