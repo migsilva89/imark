@@ -652,12 +652,15 @@ img[data-blocked] {
   margin: calc(var(--step) * 3) 0;
 }
 
+/* The byline carries the note's colour, the same as it does on the rail card.
+   It is the only line in the card that can, and without it a note in the list
+   of five is the only place the colour shows. */
 .note-card header {
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.02em;
   text-transform: uppercase;
-  color: var(--secondary);
+  color: var(--note);
   margin-bottom: calc(var(--step) * 2);
 }
 
