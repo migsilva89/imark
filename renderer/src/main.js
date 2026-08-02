@@ -565,7 +565,7 @@ const content = () => document.getElementById('content')
 let activeHeadings = []
 let renderToken = 0
 
-async function render({ markdown, path, theme, preview }) {
+async function render({ markdown, path, theme, preview, rail }) {
   const token = ++renderToken
   docDir = path ? path.slice(0, path.lastIndexOf('/')) || '/' : '/'
   slugCounts.clear()
@@ -575,6 +575,10 @@ async function render({ markdown, path, theme, preview }) {
   // setters, and in Quick Look those calls arrive before the page exists.
   if (theme) document.documentElement.dataset.theme = theme
   if (preview) document.documentElement.dataset.preview = 'true'
+  // 'left' in the preview panel, 'right' in a window where the sidebar already
+  // owns the left edge. Absent means no rail at all.
+  if (rail) document.documentElement.dataset.rail = rail
+  else delete document.documentElement.dataset.rail
 
   const { data, body } = splitFrontMatter(markdown ?? '')
   const root = content()
@@ -771,6 +775,11 @@ window.imark = {
   },
   setPreview(on) {
     document.documentElement.dataset.preview = on ? 'true' : 'false'
+  },
+  setRail(side) {
+    if (side) document.documentElement.dataset.rail = side
+    else delete document.documentElement.dataset.rail
+    buildRail(content())
   },
   find: runFind,
   findStep: step,

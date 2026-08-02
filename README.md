@@ -33,7 +33,9 @@ Both are rendering [`testdata/showcase.md`](testdata/showcase.md), which exercis
 - **Quick Look previews** — the space bar in the Finder renders the document, not raw text, using the same engine as the app
 - **Live reload** — saving in your editor updates the view in under 300ms, keeping your scroll position, and it survives the delete-and-rename that editors call an atomic save
 - **Foldable outline** — headings in the sidebar, with sections you can collapse; past twenty entries it opens folded, so a changelog is one row per version
+- **Outline rail** — a column of ticks down the edge that tapers around wherever you point, with a card showing the section and its first line; hover to look, click to jump, drag to scrub
 - **Wiki-links** — `[[note]]` resolves against the folder and opens in the same window, with back and forward history
+- **The folder and the recents** — every `.md` beside the open document, plus the last five you opened from anywhere else
 - **Everything GitHub-flavoured** — tables, task lists, footnotes, front matter as a header card, syntax highlighting, Mermaid diagrams, KaTeX maths
 - **Find with a counter** — `⌘F` highlights every hit and tells you which one you are on
 - **Truly offline** — a content security policy blocks every request, and the KaTeX fonts are embedded in the bundle. Remote images do not load, on purpose

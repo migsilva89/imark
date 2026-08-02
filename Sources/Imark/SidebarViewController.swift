@@ -22,6 +22,7 @@ final class SidebarViewController: NSViewController {
     private var rows: [Row] = []
     private var toc: [TocEntry] = []
     private var files: [URL] = []
+    private var recents: [URL] = []
     private var currentFile: URL?
     private var activeID: String?
 
@@ -82,9 +83,10 @@ final class SidebarViewController: NSViewController {
         rebuild()
     }
 
-    func update(files: [URL], current: URL) {
+    func update(files: [URL], current: URL, recents: [URL] = []) {
         self.files = files
         self.currentFile = current
+        self.recents = recents
         rebuild()
     }
 
@@ -162,8 +164,12 @@ final class SidebarViewController: NSViewController {
         }
         // A lone file is just the document you already have open.
         if files.count > 1 {
-            built.append(.header("Files"))
+            built.append(.header("In this folder"))
             built.append(contentsOf: files.map(Row.file))
+        }
+        if !recents.isEmpty {
+            built.append(.header("Recent"))
+            built.append(contentsOf: recents.map(Row.file))
         }
         rows = built
         table.reloadData()

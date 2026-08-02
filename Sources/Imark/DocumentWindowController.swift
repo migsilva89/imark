@@ -63,6 +63,9 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
 
         content.renderer.setTextScale(Settings.textScale)
         content.renderer.setWidth(Settings.width.rawValue)
+        // Right edge, so it complements the outline on the left rather than
+        // competing with it.
+        content.renderer.setRail("right")
 
         show(url, pushingHistory: false)
 
@@ -136,7 +139,16 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         let markdown = found
             .filter(MarkdownType.matches)
             .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
-        sidebar.update(files: markdown, current: url)
+        // Recently opened markdown from anywhere, minus what is already listed
+        // as a neighbour — the sibling list is only useful inside a doc folder.
+        let siblings = Set(markdown)
+        let recents = NSDocumentController.shared.recentDocumentURLs
+            .map { $0.standardizedFileURL }
+            .filter { $0 != url && !siblings.contains($0) && MarkdownType.matches($0) }
+            .filter { FileManager.default.fileExists(atPath: $0.path) }
+            .prefix(5)
+
+        sidebar.update(files: markdown, current: url, recents: Array(recents))
     }
 
     // MARK: - Messages

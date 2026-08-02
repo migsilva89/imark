@@ -30,6 +30,7 @@ public final class RendererView: NSView {
 
     private let bridge = Bridge()
     private var previewMode = false
+    private var railSide: String?
 
     public override init(frame frameRect: NSRect) {
         let config = WKWebViewConfiguration()
@@ -77,6 +78,7 @@ public final class RendererView: NSView {
             // Carried in the payload rather than sent separately: a standalone
             // call lands before the page is ready and is silently dropped.
             "preview": previewMode,
+            "rail": railSide ?? "",
         ])
     }
 
@@ -104,7 +106,15 @@ public final class RendererView: NSView {
     /// margins, no copy buttons, nothing clickable.
     public func setPreviewMode() {
         previewMode = true
+        setRail("left")
         call("window.imark.setPreview", true)
+    }
+
+    /// Which edge the outline rail hugs: `left` in the preview panel, `right`
+    /// in a window where the sidebar already owns the left edge, nil for none.
+    public func setRail(_ side: String?) {
+        railSide = side
+        call("window.imark.setRail", side ?? "")
     }
 
     public func find(_ query: String) {
