@@ -13,6 +13,7 @@ import mermaid from 'mermaid'
 import wikilink from './wikilink.js'
 import {
   attachComments,
+  buildNoteRail,
   extractComments,
   installCommentHandlers,
   isReviewing,
@@ -411,6 +412,10 @@ function buildRail(root) {
     const slot = document.createElement('span')
     slot.className = 'rail-tick'
     slot.dataset.level = String(headingLevel(block))
+    // Which heading this tick stands for. The notes rail lines its marks up
+    // with these, and needs to know where in the document each one starts —
+    // the tick's own position is a slot in a list, not a place.
+    if (block.id) slot.dataset.heading = block.id
     slot.appendChild(document.createElement('i'))
     rail.appendChild(slot)
     railTicks.push(slot)
@@ -688,6 +693,9 @@ async function render({ markdown, path, theme, preview, rail }) {
   renderMath(root)
   activeHeadings = buildToc(root)
   buildRail(root)
+  // After the outline rail, never before: the marks are placed against its
+  // ticks, and ticks that do not exist yet put every note at the top.
+  buildNoteRail()
   await renderMermaid(root, theme)
   if (token !== renderToken) return
 
@@ -963,6 +971,7 @@ window.imark = {
     if (side) document.documentElement.dataset.rail = side
     else delete document.documentElement.dataset.rail
     buildRail(content())
+    buildNoteRail()
   },
   find: runFind,
   findStep: step,
