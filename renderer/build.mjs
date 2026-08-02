@@ -1,10 +1,10 @@
 import * as esbuild from 'esbuild'
-import { copyFileSync, mkdirSync } from 'node:fs'
+import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs'
 
 const OUT = '../Resources'
 mkdirSync(OUT, { recursive: true })
 
-await esbuild.build({
+const result = await esbuild.build({
   entryPoints: ['src/main.js'],
   bundle: true,
   minify: true,
@@ -20,7 +20,12 @@ await esbuild.build({
   },
   legalComments: 'none',
   logLevel: 'warning',
+  // Support/licences.mjs reads this to credit exactly what ended up in the
+  // bundle, rather than everything that happens to be in node_modules.
+  metafile: true,
 })
+
+writeFileSync('.esbuild-meta.json', JSON.stringify(result.metafile))
 
 copyFileSync('src/index.html', `${OUT}/index.html`)
 

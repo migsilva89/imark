@@ -243,7 +243,7 @@ Sources/ImarkQuickLook/  the Quick Look extension
 Sources/ImarkRender/     the renderer both of them share
 renderer/                JavaScript source
 Resources/               build output — not edited by hand
-Support/                 Info.plist, entitlements, the icon generator, and tests
+Support/                 Info.plist, entitlements, generators, and tests
 testdata/                documents that exercise the renderer
 docs/                    design, flows and acceptance criteria
 ```
@@ -251,6 +251,17 @@ docs/                    design, flows and acceptance criteria
 The renderer is the only part that knows how to turn Markdown into anything. The Swift side handles windows, files and navigation, and talks to it in messages.
 
 Design and acceptance criteria live in [docs/DESIGN.md](docs/DESIGN.md); the build order and what each milestone had to satisfy is in [docs/PLAN.md](docs/PLAN.md). Comments have their own pair — [docs/EDITOR.md](docs/EDITOR.md) for why they are stored the way they are, [docs/PLAN-COMMENTS.md](docs/PLAN-COMMENTS.md) for the order it was built in and what went wrong on the way.
+
+## Licences
+
+Everything Imark bundles is permissive — MIT, ISC, BSD, Unlicense — with no
+copyleft anywhere in the tree. Several of them require their copyright notice to
+travel with the binary, so [`THIRD-PARTY.md`](THIRD-PARTY.md) is generated from
+what esbuild actually put in the bundle, on every build, and the same list ships
+inside the app: **Imark › About Imark** shows it.
+
+Imark itself carries no licence yet, which means all rights reserved. Read it,
+but do not assume you may use it.
 
 ## Tools
 

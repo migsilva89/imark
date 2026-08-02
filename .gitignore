@@ -11,3 +11,4 @@ renderer/node_modules/
 
 # macOS
 .DS_Store
+renderer/.esbuild-meta.json

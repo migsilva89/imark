@@ -49,6 +49,9 @@ step() { printf '\n\033[1;35m▸ %s\033[0m\n' "$1"; }
 if [ -d "$ROOT/renderer/node_modules" ]; then
 	step "renderer (esbuild)"
 	(cd "$ROOT/renderer" && node build.mjs)
+	# Generated from what esbuild actually bundled, so the notices cannot drift
+	# from the binary they have to travel with.
+	node "$ROOT/Support/licences.mjs"
 else
 	echo "aviso: renderer/node_modules em falta — a saltar o bundle JS" >&2
 fi
@@ -88,6 +91,12 @@ if [ -f "$ROOT/Support/AppIcon.icns" ]; then
 	cp "$ROOT/Support/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
 else
 	echo "aviso: sem ícone — corre 'swift Support/make-icon.swift'" >&2
+fi
+
+# macOS shows Credits.html in the standard About panel on its own, so the
+# third-party notices travel with the binary without a line of UI code.
+if [ -f "$ROOT/Support/Credits.html" ]; then
+	cp "$ROOT/Support/Credits.html" "$APP/Contents/Resources/Credits.html"
 fi
 
 APPEX="$APP/Contents/PlugIns/ImarkQuickLook.appex"
