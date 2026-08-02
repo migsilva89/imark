@@ -90,6 +90,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSDocumentController.shared.noteNewRecentDocumentURL(key)
     }
 
+    /// Greys out the menu item once Imark already owns .md — offering to do
+    /// something that is already done is just noise.
+    func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        if item.action == #selector(makeDefaultHandler(_:)) {
+            return !MarkdownType.imarkIsDefault
+        }
+        return true
+    }
+
     @objc func makeDefaultHandler(_ sender: Any?) {
         MarkdownType.makeImarkDefault { ok in
             let alert = NSAlert()

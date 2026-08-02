@@ -16,6 +16,16 @@ enum MarkdownType {
         extensions.contains(url.pathExtension.lowercased())
     }
 
+    /// Whether the system already opens markdown with us. Asked of Launch
+    /// Services every time rather than remembered — the user can change the
+    /// handler in the Finder behind our back.
+    static var imarkIsDefault: Bool {
+        guard let markdown = UTType("net.daringfireball.markdown"),
+              let handler = NSWorkspace.shared.urlForApplication(toOpen: markdown)
+        else { return false }
+        return handler.standardizedFileURL == Bundle.main.bundleURL.standardizedFileURL
+    }
+
     /// Registers Imark as the handler for markdown, so the user does not have
     /// to walk through Get Info → Open with → Change All.
     static func makeImarkDefault(completion: @escaping (Bool) -> Void) {

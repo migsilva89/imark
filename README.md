@@ -97,5 +97,12 @@ swift Support/shoot.swift file:///caminho/pagina.html saida.png "js opcional" "p
 Os últimos dois argumentos recortam a fotografia. Ler o cabeçalho do ficheiro
 antes de o usar — há duas armadilhas com o compositor.
 
+Para as partes nativas, `Support/window-id.swift` dá o id de uma janela para se
+fotografar só essa, em vez do ecrã todo:
+
+```bash
+screencapture -x -o -l"$(swift Support/window-id.swift Imark)" shot.png
+```
+
 O renderer é a única parte que sabe converter markdown. A app Swift trata de
 janelas, ficheiros e navegação, e fala com ele por mensagens.

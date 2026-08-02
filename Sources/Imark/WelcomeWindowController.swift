@@ -6,7 +6,9 @@ import UniformTypeIdentifiers
 final class WelcomeWindowController: NSWindowController {
     var onOpen: (([URL]) -> Void)?
 
-    private let hint = NSTextField(labelWithString: "")
+    /// Holds either the "make me the default" button or the confirmation that
+    /// Imark already is, and is rebuilt when that changes.
+    private let defaultRow = NSStackView()
 
     init() {
         let window = NSWindow(
@@ -32,9 +34,15 @@ final class WelcomeWindowController: NSWindowController {
     required init?(coder: NSCoder) { fatalError("not supported") }
 
     private func buildContent(in container: NSView) {
-        let mark = NSTextField(labelWithString: "◗")
-        mark.font = .systemFont(ofSize: 56, weight: .medium)
-        mark.textColor = .controlAccentColor
+        // The real app icon, not a stand-in glyph — this is the one place the
+        // user sees Imark with nothing else on screen.
+        let icon = NSImageView(image: NSApp.applicationIconImage)
+        icon.imageScaling = .scaleProportionallyUpOrDown
+        icon.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            icon.widthAnchor.constraint(equalToConstant: 84),
+            icon.heightAnchor.constraint(equalToConstant: 84),
+        ])
 
         let title = NSTextField(labelWithString: "Imark")
         title.font = .systemFont(ofSize: 26, weight: .semibold)
@@ -47,24 +55,18 @@ final class WelcomeWindowController: NSWindowController {
         openButton.bezelStyle = .rounded
         openButton.keyEquivalent = "\r"
 
-        let defaultButton = NSButton(
-            title: "Make Imark the default for .md",
-            target: self,
-            action: #selector(makeDefault)
-        )
-        defaultButton.bezelStyle = .rounded
+        defaultRow.orientation = .horizontal
+        defaultRow.spacing = 5
+        defaultRow.alignment = .centerY
+        refreshDefaultRow()
 
-        hint.font = .systemFont(ofSize: 11)
-        hint.textColor = .tertiaryLabelColor
-        hint.alignment = .center
-
-        let stack = NSStackView(views: [mark, title, subtitle, openButton, defaultButton, hint])
+        let stack = NSStackView(views: [icon, title, subtitle, openButton, defaultRow])
         stack.orientation = .vertical
         stack.alignment = .centerX
         stack.spacing = 10
-        stack.setCustomSpacing(2, after: mark)
-        stack.setCustomSpacing(24, after: subtitle)
-        stack.setCustomSpacing(20, after: openButton)
+        stack.setCustomSpacing(14, after: icon)
+        stack.setCustomSpacing(26, after: subtitle)
+        stack.setCustomSpacing(22, after: openButton)
 
         stack.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(stack)
@@ -72,6 +74,39 @@ final class WelcomeWindowController: NSWindowController {
             stack.centerXAnchor.constraint(equalTo: container.centerXAnchor),
             stack.centerYAnchor.constraint(equalTo: container.centerYAnchor),
         ])
+    }
+
+    // MARK: - Default handler
+
+    private func refreshDefaultRow() {
+        defaultRow.arrangedSubviews.forEach { $0.removeFromSuperview() }
+
+        guard !MarkdownType.imarkIsDefault else {
+            // Already the default: an offer to do what is already done is just
+            // one more thing to read and dismiss.
+            let check = NSImageView(
+                image: NSImage(systemSymbolName: "checkmark.circle.fill", accessibilityDescription: nil)
+                    ?? NSImage()
+            )
+            check.contentTintColor = .secondaryLabelColor
+            check.symbolConfiguration = .init(pointSize: 11, weight: .regular)
+
+            let label = NSTextField(labelWithString: "Default for .md files")
+            label.font = .systemFont(ofSize: 11)
+            label.textColor = .secondaryLabelColor
+
+            defaultRow.addArrangedSubview(check)
+            defaultRow.addArrangedSubview(label)
+            return
+        }
+
+        let button = NSButton(
+            title: "Make Imark the default for .md",
+            target: self,
+            action: #selector(makeDefault)
+        )
+        button.bezelStyle = .rounded
+        defaultRow.addArrangedSubview(button)
     }
 
     @objc private func openPanel() {
@@ -84,15 +119,17 @@ final class WelcomeWindowController: NSWindowController {
     }
 
     @objc private func makeDefault() {
-        MarkdownType.makeImarkDefault { [weak self] ok in
-            self?.hint.stringValue = ok
-                ? "Done — .md files now open in Imark."
-                : "Couldn't set it. Use Get Info on a .md → Open with → Change All."
+        MarkdownType.makeImarkDefault { [weak self] _ in
+            // Ask the system rather than trusting the result: if it refused,
+            // the row correctly stays a button.
+            self?.refreshDefaultRow()
         }
     }
 
     override func showWindow(_ sender: Any?) {
         super.showWindow(sender)
+        // The user may have changed the handler in the Finder since last time.
+        refreshDefaultRow()
         window?.makeKeyAndOrderFront(nil)
     }
 
