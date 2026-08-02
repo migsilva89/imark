@@ -36,15 +36,16 @@
   --size-body: 16px;
 }
 
-/* A palette is one of these blocks and nothing else — Swift only ever sets
-   `data-theme` to its name, and mermaid reads the computed variables. Adding a
-   theme is adding a block here and a case in Settings.Palette. `light` and
-   `dark` stay as names for the Quick Look extension, which asks for those two.
+/* A palette is a pair of these blocks and nothing else — Swift only ever sets
+   `data-theme` to `<name>-light` or `<name>-dark`, and mermaid reads the
+   computed variables. Adding a theme is two blocks here and a case in
+   Settings.Palette. `light` and `dark` stay as names for the Quick Look
+   extension, which asks for those two.
 
-   Every block has to set every colour it changes away from :root, because the
-   base is Paper and anything left out falls back to it. */
+   Classic's light face is :root itself, so it needs no block. Every other block
+   has to set every colour it moves, because anything left out falls back there. */
 :root[data-theme='dark'],
-:root[data-theme='ink'] {
+:root[data-theme='classic-dark'] {
   --bg: #0f0f10;
   --text: #ededed;
   --secondary: #98989d;
@@ -66,9 +67,9 @@
   --syn-number: #fbbf24;
 }
 
-/* Warm paper. The accent moves off violet towards ink-brown, because a cool
-   violet on a warm ground is the one combination that reads as a mistake. */
-:root[data-theme='sepia'] {
+/* Warm, light. The accent moves off violet towards ink-brown: a cool violet on
+   a warm ground is the one combination that reads as a mistake. */
+:root[data-theme='warm-light'] {
   --bg: #f6efe3;
   --text: #33291d;
   --secondary: #75695a;
@@ -91,10 +92,60 @@
   --syn-number: #98601c;
 }
 
-/* Cooler and deeper than Ink, for reading at night with the lights off. Blue
-   rather than neutral black: the same lightness reads as darker when it is
-   cold, so the page recedes without the text losing contrast. */
-:root[data-theme='midnight'] {
+/* Warm, dark. The same ground as the light face seen at night — brown-black
+   rather than neutral, so the pair reads as one theme and not as two. */
+:root[data-theme='warm-dark'] {
+  --bg: #14100c;
+  --text: #ece2d4;
+  --secondary: #9c8f7e;
+  --accent: #d99a5b;
+  --accent-soft: #3a2a19;
+  --code-bg: #1b1611;
+  --surface: #221b14;
+  --border: #33291f;
+  --diagram: #e0a76b;
+
+  --note: var(--accent);
+  --note-amber: #e8b56a;
+  --note-green: #9dbf7a;
+  --note-blue: #8fb3d9;
+  --note-red: #e08a72;
+
+  --syn-keyword: #e3a3c9;
+  --syn-string: #b5c46e;
+  --syn-comment: #7a6c5c;
+  --syn-number: #e8a95e;
+}
+
+/* Cool, light. Blue-white paper rather than plain white, with an ink-blue
+   accent — the counterpart to the night face below it. */
+:root[data-theme='cool-light'] {
+  --bg: #f7f9fc;
+  --text: #1a2230;
+  --secondary: #61708a;
+  --accent: #3b6ea5;
+  --accent-soft: #dfe9f5;
+  --code-bg: #eef2f8;
+  --surface: #ffffff;
+  --border: #d8e0ec;
+  --diagram: #4a7db5;
+
+  --note: var(--accent);
+  --note-amber: #a8730a;
+  --note-green: #2b7a4b;
+  --note-blue: #2b6cb0;
+  --note-red: #b8362a;
+
+  --syn-keyword: #6a4fbf;
+  --syn-string: #2f7a52;
+  --syn-comment: #8b95a8;
+  --syn-number: #a35a10;
+}
+
+/* Cool, dark. Deeper than Classic's night face and blue rather than neutral:
+   the same lightness reads as darker when it is cold, so the page recedes
+   without the text losing contrast. */
+:root[data-theme='cool-dark'] {
   --bg: #0c1018;
   --text: #dde3ee;
   --secondary: #8b95a8;

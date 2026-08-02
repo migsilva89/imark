@@ -558,8 +558,8 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     /// opened now and a window opened an hour ago cannot disagree.
     private func applySettings() {
         content.renderer.palettes = (
-            light: Settings.lightPalette.rawValue,
-            dark: Settings.darkPalette.rawValue
+            light: Settings.palette.face(dark: false),
+            dark: Settings.palette.face(dark: true)
         )
         content.renderer.applyTheme()
         content.renderer.setTextScale(Settings.textScale)

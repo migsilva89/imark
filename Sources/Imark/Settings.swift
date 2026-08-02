@@ -51,35 +51,28 @@ enum Settings {
         }
     }
 
-    /// A document palette. The colours themselves live in the stylesheet as
-    /// `[data-theme='…']` blocks, which is where every other colour in the
-    /// document already lives — this is only the list, the names for the picker
-    /// and which slot each one may fill. Adding a theme is a block of CSS and a
-    /// case here, and nothing else.
+    /// A document palette, in both of its faces. One list rather than a light
+    /// slot and a dark slot: picking a theme should be one decision, and a theme
+    /// that only exists on one side of the system switch is half a theme.
+    ///
+    /// The colours live in the stylesheet as `[data-theme='…']` blocks, which is
+    /// where every other colour in the document already lives. Adding a theme is
+    /// two blocks of CSS and a case here, and nothing else.
     enum Palette: String, CaseIterable {
-        case paper, sepia, ink, midnight
+        case classic, warm, cool
 
         var label: String {
             switch self {
-            case .paper: return "Paper"
-            case .sepia: return "Sepia"
-            case .ink: return "Ink"
-            case .midnight: return "Midnight"
+            case .classic: return "Classic"
+            case .warm: return "Warm"
+            case .cool: return "Cool"
             }
         }
 
-        /// Which slot it belongs in, and the appearance the window takes while
-        /// it is showing. The chrome is AppKit and only knows aqua and darkAqua,
-        /// so a palette cannot tint it — it can only pick a side.
-        var isDark: Bool {
-            switch self {
-            case .paper, .sepia: return false
-            case .ink, .midnight: return true
-            }
-        }
-
-        static var light: [Palette] { allCases.filter { !$0.isDark } }
-        static var dark: [Palette] { allCases.filter(\.isDark) }
+        /// The name the page answers to. The chrome is AppKit and only knows
+        /// aqua and darkAqua, so the system switch still decides which face
+        /// shows — the palette only decides what each face looks like.
+        func face(dark: Bool) -> String { "\(rawValue)-\(dark ? "dark" : "light")" }
     }
 
     /// Where "Search the web" goes. It is a URL with the phrase in it, so the
@@ -145,17 +138,11 @@ enum Settings {
         set { store.set(newValue.rawValue, forKey: "theme"); announce() }
     }
 
-    /// Which palette fills each slot. Two slots rather than one setting so that
-    /// a Mac going dark at sunset still takes the app with it — the system
-    /// switch keeps deciding *when*, and these decide *what*.
-    static var lightPalette: Palette {
-        get { Palette(rawValue: store.string(forKey: "lightPalette") ?? "").flatMap { $0.isDark ? nil : $0 } ?? .paper }
-        set { store.set(newValue.rawValue, forKey: "lightPalette"); announce() }
-    }
-
-    static var darkPalette: Palette {
-        get { Palette(rawValue: store.string(forKey: "darkPalette") ?? "").flatMap { $0.isDark ? $0 : nil } ?? .ink }
-        set { store.set(newValue.rawValue, forKey: "darkPalette"); announce() }
+    /// The palette, in both faces. A Mac going dark at sunset still takes the
+    /// app with it: the system switch decides *when*, this decides *what*.
+    static var palette: Palette {
+        get { Palette(rawValue: store.string(forKey: "palette") ?? "") ?? .classic }
+        set { store.set(newValue.rawValue, forKey: "palette"); announce() }
     }
 
     /// The name that signs your notes. It used to be `NSFullUserName()` with no
@@ -179,6 +166,13 @@ enum Settings {
     static var noteColour: NoteColour {
         get { NoteColour(attribute: store.string(forKey: "noteColour")) }
         set { store.set(newValue.attribute, forKey: "noteColour"); announce() }
+    }
+
+    /// Off by default. The menu bar is the most contested strip of space on the
+    /// machine, and a document reader has no standing claim to it.
+    static var showInMenuBar: Bool {
+        get { store.bool(forKey: "showInMenuBar") }
+        set { store.set(newValue, forKey: "showInMenuBar"); announce() }
     }
 
     static var searchEngine: SearchEngine {

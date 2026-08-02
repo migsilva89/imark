@@ -11,6 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         Menu.install()
         Settings.applyThemeToApp()
+        MenuBarItem.shared.sync()
         NSApp.activate(ignoringOtherApps: true)
         // Launch Services delivers documents just after this callback, so give
         // it a beat before deciding the app was opened empty — otherwise the

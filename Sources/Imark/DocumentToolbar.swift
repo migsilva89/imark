@@ -21,15 +21,16 @@ extension DocumentWindowController: NSToolbarDelegate {
     }
 
     public func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
+        // Actions you take while reading, and the appearance. Two things left:
+        // the AA menu, a second copy of View › Bigger/Smaller/Actual Size, which
+        // already have ⌘+, ⌘− and ⌘0; and the shortcuts cheat sheet, which is
+        // read once or twice ever and was already sitting in Help under ⌘/.
+        // Reading the document, then changing how it looks, then taking it
+        // somewhere else. Find sits with the appearance rather than leading the
+        // row: it is a thing you do to the page in front of you, not a way out
+        // of it.
         [.toggleSidebar, .sidebarTrackingSeparator, .flexibleSpace,
-         // Shortcuts leads its own group, with a gap after it: it is the one
-         // button that explains the others, and sitting next to Share made it
-         // look like part of exporting.
-         .shortcuts, .space,
-         // The AA menu used to sit between comments and appearance. It was a
-         // second copy of View › Bigger/Smaller/Actual Size, which already have
-         // ⌘+, ⌘− and ⌘0, and it now has a third home in the preferences.
-         .find, .comments, .theme, .export, .openIn]
+         .comments, .theme, .find, .export, .openIn]
     }
 
     public func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
@@ -146,11 +147,10 @@ extension DocumentWindowController: NSToolbarDelegate {
     private func editorsMenu() -> NSMenu {
         let menu = NSMenu()
         let editors = Editors.installed(for: url)
-        guard !editors.isEmpty else {
+        if editors.isEmpty {
             let empty = NSMenuItem(title: "No editors found", action: nil, keyEquivalent: "")
             empty.isEnabled = false
             menu.addItem(empty)
-            return menu
         }
         for editor in editors {
             let item = NSMenuItem(title: editor.name, action: #selector(openInEditor(_:)), keyEquivalent: "")
@@ -159,6 +159,19 @@ extension DocumentWindowController: NSToolbarDelegate {
             item.target = self
             menu.addItem(item)
         }
+
+        // Below a rule, because it is the odd one out: every entry above hands
+        // the file to something that will show you its contents, and this one
+        // shows you where it lives. Same command as ⇧⌘R — this menu is "where
+        // else does this file go", and the Finder is an answer to that.
+        menu.addItem(.separator())
+        let reveal = menu.addItem(
+            withTitle: "Reveal in Finder",
+            action: #selector(revealInFinder(_:)),
+            keyEquivalent: ""
+        )
+        reveal.image = icon(for: URL(fileURLWithPath: "/System/Library/CoreServices/Finder.app"))
+        reveal.target = self
         return menu
     }
 

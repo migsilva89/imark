@@ -11,8 +11,7 @@ final class PreferencesWindowController: NSWindowController, NSWindowDelegate {
     static let shared = PreferencesWindowController()
 
     private let appearance = NSSegmentedControl()
-    private let lightPalette = NSPopUpButton()
-    private let darkPalette = NSPopUpButton()
+    private let palette = NSPopUpButton()
     private let textSize = NSSlider()
     private let textSizeLabel = NSTextField(labelWithString: "")
     private let width = NSPopUpButton()
@@ -21,6 +20,8 @@ final class PreferencesWindowController: NSWindowController, NSWindowDelegate {
     private let engine = NSPopUpButton()
     private let editor = NSPopUpButton()
     private let makeDefault = NSButton()
+    private let menuBar = NSButton()
+    private let shortcuts = NSButton()
 
     private init() {
         let window = NSWindow(
@@ -37,8 +38,8 @@ final class PreferencesWindowController: NSWindowController, NSWindowDelegate {
         // their own label column width, and three columns of labels that nearly
         // line up read worse than no alignment at all.
         let grid = NSGridView()
-        grid.rowSpacing = 10
-        grid.columnSpacing = 12
+        grid.rowSpacing = 14
+        grid.columnSpacing = 14
         grid.translatesAutoresizingMaskIntoConstraints = false
 
         add(heading: "Appearance", to: grid, first: true)
@@ -53,10 +54,10 @@ final class PreferencesWindowController: NSWindowController, NSWindowDelegate {
         let host = NSView()
         host.addSubview(grid)
         NSLayoutConstraint.activate([
-            grid.leadingAnchor.constraint(equalTo: host.leadingAnchor, constant: 24),
-            grid.trailingAnchor.constraint(equalTo: host.trailingAnchor, constant: -24),
-            grid.topAnchor.constraint(equalTo: host.topAnchor, constant: 18),
-            grid.bottomAnchor.constraint(equalTo: host.bottomAnchor, constant: -22),
+            grid.leadingAnchor.constraint(equalTo: host.leadingAnchor, constant: 30),
+            grid.trailingAnchor.constraint(equalTo: host.trailingAnchor, constant: -30),
+            grid.topAnchor.constraint(equalTo: host.topAnchor, constant: 24),
+            grid.bottomAnchor.constraint(equalTo: host.bottomAnchor, constant: -30),
         ])
         window.contentView = host
         // Sized to its contents rather than to a number picked by hand: the
@@ -93,8 +94,10 @@ final class PreferencesWindowController: NSWindowController, NSWindowDelegate {
         appearance.target = self
         appearance.action = #selector(appearanceChanged)
 
-        fill(lightPalette, with: Settings.Palette.light, action: #selector(paletteChanged))
-        fill(darkPalette, with: Settings.Palette.dark, action: #selector(paletteChanged))
+        palette.removeAllItems()
+        for value in Settings.Palette.allCases { palette.addItem(withTitle: value.label) }
+        palette.target = self
+        palette.action = #selector(paletteChanged)
 
         textSize.minValue = Settings.textScaleRange.lowerBound
         textSize.maxValue = Settings.textScaleRange.upperBound
@@ -115,9 +118,10 @@ final class PreferencesWindowController: NSWindowController, NSWindowDelegate {
         width.action = #selector(widthChanged)
 
         return [
-            ("Theme", appearance),
-            ("Light", lightPalette),
-            ("Dark", darkPalette),
+            // Not "Appearance" again: the group above it already says that, and
+            // a row that repeats its own heading tells you nothing.
+            ("Mode", appearance),
+            ("Theme", palette),
             ("Text size", size),
             ("Column", width),
         ]
@@ -165,10 +169,22 @@ final class PreferencesWindowController: NSWindowController, NSWindowDelegate {
         makeDefault.target = self
         makeDefault.action = #selector(makeDefaultPressed)
 
+        menuBar.title = "Show icon in the menu bar"
+        menuBar.setButtonType(.switch)
+        menuBar.target = self
+        menuBar.action = #selector(menuBarChanged)
+
+        shortcuts.title = "Keyboard Shortcuts…"
+        shortcuts.bezelStyle = .rounded
+        shortcuts.target = self
+        shortcuts.action = #selector(shortcutsPressed)
+
         return [
             ("Search with", engine),
             ("Open in", editor),
             ("Markdown files", makeDefault),
+            ("Menu bar", menuBar),
+            ("Reference", shortcuts),
         ]
     }
 
@@ -189,8 +205,9 @@ final class PreferencesWindowController: NSWindowController, NSWindowDelegate {
         // The merged cell inherits the label column's trailing placement, which
         // pushes a heading to the far right of the window.
         row.cell(at: 0).xPlacement = .leading
-        row.topPadding = first ? 0 : 14
-        row.bottomPadding = 2
+        // A group is told apart by the air above it more than by its title.
+        row.topPadding = first ? 0 : 22
+        row.bottomPadding = 6
     }
 
     private func add(rows: [(String, NSView)], to grid: NSGridView) {
@@ -210,23 +227,11 @@ final class PreferencesWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
-    private func fill(_ button: NSPopUpButton, with palettes: [Settings.Palette], action: Selector) {
-        button.removeAllItems()
-        for palette in palettes {
-            let item = NSMenuItem(title: palette.label, action: nil, keyEquivalent: "")
-            item.representedObject = palette.rawValue
-            button.menu?.addItem(item)
-        }
-        button.target = self
-        button.action = action
-    }
-
     // MARK: - Reading the settings back
 
     private func refresh() {
         appearance.selectedSegment = Settings.Theme.allCases.firstIndex(of: Settings.theme) ?? 0
-        select(lightPalette, Settings.lightPalette.rawValue)
-        select(darkPalette, Settings.darkPalette.rawValue)
+        palette.selectItem(at: Settings.Palette.allCases.firstIndex(of: Settings.palette) ?? 0)
 
         textSize.doubleValue = Settings.textScale
         textSizeLabel.stringValue = "\(Int(Settings.textScale)) pt"
@@ -243,14 +248,9 @@ final class PreferencesWindowController: NSWindowController, NSWindowDelegate {
            let index = editor.itemArray.firstIndex(where: { $0.representedObject as? URL == preferred }) {
             editor.selectItem(at: index)
         }
+        menuBar.state = Settings.showInMenuBar ? .on : .off
         makeDefault.isEnabled = !MarkdownType.imarkIsDefault
         makeDefault.title = MarkdownType.imarkIsDefault ? "Imark is the Default" : "Make Imark the Default"
-    }
-
-    private func select(_ button: NSPopUpButton, _ raw: String) {
-        guard let index = button.itemArray.firstIndex(where: { $0.representedObject as? String == raw })
-        else { return }
-        button.selectItem(at: index)
     }
 
     // MARK: - Actions
@@ -262,10 +262,9 @@ final class PreferencesWindowController: NSWindowController, NSWindowDelegate {
         Settings.applyThemeToApp()
     }
 
-    @objc private func paletteChanged(_ sender: NSPopUpButton) {
-        guard let raw = sender.selectedItem?.representedObject as? String,
-              let palette = Settings.Palette(rawValue: raw) else { return }
-        if palette.isDark { Settings.darkPalette = palette } else { Settings.lightPalette = palette }
+    @objc private func paletteChanged() {
+        guard Settings.Palette.allCases.indices.contains(palette.indexOfSelectedItem) else { return }
+        Settings.palette = Settings.Palette.allCases[palette.indexOfSelectedItem]
     }
 
     @objc private func textSizeChanged() {
@@ -298,6 +297,13 @@ final class PreferencesWindowController: NSWindowController, NSWindowDelegate {
     @objc private func editorChanged() {
         Settings.preferredEditor = editor.selectedItem?.representedObject as? URL
     }
+
+    @objc private func menuBarChanged() {
+        Settings.showInMenuBar = menuBar.state == .on
+        MenuBarItem.shared.sync()
+    }
+
+    @objc private func shortcutsPressed() { ShortcutsPanel.toggle() }
 
     @objc private func makeDefaultPressed() {
         MarkdownType.makeImarkDefault { [weak self] _ in self?.refresh() }
