@@ -20,6 +20,10 @@ final class PreferencesWindowController: NSWindowController, NSWindowDelegate {
     private let engine = NSPopUpButton()
     private let editor = NSPopUpButton()
     private let makeDefault = NSButton()
+    /// Shown instead of the button once there is nothing left to press. A
+    /// greyed-out button that states a fact reads as broken; a tick reads as
+    /// done.
+    private let isDefault = NSStackView()
     private let menuBar = NSButton()
     private let shortcuts = NSButton()
 
@@ -169,6 +173,19 @@ final class PreferencesWindowController: NSWindowController, NSWindowDelegate {
         makeDefault.target = self
         makeDefault.action = #selector(makeDefaultPressed)
 
+        let tick = NSImageView(image: NSImage(
+            systemSymbolName: "checkmark.circle.fill",
+            accessibilityDescription: nil
+        ) ?? NSImage())
+        tick.contentTintColor = .systemGreen
+        let done = NSTextField(labelWithString: "Imark opens them")
+        done.textColor = .secondaryLabelColor
+        isDefault.setViews([tick, done], in: .leading)
+        isDefault.spacing = 6
+
+        let markdown = NSStackView(views: [makeDefault, isDefault])
+        markdown.spacing = 0
+
         menuBar.title = "Show icon in the menu bar"
         menuBar.setButtonType(.switch)
         menuBar.target = self
@@ -182,7 +199,7 @@ final class PreferencesWindowController: NSWindowController, NSWindowDelegate {
         return [
             ("Search with", engine),
             ("Open in", editor),
-            ("Markdown files", makeDefault),
+            ("Markdown files", markdown),
             ("Menu bar", menuBar),
             ("Reference", shortcuts),
         ]
@@ -249,8 +266,11 @@ final class PreferencesWindowController: NSWindowController, NSWindowDelegate {
             editor.selectItem(at: index)
         }
         menuBar.state = Settings.showInMenuBar ? .on : .off
-        makeDefault.isEnabled = !MarkdownType.imarkIsDefault
-        makeDefault.title = MarkdownType.imarkIsDefault ? "Imark is the Default" : "Make Imark the Default"
+        // One or the other, never a dead button: there is either something to
+        // press or a fact to state.
+        let owns = MarkdownType.imarkIsDefault
+        makeDefault.isHidden = owns
+        isDefault.isHidden = !owns
     }
 
     // MARK: - Actions
