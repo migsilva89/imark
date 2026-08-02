@@ -36,6 +36,72 @@ enum Comments {
         }
     }
 
+    /// Every change to a document goes through here: read, check nobody else
+    /// got there first, rewrite atomically. Keeping it in one place is what
+    /// stops delete and edit from quietly growing weaker guarantees than insert.
+    private static func edit(
+        _ url: URL,
+        expecting stamp: Stamp?,
+        _ change: (inout [String]) -> Void
+    ) throws {
+        guard let source = try? String(contentsOf: url, encoding: .utf8) else {
+            throw Failure.unreadable
+        }
+        if let stamp, let now = Stamp(of: url), now != stamp {
+            throw Failure.fileChanged
+        }
+        var lines = source.components(separatedBy: "\n")
+        change(&lines)
+        try write(lines.joined(separator: "\n"), to: url)
+    }
+
+    /// Takes a note out, along with one blank line it left behind — otherwise
+    /// deleting notes slowly fills a document with gaps.
+    static func remove(lines range: ClosedRange<Int>, from url: URL, expecting stamp: Stamp?) throws {
+        try edit(url, expecting: stamp) { lines in
+            guard let bounds = clamp(range, to: lines) else { return }
+            var cut = bounds
+            if cut.upperBound + 1 < lines.count, lines[cut.upperBound + 1].isBlank {
+                cut = cut.lowerBound...(cut.upperBound + 1)
+            } else if cut.lowerBound > 0, lines[cut.lowerBound - 1].isBlank {
+                cut = (cut.lowerBound - 1)...cut.upperBound
+            }
+            lines.removeSubrange(cut)
+        }
+    }
+
+    /// Rewrites the text of a note, keeping its opening line exactly as it was.
+    /// The quote, the author and the date are read back out of the file rather
+    /// than passed in: editing your own wording should not silently re-anchor
+    /// the note, restamp it, or put your name on somebody else's.
+    static func update(
+        lines range: ClosedRange<Int>,
+        body: String,
+        in url: URL,
+        expecting stamp: Stamp?
+    ) throws {
+        try edit(url, expecting: stamp) { lines in
+            guard let bounds = clamp(range, to: lines) else { return }
+            lines.replaceSubrange(bounds, with: [lines[bounds.lowerBound], neutralize(body), "-->"])
+        }
+    }
+
+    /// Puts a whole document back, for undo. No stamp check: the caller took
+    /// the snapshot and is the one asking for it back.
+    static func restore(_ text: String, to url: URL) throws {
+        try write(text, to: url)
+    }
+
+    /// A file can shrink under us — a stale range must not take neighbouring
+    /// lines with it.
+    private static func clamp(_ range: ClosedRange<Int>, to lines: [String]) -> ClosedRange<Int>? {
+        let lower = max(0, range.lowerBound)
+        let upper = min(lines.count - 1, range.upperBound)
+        guard lower <= upper, lines[lower].hasPrefix("<!--") || lines[lower].contains("<!-- imark")
+        else { return nil }
+        return lower...upper
+    }
+
     /// Writes a note into the file, immediately after the block the selection
     /// came from. Returns its position among all the notes in the document, so
     /// the caller can open the one that was just written.
@@ -107,7 +173,7 @@ enum Comments {
 
     /// A literal `-->` inside the note would close the comment early and spill
     /// the rest of it into the document as text.
-    private static func neutralize(_ body: String) -> String {
+    static func neutralize(_ body: String) -> String {
         body
             .replacingOccurrences(of: "&", with: "&amp;")
             .replacingOccurrences(of: "-->", with: "--&gt;")
@@ -134,4 +200,9 @@ enum Comments {
             throw error
         }
     }
+}
+
+
+private extension String {
+    var isBlank: Bool { trimmingCharacters(in: .whitespaces).isEmpty }
 }

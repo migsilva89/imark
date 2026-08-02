@@ -660,3 +660,48 @@ img[data-blocked] {
 :root[data-notes='all'] .note-dot {
   transform: none;
 }
+
+/* Edit and delete, on the card. Only visible once you are looking at the note,
+   so five open cards are not five pairs of buttons competing for attention. */
+.note-card header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(var(--step) * 2);
+}
+
+.note-actions {
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.note-card:hover .note-actions,
+.note-card:focus-within .note-actions {
+  opacity: 1;
+}
+
+.note-action {
+  border: 0;
+  background: none;
+  color: var(--secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  line-height: 1;
+  padding: 3px 5px;
+  border-radius: 4px;
+}
+
+.note-action:hover {
+  background: var(--code-bg);
+  color: var(--text);
+}
+
+.note-delete:hover {
+  color: #d9544f;
+}

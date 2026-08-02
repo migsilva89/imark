@@ -66,6 +66,8 @@ enum Menu {
 
     private static func editMenu() -> NSMenu {
         let menu = NSMenu(title: "Edit")
+        menu.addItem(withTitle: "Undo", action: #selector(DocumentWindowController.undoComment(_:)), keyEquivalent: "z")
+        menu.addItem(.separator())
         menu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
         menu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
         menu.addItem(.separator())

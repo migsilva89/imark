@@ -53,7 +53,8 @@ to be different jobs.
 </p>
 
 Select a phrase, press the speech bubble, write. The quoted words get underlined,
-a dot appears in the margin, and clicking either opens the note.
+a dot appears in the margin, and clicking either opens the note. The card carries
+**Edit** and **Delete**, and `⌘Z` undoes any of it — writing, editing or deleting.
 
 The note is stored **inside the `.md` file**, as an HTML comment:
 
@@ -87,13 +88,13 @@ somebody has been through end to end. `⌘'` and `⌘⇧'` step between them.
 
 > [!IMPORTANT]
 > This is the only feature that writes to your files. It writes to a temporary
-> file and moves it into place, and it refuses to save at all if the document
-> changed on disk since Imark read it. There is no undo yet — deleting a note
-> means deleting the block in your editor.
+> file and moves it into place, refuses to save at all if the document changed
+> on disk since Imark read it, and keeps the last ten states of the document so
+> `⌘Z` can put any of them back.
 
 ## Features
 
-- **Comments in the file** — select, comment, and the note is written into the document as an HTML comment, so it survives being emailed, committed, or opened in anything else
+- **Comments in the file** — select, comment, edit or delete, and the note lives in the document as an HTML comment, so it survives being emailed, committed, or opened in anything else. `⌘Z` undoes any of it
 - **Actions on a selection** — copy as Markdown rather than flattened text, look the words up, translate them on device, hear them read, or send them to the search engine you actually chose
 - **Quick Look previews** — the space bar in the Finder renders the document, not raw text, using the same engine as the app
 - **Live reload** — saving in your editor updates the view in under 300ms, keeping your scroll position, and it survives the delete-and-rename that editors call an atomic save
@@ -143,7 +144,7 @@ That builds the JavaScript bundle, compiles the Swift, assembles `Imark.app`, si
 | `⌘[` / `⌘]` | Back / forward | `⌘R` | Reload |
 | `⌘+` / `⌘-` / `⌘0` | Text size | `⌘⇧R` | Reveal in Finder |
 | `⌘P` | Print or export PDF | `⌘⇧C` | Show all comments |
-| `⌘'` / `⌘⇧'` | Next / previous comment | | |
+| `⌘'` / `⌘⇧'` | Next / previous comment | `⌘Z` | Undo the last comment change |
 
 ## FAQ
 
@@ -154,6 +155,13 @@ Launch it with no document open and click **Make Imark the default for .md**, or
 ### Why does the Quick Look extension need the network entitlement?
 
 It does not use the network. WebKit refuses to start its WebContent process inside a sandboxed app extension without `com.apple.security.network.client`, even when every byte is served from a local scheme. The panel stays blank without it, with no error and no log entry. See `docs/PLAN.md` for the rest of that afternoon.
+
+### What does `⌘Z` undo?
+
+The last change to the document — a note written, edited or deleted — up to ten
+deep. Each one is a snapshot of the whole file taken before the change, which is
+why undo behaves the same for all three. It only covers changes Imark made; edits
+from your own editor are your editor's to undo.
 
 ### What happens if two people comment on the same words?
 

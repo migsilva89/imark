@@ -17,6 +17,12 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     /// other stops our own write from being announced as an outside change.
     private var stamp: Comments.Stamp?
     private var lastWrite = Date.distantPast
+    /// A snapshot of the whole document before each change, which is what makes
+    /// undo work the same for writing, editing and deleting a note. Documents
+    /// are capped at 5 MB and the stack at ten, so this stays small.
+    private var undoStack: [(text: String, what: String)] = []
+    /// Set while the composer is editing a note rather than writing a new one.
+    private var editingNote: ClosedRange<Int>?
     private(set) var noteCount = 0
     private(set) var reviewingComments = false
 
@@ -214,6 +220,9 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
             selection = nil
             selectionPopover.dismiss()
 
+        case .noteCommand(let command):
+            perform(command)
+
         case .comments(let count, let reviewing):
             noteCount = count
             reviewingComments = reviewing
@@ -251,11 +260,15 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     /// it goes through an atomic replace and refuses to write over a file that
     /// moved underneath it.
     private func saveComment(_ body: String) {
+        if let range = editingNote {
+            return updateComment(body, at: range)
+        }
         guard let selection, let block = selection.block else {
             selectionPopover.reportCommentFailure("Couldn't tell where that selection came from")
             return
         }
         do {
+            snapshot("Comment")
             let index = try Comments.insert(
                 quote: selection.text,
                 body: body,
@@ -276,9 +289,74 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
                 self?.content.renderer.revealNote(index)
             }
         } catch {
+            undoStack.removeLast()
             selectionPopover.reportCommentFailure(
                 (error as? LocalizedError)?.errorDescription ?? "Couldn't save the comment"
             )
+        }
+    }
+
+    /// Edit and delete, asked for from the note's own card.
+    private func perform(_ command: NoteCommand) {
+        switch command.kind {
+        case .edit:
+            editingNote = command.lines
+            selectionPopover.quotedText = command.quote
+            selectionPopover.compose(existing: command.text, at: command.rect, in: content.renderer)
+
+        case .delete:
+            do {
+                snapshot("Delete Comment")
+                try Comments.remove(lines: command.lines, from: url, expecting: stamp)
+                finishWrite()
+            } catch {
+                undoStack.removeLast()
+                report(error, doing: "delete that comment")
+            }
+        }
+    }
+
+    private func updateComment(_ body: String, at range: ClosedRange<Int>) {
+        editingNote = nil
+        do {
+            snapshot("Edit Comment")
+            try Comments.update(lines: range, body: body, in: url, expecting: stamp)
+            selectionPopover.dismiss()
+            finishWrite()
+        } catch {
+            undoStack.removeLast()
+            selectionPopover.reportCommentFailure(
+                (error as? LocalizedError)?.errorDescription ?? "Couldn't save the comment"
+            )
+        }
+    }
+
+    private func snapshot(_ what: String) {
+        undoStack.append((text: (try? String(contentsOf: url, encoding: .utf8)) ?? "", what: what))
+        if undoStack.count > 10 { undoStack.removeFirst() }
+    }
+
+    private func finishWrite() {
+        lastWrite = Date()
+        load()
+    }
+
+    private func report(_ error: Error, doing what: String) {
+        let alert = NSAlert()
+        alert.messageText = "Couldn't \(what)"
+        alert.informativeText = (error as? LocalizedError)?.errorDescription
+            ?? error.localizedDescription
+        alert.alertStyle = .warning
+        if let window { alert.beginSheetModal(for: window) } else { alert.runModal() }
+    }
+
+    @objc func undoComment(_ sender: Any?) {
+        guard let last = undoStack.popLast() else { return NSSound.beep() }
+        do {
+            try Comments.restore(last.text, to: url)
+            finishWrite()
+        } catch {
+            report(error, doing: "undo that")
         }
     }
 
@@ -323,6 +401,11 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     /// the toggle when review mode is on.
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
         switch item.action {
+        case #selector(undoComment(_:)):
+            // Named after what it will actually put back, so the menu never
+            // offers a vague "Undo" that might mean something else.
+            item.title = undoStack.last.map { "Undo \($0.what)" } ?? "Undo"
+            return !undoStack.isEmpty
         case #selector(toggleAllComments(_:)):
             item.state = reviewingComments ? .on : .off
             return noteCount > 0

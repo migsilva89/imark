@@ -8,6 +8,10 @@
 // docs/EDITOR.md for why this beats a sidecar file or a syntax of our own.
 // Swift writes them; the escaping rules it has to match live in Comments.swift.
 
+const bridge = (payload) => {
+  window.webkit?.messageHandlers?.imark?.postMessage(payload)
+}
+
 const OPEN = /^\s*<!--\s*imark\b(.*)$/
 const ATTR = /(\w+)="([^"]*)"/g
 
@@ -39,7 +43,9 @@ export function extractComments(body, lineOffset = 0) {
       at: attributes.at ?? '',
       nth: Number(attributes.nth) || 1,
       text: unwrap(unescapeHTML(lines.slice(index + 1, end).join('\n').trim())),
+      // Both ends, because editing and deleting have to find the block again.
       line: index + lineOffset,
+      endLine: end + lineOffset,
     })
 
     for (let i = index; i <= end; i += 1) lines[i] = ''
@@ -171,7 +177,10 @@ function buildCard(note, orphan) {
   card.hidden = true
 
   const head = document.createElement('header')
-  head.textContent = [note.by, formatDate(note.at)].filter(Boolean).join(' · ') || 'Note'
+  const who = document.createElement('span')
+  who.textContent = [note.by, formatDate(note.at)].filter(Boolean).join(' · ') || 'Note'
+  head.appendChild(who)
+  head.appendChild(cardActions(note))
   card.appendChild(head)
 
   if (orphan) {
@@ -189,6 +198,44 @@ function buildCard(note, orphan) {
   card.appendChild(body)
 
   return card
+}
+
+/// Edit and delete live on the card itself. A note you can write but not take
+/// back is a trapdoor, and hiding the controls in a menu somewhere else would
+/// mean guessing which note the menu meant.
+function cardActions(note) {
+  const actions = document.createElement('span')
+  actions.className = 'note-actions'
+
+  // Words rather than glyphs: at this size a pencil and a cross are a guess,
+  // and there is room for two short labels.
+  for (const [command, label] of [
+    ['edit', 'Edit'],
+    ['delete', 'Delete'],
+  ]) {
+    const button = document.createElement('button')
+    button.type = 'button'
+    button.className = `note-action note-${command}`
+    button.title = `${label} this note`
+    button.textContent = label
+    button.addEventListener('click', (event) => {
+      event.preventDefault()
+      event.stopPropagation()
+      const dot = document.querySelector(`.note-dot[data-note="${note.id}"]`)
+      const box = (dot ?? button).getBoundingClientRect()
+      bridge({
+        type: 'noteCommand',
+        command,
+        line: note.line,
+        endLine: note.endLine,
+        text: note.text,
+        quote: note.quote,
+        rect: { x: box.left, y: box.top, width: box.width, height: box.height },
+      })
+    })
+    actions.appendChild(button)
+  }
+  return actions
 }
 
 function formatDate(raw) {

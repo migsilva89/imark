@@ -31,6 +31,8 @@ final class SelectionPopover {
     /// rather than at wherever the mouse happens to be.
     private weak var host: NSView?
     private var hostRect = NSRect.zero
+    /// What the note being edited is anchored to, for the header of the composer.
+    var quotedText = ""
 
     init() {
         popover.behavior = .transient
@@ -301,18 +303,34 @@ final class SelectionPopover {
 
     // MARK: - Composing a comment
 
-    private func beginComposing() {
+    /// Opens the composer over an existing note rather than over a selection,
+    /// so editing happens where the note is.
+    func compose(existing text: String, at rect: NSRect, in view: NSView) {
+        host = view
+        hostRect = rect
+        self.text = ""
+        guard let anchor = anchor(for: rect.insetBy(dx: -60, dy: -8), in: view) else { return }
+        if !popover.isShown {
+            popover.show(relativeTo: anchor, of: view, preferredEdge: .maxY)
+        } else {
+            popover.positioningRect = anchor
+        }
+        beginComposing(prefill: text)
+    }
+
+    private func beginComposing(prefill: String = "") {
         isComposing = true
         // A click elsewhere must not silently bin what is being typed.
         popover.behavior = .applicationDefined
 
-        let quoted = NSTextField(labelWithString: "“\(text.prefix(80))\(text.count > 80 ? "…" : "")”")
+        let subject = prefill.isEmpty ? text : quotedText
+        let quoted = NSTextField(labelWithString: "“\(subject.prefix(80))\(subject.count > 80 ? "…" : "")”")
         quoted.font = .systemFont(ofSize: 11)
         quoted.textColor = .secondaryLabelColor
         quoted.lineBreakMode = .byTruncatingTail
         quoted.preferredMaxLayoutWidth = 280
 
-        composer.string = ""
+        composer.string = prefill
         composer.delegate = target
         composer.font = .systemFont(ofSize: 13)
         composer.isRichText = false
@@ -334,7 +352,8 @@ final class SelectionPopover {
         // Deliberately not the default button: a Return key equivalent is
         // consumed by the window before the text view ever sees it, and a
         // composer where Return saves instead of starting a line is useless.
-        let save = NSButton(title: "Comment", target: target, action: #selector(Target.saveComment))
+        let save = NSButton(title: prefill.isEmpty ? "Comment" : "Save",
+                            target: target, action: #selector(Target.saveComment))
         save.bezelStyle = .rounded
         save.controlSize = .small
 
@@ -362,6 +381,9 @@ final class SelectionPopover {
             guard let self, let window = self.container.window else { return }
             window.makeKeyAndOrderFront(nil)
             window.makeFirstResponder(self.composer)
+            // Editing starts with the cursor at the end, not with the note
+            // selected — the first keystroke should not wipe it.
+            self.composer.setSelectedRange(NSRange(location: self.composer.string.count, length: 0))
         }
     }
 

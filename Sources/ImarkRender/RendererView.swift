@@ -16,6 +16,7 @@ public enum RendererMessage {
     case selection(Selection)
     case selectionCleared
     case comments(count: Int, reviewing: Bool)
+    case noteCommand(NoteCommand)
 }
 
 /// A live selection in the document, and where it came from in the file.
@@ -35,6 +36,19 @@ public struct Selection {
     /// Which occurrence of this text inside the block it is, counting from one.
     /// Two notes on the same word would otherwise both anchor to the first.
     public let occurrence: Int
+}
+
+/// Edit or delete, asked for from a note's own card.
+public struct NoteCommand {
+    public enum Kind: String { case edit, delete }
+
+    public let kind: Kind
+    /// The lines the block occupies in the file, both ends inclusive.
+    public let lines: ClosedRange<Int>
+    public let text: String
+    public let quote: String
+    /// Where to put the composer, in the renderer view's coordinates.
+    public let rect: NSRect
 }
 
 public struct TocEntry: Identifiable, Equatable {
@@ -168,6 +182,7 @@ public final class RendererView: NSView {
         call("window.imark.revealNote", index)
     }
 
+
     public func findClear() {
         webView.evaluateJavaScript("window.imark.findClear()")
     }
@@ -291,6 +306,23 @@ public final class RendererView: NSView {
                     count: body["count"] as? Int ?? 0,
                     reviewing: body["reviewing"] as? Bool ?? false
                 ))
+
+            case "noteCommand":
+                guard let raw = body["command"] as? String,
+                      let kind = NoteCommand.Kind(rawValue: raw),
+                      let start = body["line"] as? Int,
+                      let end = body["endLine"] as? Int, start <= end,
+                      let box = body["rect"] as? [String: Any],
+                      let x = box["x"] as? Double, let y = box["y"] as? Double,
+                      let w = box["width"] as? Double, let h = box["height"] as? Double
+                else { break }
+                owner.onMessage?(.noteCommand(NoteCommand(
+                    kind: kind,
+                    lines: start...end,
+                    text: body["text"] as? String ?? "",
+                    quote: body["quote"] as? String ?? "",
+                    rect: NSRect(x: x, y: owner.bounds.height - y - h, width: w, height: h)
+                )))
 
             case "wikilinks":
                 owner.onMessage?(.wikilinks(body["targets"] as? [String] ?? []))
