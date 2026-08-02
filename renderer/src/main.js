@@ -13,6 +13,7 @@ import mermaid from 'mermaid'
 import wikilink from './wikilink.js'
 import {
   attachComments,
+  attached as attachedNotes,
   buildNoteRail,
   extractComments,
   installCommentHandlers,
@@ -990,11 +991,12 @@ window.imark = {
   },
   setReviewing(on) {
     applyReviewing(on)
-    bridge({
-      type: 'comments',
-      count: document.querySelectorAll('.note-dot').length,
-      reviewing: on,
-    })
+    // The notes have to go with it. Announcing a count and no items left the
+    // app believing the document had none: the status bar read zero, every
+    // comment command greyed out, and the switch that had just been turned on
+    // could not be turned off again.
+    const items = attachedNotes()
+    bridge({ type: 'comments', count: items.length, reviewing: on, items })
   },
   stepNote,
   exportComments: () => toVisibleText(lastSource),

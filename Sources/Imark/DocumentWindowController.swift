@@ -263,6 +263,10 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
             noteCount = found.count
             reviewingComments = reviewing
             content.setStatus(comments: found.count)
+            // The renderer is the one that knows whether review mode survived
+            // this render, and switching documents changes whether there is
+            // anything to review at all.
+            refreshCommentsButton()
             if found.isEmpty { commentsList.dismiss() }
 
         case .ready, .rendered, .find:
@@ -420,6 +424,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         guard noteCount > 0 else { return NSSound.beep() }
         reviewingComments.toggle()
         content.renderer.setReviewingComments(reviewingComments)
+        refreshCommentsButton()
     }
 
     @objc func nextComment(_ sender: Any?) {

@@ -403,6 +403,11 @@ export function setReviewing(on) {
 
 export const isReviewing = () => reviewing
 
+/// The notes exactly as they were attached, for anyone who has to announce them
+/// again without re-rendering. Reaching for the DOM instead would rebuild them
+/// from what is on screen, which is a second parser to keep in step.
+export const attached = () => attachedNotes
+
 /// Moves to the next or previous note, wrapping around. In review mode the
 /// notes are already open, so this only scrolls.
 export function stepNote(delta) {
