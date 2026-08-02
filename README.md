@@ -28,12 +28,29 @@
 
 Both are rendering [`testdata/showcase.md`](testdata/showcase.md), which exercises everything the renderer supports and is worth opening first.
 
+### The outline rail
+
+<p align="center">
+  <img src=".github/assets/imark-rail.png" width="520" alt="The rail tapering around the pointer, with a card naming the section and quoting its first line">
+</p>
+
+Down the left edge of every document — in a window and in the Finder's preview
+panel alike — sits one tick per heading. The marks taper around wherever you are
+in the document, and around wherever you point, whichever is more recent: move
+onto the rail and the funnel follows the pointer, so you can survey the whole
+file without moving the page. A card names the section and quotes its first
+line. Click to jump, or press and drag to scrub.
+
+It exists because the preview panel has no room for a sidebar. It stayed in the
+window because reading a long document and knowing where you are in it turn out
+to be different jobs.
+
 ## Features
 
 - **Quick Look previews** — the space bar in the Finder renders the document, not raw text, using the same engine as the app
 - **Live reload** — saving in your editor updates the view in under 300ms, keeping your scroll position, and it survives the delete-and-rename that editors call an atomic save
 - **Foldable outline** — headings in the sidebar, with sections you can collapse; past twenty entries it opens folded, so a changelog is one row per version
-- **Outline rail** — a column of ticks down the edge that tapers around wherever you point, with a card showing the section and its first line; hover to look, click to jump, drag to scrub
+- **Outline rail** — a tick per heading down the edge of every document, tapering around the pointer, with a card that names the section before you commit to going there
 - **Wiki-links** — `[[note]]` resolves against the folder and opens in the same window, with back and forward history
 - **The folder and the recents** — every `.md` beside the open document, plus the last five you opened from anywhere else
 - **Everything GitHub-flavoured** — tables, task lists, footnotes, front matter as a header card, syntax highlighting, Mermaid diagrams, KaTeX maths
