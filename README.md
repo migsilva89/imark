@@ -130,7 +130,7 @@ place would trade one for the other.
 - **Everything GitHub-flavoured** — tables, task lists, footnotes, front matter as a header card, syntax highlighting, Mermaid diagrams, KaTeX maths
 - **Find with a counter** — `⌘F` highlights every hit and tells you which one you are on
 - **Truly offline** — a content security policy blocks every request, and the KaTeX fonts are embedded in the bundle. Remote images do not load, on purpose
-- **Tabs** — several documents in one window, with everything macOS gives a tabbed app: `⌘⇧[` and `⌘⇧]`, drag a tab out to its own window, Merge All Windows
+- **Tabs** — several documents in one window. ⌘-click a file in the sidebar to open it in a new tab, and everything macOS gives a tabbed app comes with it: `⌘⇧[` and `⌘⇧]`, drag a tab out to its own window, Merge All Windows
 - **Native throughout** — real AppKit windows, menus, appearance switching and printing, around a WebView that only ever renders
 
 ## Tech Stack

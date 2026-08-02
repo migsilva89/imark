@@ -61,7 +61,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Windows
 
-    func open(_ url: URL) {
+    /// `host` asks for the document to land as a tab beside that window rather
+    /// than wherever the window server would have put it. Said outright instead
+    /// of left to `tabbingMode`, which answers to a system-wide preference we
+    /// do not get to see and should not be second-guessing.
+    func open(_ url: URL, asTabIn host: NSWindow? = nil) {
         let key = url.resolvingSymlinksInPath().standardizedFileURL
         dismissWelcome()
 
@@ -79,15 +83,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         controllers.append(controller)
 
-        controller.showWindow(nil)
-        controller.window?.makeKeyAndOrderFront(nil)
+        // Added to the group before it is shown: ordering it front first makes
+        // it a window for an instant, and it keeps that window's shadow and
+        // frame after joining.
+        if let host, let window = controller.window {
+            host.addTabbedWindow(window, ordered: .above)
+            window.makeKeyAndOrderFront(nil)
+        } else {
+            controller.showWindow(nil)
+            controller.window?.makeKeyAndOrderFront(nil)
 
-        // Every document window restores the same autosaved frame, so without
-        // this a second document lands exactly on top of the first and looks
-        // like nothing happened. A window that joined a tab group has no frame
-        // of its own to move, so cascading it would fight the tab bar.
-        if controllers.count > 1, let window = controller.window, window.tabGroup == nil {
-            cascadePoint = window.cascadeTopLeft(from: cascadePoint)
+            // Every document window restores the same autosaved frame, so
+            // without this a second document lands exactly on top of the first
+            // and looks like nothing happened. A window that joined a tab group
+            // has no frame of its own to move, so cascading it would fight the
+            // tab bar.
+            if controllers.count > 1, let window = controller.window, window.tabGroup == nil {
+                cascadePoint = window.cascadeTopLeft(from: cascadePoint)
+            }
         }
         NSDocumentController.shared.noteNewRecentDocumentURL(key)
     }

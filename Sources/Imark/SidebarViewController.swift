@@ -15,6 +15,10 @@ final class SidebarViewController: NSViewController {
 
     var onSelectHeading: ((String) -> Void)?
     var onSelectFile: ((URL) -> Void)?
+    /// ⌘-click, the way the Finder and Safari open a thing beside the thing you
+    /// already have. Without it the only way to get a second tab is to leave the
+    /// app entirely, which is why nobody noticed tabs existed.
+    var onOpenFileInTab: ((URL) -> Void)?
 
     private let scroll = NSScrollView()
     private let table = OutlineTable()
@@ -49,6 +53,7 @@ final class SidebarViewController: NSViewController {
         table.action = #selector(rowClicked)
         table.addTableColumn(NSTableColumn(identifier: .init("main")))
         table.onArrow = { [weak self] expand in self?.arrowPressed(expand: expand) }
+        table.onCommandClick = { [weak self] row in self?.openInTab(row) ?? false }
 
         scroll.documentView = table
         scroll.drawsBackground = false
@@ -196,6 +201,16 @@ final class SidebarViewController: NSViewController {
         activate(row: table.clickedRow)
     }
 
+    /// Whether the click was consumed. Headings and section titles have no
+    /// second place to go, so they fall through to an ordinary click.
+    private func openInTab(_ row: Int) -> Bool {
+        guard rows.indices.contains(row), case .file(let url) = rows[row],
+              let open = onOpenFileInTab
+        else { return false }
+        open(url)
+        return true
+    }
+
     private func activate(row: Int) {
         guard rows.indices.contains(row) else { return }
         switch rows[row] {
@@ -245,12 +260,16 @@ extension SidebarViewController: NSTableViewDataSource, NSTableViewDelegate {
             )
 
         case .file(let url):
-            return ItemCell(
+            let cell = ItemCell(
                 text: url.deletingPathExtension().lastPathComponent,
                 indent: 0,
                 isActive: url == currentFile,
                 symbol: "doc.text"
             )
+            // A gesture with no menu item behind it has nowhere else to be
+            // discovered, and ⌘/ only lists what the menus already say.
+            cell.toolTip = "\(url.lastPathComponent)\n⌘-click to open in a new tab"
+            return cell
         }
     }
 }
@@ -261,6 +280,19 @@ extension SidebarViewController: NSTableViewDataSource, NSTableViewDelegate {
 /// behaves. NSTableView has no notion of it, so the keys are caught here.
 private final class OutlineTable: NSTableView {
     var onArrow: ((Bool) -> Void)?
+    /// Returns whether it took the click.
+    var onCommandClick: ((Int) -> Bool)?
+
+    /// Caught before NSTableView sees it, not in the action. A ⌘-click still
+    /// moves the selection, and moving the selection already opens the file in
+    /// this window — by the time an action fired, the tab would be a second
+    /// copy of a document we had just navigated to.
+    override func mouseDown(with event: NSEvent) {
+        let clicked = row(at: convert(event.locationInWindow, from: nil))
+        if event.modifierFlags.contains(.command), clicked >= 0,
+           onCommandClick?(clicked) == true { return }
+        super.mouseDown(with: event)
+    }
 
     override func keyDown(with event: NSEvent) {
         switch event.keyCode {

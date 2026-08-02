@@ -110,6 +110,10 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
 
         sidebar.onSelectHeading = { [weak self] id in self?.content.renderer.scrollTo(anchor: id) }
         sidebar.onSelectFile = { [weak self] url in self?.show(url, pushingHistory: true) }
+        sidebar.onOpenFileInTab = { [weak self] url in
+            guard let window = self?.window else { return }
+            (NSApp.delegate as? AppDelegate)?.open(url, asTabIn: window)
+        }
 
         content.renderer.setTextScale(Settings.textScale)
         content.renderer.setWidth(Settings.width.rawValue)
@@ -397,15 +401,15 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         Settings.sidebarCollapsed = sidebarItem.isCollapsed
     }
 
-    /// Whatever is selected goes into the search field. Selecting a phrase and
-    /// pressing ⌘F only ever meant one thing, and typing it again was the app
-    /// ignoring what you had already told it.
     /// Gives the tab bar its + button and ⌘T. Without it macOS shows tabs but
     /// no way to open another one, which reads as a broken tab bar.
     override func newWindowForTab(_ sender: Any?) {
         (NSApp.delegate as? AppDelegate)?.openDocument(sender)
     }
 
+    /// Whatever is selected goes into the search field. Selecting a phrase and
+    /// pressing ⌘F only ever meant one thing, and typing it again was the app
+    /// ignoring what you had already told it.
     @objc func performFind(_ sender: Any?) {
         selectionPopover.dismiss()
         content.showFind(with: selection?.text)
