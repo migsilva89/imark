@@ -341,8 +341,6 @@ export function installCommentHandlers() {
     }
     event.preventDefault()
     event.stopPropagation()
-    // The real card is about to appear in the same place as the preview.
-    hideTip()
 
     const id = trigger.dataset.note
     const card = document.querySelector(`.note-card[data-note="${id}"]`)
@@ -357,21 +355,6 @@ export function installCommentHandlers() {
     // of the one you pressed rather than all at the top of the paragraph.
     card.style.top = dot?.style.top || '0px'
     if (opening) placeCard(card)
-  })
-
-  // Hovering a dot in the margin reads the note without opening it, the same
-  // preview the rail marks give. Clicking still opens the real card, which is
-  // the one with the buttons on it.
-  document.addEventListener('mouseover', (event) => {
-    const dot = event.target?.closest?.('.note-dot')
-    if (!dot) return
-    // Its own card is already open, and says everything the preview would.
-    if (reviewing || dot.classList.contains('open')) return
-    showTip(attachedNotes[dots().indexOf(dot)], dot)
-  })
-
-  document.addEventListener('mouseout', (event) => {
-    if (event.target?.closest?.('.note-dot')) scheduleHide()
   })
 
   document.addEventListener('keydown', (event) => {
@@ -641,9 +624,9 @@ function showTip(note, mark) {
   }
 
   tip.classList.add('is-visible')
-  if (mark.classList.contains('note-mark')) mark.classList.add('is-active')
+  mark.classList.add('is-active')
 
-  // Size has to be read after the content lands, or the first card of a
+  // Height has to be read after the content lands, or the first card of a
   // session is positioned against the previous one's size.
   const box = mark.getBoundingClientRect()
   const height = tip.offsetHeight
@@ -651,19 +634,6 @@ function showTip(note, mark) {
     Math.max(10, box.top + box.height / 2 - height / 2),
     window.innerHeight - height - 10,
   )}px`
-
-  // The rail is a fixed column and the stylesheet knows where its card goes. A
-  // dot out in the margin does not: the preview opens to its left, where the
-  // note's own card would, and stops at the edge of the window rather than
-  // hanging off it.
-  const atDot = mark.classList.contains('note-dot')
-  tip.classList.toggle('at-dot', atDot)
-  if (atDot) {
-    const width = tip.offsetWidth
-    tip.style.left = `${Math.max(10, Math.min(box.left - width - 10, window.innerWidth - width - 10))}px`
-  } else {
-    tip.style.left = ''
-  }
 }
 
 function scheduleHide() {
