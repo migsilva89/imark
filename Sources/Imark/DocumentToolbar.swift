@@ -33,6 +33,26 @@ extension DocumentWindowController: NSToolbarDelegate {
         toolbarDefaultItemIdentifiers(toolbar)
     }
 
+    /// Comments is a switch, and a switch has to look switched. A toolbar item
+    /// has no on-state of its own, so it says so the way the rest of the system
+    /// does: the glyph fills in and takes the accent colour.
+    func refreshCommentsButton() {
+        guard let item = window?.toolbar?.items.first(where: { $0.itemIdentifier == .comments })
+        else { return }
+
+        let on = reviewingComments
+        let symbol = on ? "bubble.left.and.bubble.right.fill" : "bubble.left.and.bubble.right"
+        let image = NSImage(systemSymbolName: symbol, accessibilityDescription: "Comments")
+        item.image = on ? image?.withSymbolConfiguration(.init(paletteColors: [.imarkAccent])) : image
+        item.toolTip = on ? "Hide All Comments (⇧⌘C)" : "Show All Comments (⇧⌘C)"
+    }
+
+    /// Greyed out on a document with nothing to show. A button that only ever
+    /// beeps is worse than one that admits there is nothing behind it.
+    public func validateToolbarItem(_ item: NSToolbarItem) -> Bool {
+        item.itemIdentifier == .comments ? noteCount > 0 : true
+    }
+
     public func toolbar(
         _ toolbar: NSToolbar,
         itemForItemIdentifier identifier: NSToolbarItem.Identifier,
@@ -41,10 +61,14 @@ extension DocumentWindowController: NSToolbarDelegate {
         switch identifier {
         case .find:
             return button(identifier, symbol: "magnifyingglass", label: "Find",
+                          tip: "Find in Document (⌘F)",
                           action: #selector(performFind(_:)))
 
         case .comments:
+            // "Comments" alone names the subject, not the action, and left
+            // people pressing it to find out. The tip says what happens.
             return button(identifier, symbol: "bubble.left.and.bubble.right", label: "Comments",
+                          tip: "Show All Comments (⇧⌘C)",
                           action: #selector(toggleAllComments(_:)))
 
         case .shortcuts:
@@ -58,7 +82,11 @@ extension DocumentWindowController: NSToolbarDelegate {
             return item
 
         case .export:
+            // The share glyph promises a share sheet and opens the print panel
+            // instead. Saying so is the cheap half of the fix; the icon is the
+            // other half and belongs with whatever sharing ends up being.
             return button(identifier, symbol: "square.and.arrow.up", label: "Export",
+                          tip: "Print or Save as PDF (⌘P)",
                           action: #selector(printDocument(_:)))
 
         case .text:
@@ -103,12 +131,13 @@ extension DocumentWindowController: NSToolbarDelegate {
         _ identifier: NSToolbarItem.Identifier,
         symbol: String,
         label: String,
+        tip: String? = nil,
         action: Selector
     ) -> NSToolbarItem {
         let item = NSToolbarItem(itemIdentifier: identifier)
         item.image = NSImage(systemSymbolName: symbol, accessibilityDescription: label)
         item.label = label
-        item.toolTip = label
+        item.toolTip = tip ?? label
         item.target = self
         item.action = action
         return item

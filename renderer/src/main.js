@@ -13,6 +13,8 @@ import mermaid from 'mermaid'
 import wikilink from './wikilink.js'
 import {
   attachComments,
+  attached as attachedNotes,
+  buildNoteRail,
   extractComments,
   installCommentHandlers,
   isReviewing,
@@ -411,6 +413,10 @@ function buildRail(root) {
     const slot = document.createElement('span')
     slot.className = 'rail-tick'
     slot.dataset.level = String(headingLevel(block))
+    // Which heading this tick stands for. The notes rail lines its marks up
+    // with these, and needs to know where in the document each one starts —
+    // the tick's own position is a slot in a list, not a place.
+    if (block.id) slot.dataset.heading = block.id
     slot.appendChild(document.createElement('i'))
     rail.appendChild(slot)
     railTicks.push(slot)
@@ -688,6 +694,9 @@ async function render({ markdown, path, theme, preview, rail }) {
   renderMath(root)
   activeHeadings = buildToc(root)
   buildRail(root)
+  // After the outline rail, never before: the marks are placed against its
+  // ticks, and ticks that do not exist yet put every note at the top.
+  buildNoteRail()
   await renderMermaid(root, theme)
   if (token !== renderToken) return
 
@@ -963,6 +972,7 @@ window.imark = {
     if (side) document.documentElement.dataset.rail = side
     else delete document.documentElement.dataset.rail
     buildRail(content())
+    buildNoteRail()
   },
   find: runFind,
   findStep: step,
@@ -981,11 +991,12 @@ window.imark = {
   },
   setReviewing(on) {
     applyReviewing(on)
-    bridge({
-      type: 'comments',
-      count: document.querySelectorAll('.note-dot').length,
-      reviewing: on,
-    })
+    // The notes have to go with it. Announcing a count and no items left the
+    // app believing the document had none: the status bar read zero, every
+    // comment command greyed out, and the switch that had just been turned on
+    // could not be turned off again.
+    const items = attachedNotes()
+    bridge({ type: 'comments', count: items.length, reviewing: on, items })
   },
   stepNote,
   exportComments: () => toVisibleText(lastSource),

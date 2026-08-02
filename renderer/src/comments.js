@@ -1,6 +1,6 @@
 // Comments live inside the document, as HTML comments:
 //
-//   <!-- imark quote="exequível" by="miguel" at="2026-08-02T14:31Z"
+//   <!-- imark quote="exequível" by="john" at="2026-08-02T14:31Z"
 //   Exequível com que equipa?
 //   -->
 //
@@ -403,6 +403,11 @@ export function setReviewing(on) {
 
 export const isReviewing = () => reviewing
 
+/// The notes exactly as they were attached, for anyone who has to announce them
+/// again without re-rendering. Reaching for the DOM instead would rebuild them
+/// from what is on screen, which is a second parser to keep in step.
+export const attached = () => attachedNotes
+
 /// Moves to the next or previous note, wrapping around. In review mode the
 /// notes are already open, so this only scrolls.
 export function stepNote(delta) {
@@ -431,18 +436,20 @@ export function stepNote(delta) {
 }
 
 /// Called after every render, since the notes are rebuilt from scratch.
+/// The rail is not built here: it has to wait for the outline rail, which main
+/// builds later in the same pass.
 export function restoreNoteState() {
   cursor = -1
   if (reviewing) setReviewing(true)
-  buildNoteRail()
 }
 
 /* ------------------------------------------------------------------- rail */
 
-/// One mark per note down the right edge, opposite the outline. Unlike the
-/// heading rail these are placed where the notes actually are in the document
-/// rather than spread evenly: with notes, *where* they are is the whole point —
-/// three clustered in one section says something an even list would hide.
+/// One mark per note, in the column beside the outline. Each sits level with
+/// the tick of the section it belongs to, so the two rails read as one thing
+/// instead of two that nearly agree. What that costs is the exact position
+/// inside a section — and what it keeps is the clustering, since several notes
+/// under one heading come out as a short run of marks against that tick.
 export function buildNoteRail() {
   document.querySelector('.note-rail')?.remove()
   hideTip()
@@ -457,10 +464,7 @@ export function buildNoteRail() {
   rail.className = 'note-rail'
   rail.setAttribute('aria-label', 'Comments')
 
-  const height = document.documentElement.scrollHeight || 1
-  const tops = spread(
-    all.map((dot) => ((dot.getBoundingClientRect().top + window.scrollY) / height) * window.innerHeight),
-  )
+  const tops = placeMarks(all)
 
   for (const [index, dot] of all.entries()) {
     const note = attachedNotes[index]
@@ -486,10 +490,88 @@ export function buildNoteRail() {
   document.documentElement.dataset.noteRail = 'true'
 }
 
-/// Two notes a few lines apart land on top of each other once the document is
-/// squeezed into the height of a window, and a merged blob is one mark that
-/// lies about how many there are. Push them apart just enough to stay separate,
-/// keeping the order and giving up rather than running off the bottom.
+const MARK_SIZE = 9  // .note-mark in style.css
+
+const where = (el) => el.getBoundingClientRect().top + window.scrollY
+
+/// Every mark's resting position, before they are pushed apart.
+///
+/// The outline rail is a list: its ticks sit at a fixed pitch, so the third one
+/// is the third heading whether that is on the first screen or the ninth. Marks
+/// placed by their true position in the document therefore never lined up with
+/// it, however close they looked. So each note is put level with the tick of
+/// the section it is in.
+///
+/// Without an outline rail — a short document has none, and Quick Look can turn
+/// it off — there is nothing to line up with, and the old proportional mapping
+/// is the honest answer.
+function placeMarks(all) {
+  const ticks = outlineTicks()
+  if (!ticks.length) return spread(proportional(all))
+
+  // Measured off the rail rather than agreed with it: main.js sets the pitch
+  // per document, and a second copy of that sum here would be one to keep in
+  // step.
+  const pitch = ticks.length > 1 ? ticks[1].y - ticks[0].y : MARK_GAP * 2
+
+  // The section a note is in is the last heading above it. A note higher than
+  // every heading — front matter, an opening paragraph — takes the first one,
+  // which is the section it reads as being part of.
+  const section = all.map((dot) => {
+    const at = where(dot)
+    let index = 0
+    for (let i = 0; i < ticks.length; i += 1) {
+      if (ticks[i].at > at) break
+      index = i
+    }
+    return index
+  })
+
+  const tops = new Array(all.length)
+  for (let first = 0; first < all.length; ) {
+    let last = first
+    while (last < all.length && section[last] === section[first]) last += 1
+    const count = last - first
+
+    // Several notes under one heading come out as a short stack against its
+    // tick. Tightened to fit inside the pitch, so a stack can never reach the
+    // next section and read as belonging to it — which is the whole reason for
+    // lining these up in the first place. Below about 11px of pitch the marks
+    // start to overlap, and a pile is still a truer answer than a queue
+    // wandering into somebody else's section.
+    const step = count > 1 ? Math.max(3, Math.min(MARK_GAP, (pitch * 0.8 - MARK_SIZE) / (count - 1))) : 0
+    const centre = ticks[section[first]].y - ((count - 1) * step) / 2
+
+    for (let n = 0; n < count; n += 1) tops[first + n] = centre + n * step - MARK_SIZE / 2
+    first = last
+  }
+  return tops
+}
+
+/// The ticks that are actually on screen, each with where its heading starts in
+/// the document — which is what a note gets compared against.
+function outlineTicks() {
+  const rail = document.querySelector('.rail')
+  if (!rail || !rail.getBoundingClientRect().height) return []
+  return [...rail.querySelectorAll('.rail-tick')]
+    .map((tick) => ({ tick, heading: document.getElementById(tick.dataset.heading || '') }))
+    .filter((entry) => entry.heading)
+    .map(({ tick, heading }) => {
+      // The centre of the dash, not the top of its row: the row is a hit area
+      // and stands taller than anything visible in it.
+      const box = tick.getBoundingClientRect()
+      return { y: box.top + box.height / 2, at: where(heading) }
+    })
+}
+
+const proportional = (all) => {
+  const height = document.documentElement.scrollHeight || 1
+  return all.map((dot) => (where(dot) / height) * window.innerHeight)
+}
+
+/// How far apart two marks have to be to still read as two. Only the fallback
+/// needs pushing apart: with an outline to line up against, a section's marks
+/// are laid out together and cannot collide with the next section's.
 const MARK_GAP = 12
 
 function spread(positions) {

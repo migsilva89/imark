@@ -12,15 +12,15 @@
 - `[meta]` bump deps `a1b2c3d`
 - `[Tests]` add cases `e4f5g6h`
 
-<!-- imark quote="deps" by="Miguel Silva" at="2026-08-02T13:24:26Z"
+<!-- imark quote="deps" by="John Doe" at="2026-08-02T13:24:26Z"
 hgh
 -->
 
-<!-- imark quote="meta] bump deps a1b2c3d" by="Miguel Silva" at="2026-08-02T13:24:35Z"
+<!-- imark quote="meta] bump deps a1b2c3d" by="John Doe" at="2026-08-02T13:24:35Z"
 jhgfhfh
 -->
 
-<!-- imark quote="add cases" by="Miguel Silva" at="2026-08-02T20:20:00Z"
+<!-- imark quote="add cases" by="John Doe" at="2026-08-02T20:20:00Z"
 bv
 -->
 

@@ -697,18 +697,14 @@ img[data-blocked] {
 /* Edit and delete, at the foot of the card. Only visible once you are looking
    at the note, so five open cards are not five pairs of buttons competing for
    attention. */
+/* Always there, never revealed on hover. A control you have to go looking for
+   is one most people never find — and these two are the whole answer to "can I
+   change this?". They are quiet enough at rest to stay out of the reading. */
 .note-actions {
   display: flex;
   justify-content: flex-end;
   gap: 2px;
   margin-top: calc(var(--step) * 2);
-  opacity: 0;
-  transition: opacity 0.12s ease;
-}
-
-.note-card:hover .note-actions,
-.note-card:focus-within .note-actions {
-  opacity: 1;
 }
 
 .note-action {

@@ -1,7 +1,7 @@
 ---
 title: Everything at once
 subtitle: The document that exercises the lot
-owner: Miguel Silva
+owner: John Doe
 status: living fixture
 version: 0.1.0
 tags: [markdown, macos, fixture, comments]
@@ -15,7 +15,7 @@ renderer knows, every kind of comment, and enough headings that the outline
 folds itself and both rails have something to say. If something breaks, it
 breaks here first.
 
-<!-- imark quote="opened, not to be read" by="Miguel Silva" at="2026-08-02T09:00:00Z"
+<!-- imark quote="opened, not to be read" by="John Doe" at="2026-08-02T09:00:00Z"
 The whole point of a fixture: it is a place for things to go wrong on purpose,
 before they go wrong on somebody's actual document.
 -->
@@ -27,7 +27,7 @@ track back across is a line you read twice. **Bold** and *italic* and
 ***both at once***, `inline code`, ~~struck through~~, and ==marked== text all
 sit on the same baseline without pushing the line apart.
 
-<!-- imark quote="Bold and italic" by="nikus" at="2026-08-01T12:00:00Z" color="blue"
+<!-- imark quote="Bold and italic" by="jane" at="2026-08-01T12:00:00Z" color="blue"
 A quote that runs straight across markup — bold, then plain text, then italic.
 It has to be found and underlined in three pieces. Searching node by node found
 none of these and orphaned them without a word.
@@ -37,12 +37,12 @@ A second paragraph, so there is something for a comment to be anchored to that
 is not the first thing on the page. The word *anchor* appears here, and the word
 anchor appears again in this same sentence — which is what `nth=` is for.
 
-<!-- imark quote="anchor" by="nikus" at="2026-08-01T11:20:00Z" nth="2" color="green"
+<!-- imark quote="anchor" by="jane" at="2026-08-01T11:20:00Z" nth="2" color="green"
 This one is deliberately on the second "anchor", not the first. If it moves to
 the first one, the occurrence counting has broken.
 -->
 
-<!-- imark quote="not the first thing on the page" by="Miguel Silva" at="2026-08-02T09:05:00Z" color="amber"
+<!-- imark quote="not the first thing on the page" by="John Doe" at="2026-08-02T09:05:00Z" color="amber"
 Two notes on one paragraph, to check they stack in the margin instead of landing
 on top of each other.
 -->
@@ -55,7 +55,7 @@ history. A wiki-link to [[comments]] resolves against this folder; a wiki-link
 to [[a note that is not here]] is marked as dead rather than silently doing
 nothing.
 
-<!-- imark quote="a line you have to track back across" by="Miguel Silva" at="2026-08-02T09:02:00Z"
+<!-- imark quote="a line you have to track back across" by="John Doe" at="2026-08-02T09:02:00Z"
 A note deliberately written far from its paragraph, to prove the rule: the quote
 is looked for in the block immediately above the note, not across the document.
 This one is on the wrong block on purpose and should be an orphan.
@@ -68,7 +68,7 @@ This one is on the wrong block on purpose and should be an orphan.
 > > And it can contain another one, which should indent without the border
 > > doubling up into a smear.
 
-<!-- imark quote="top-level block" by="miguel" at="2026-07-30T18:20:00Z" color="blue"
+<!-- imark quote="top-level block" by="john" at="2026-07-30T18:20:00Z" color="blue"
 Anchoring inside a blockquote is the case that proves the rule is about blocks
 and not about paragraphs.
 -->
@@ -112,7 +112,7 @@ A fence with no language at all. It should still get the frame, the copy button
 and the monospaced face, just no colours.
 ```
 
-<!-- imark quote="no language at all" by="teste" at="2026-08-02T10:00:00Z" color="red"
+<!-- imark quote="no language at all" by="sam" at="2026-08-02T10:00:00Z" color="red"
 A note on a code block. The quote has to be found inside the highlighted markup
 without disturbing any of the spans highlight.js put there.
 -->
@@ -155,7 +155,7 @@ sequenceDiagram
 | Colour | `Sources/Imark/NoteColour.swift` | Five names, closed set |
 | Undo | `DocumentWindowController` | Snapshots, ten deep |
 
-<!-- imark quote="Atomic, with a conflict check" by="nikus" at="2026-08-01T09:00:00Z"
+<!-- imark quote="Atomic, with a conflict check" by="jane" at="2026-08-01T09:00:00Z"
 A note anchored inside a table cell, which is the case that made the wrapper
 necessary — a table will not take a stray child of its own.
 -->
@@ -250,7 +250,7 @@ Remote images deliberately do not load.
 
 This paragraph no longer contains what the note below was written about.
 
-<!-- imark quote="a sentence that was edited away" by="miguel" at="2026-07-28T11:05:00Z"
+<!-- imark quote="a sentence that was edited away" by="john" at="2026-07-28T11:05:00Z"
 Orphaned on purpose. It should still be readable and still be attached here, with
 a hollow mark instead of a filled one, and no underline anywhere.
 -->
@@ -260,7 +260,7 @@ a hollow mark instead of a filled one, and no underline anywhere.
 A file can carry anything at all in `color=`. Anything unrecognised has to come
 back as the default rather than reach the stylesheet.
 
-<!-- imark quote="anything at all" by="teste" at="2026-08-02T16:00:00Z" color="chartreuse; } body { display: none"
+<!-- imark quote="anything at all" by="sam" at="2026-08-02T16:00:00Z" color="chartreuse; } body { display: none"
 This note tries to close the attribute and inject CSS. It should be the ordinary
 violet, and the page should look exactly as it did.
 -->
@@ -309,6 +309,6 @@ per version instead of four hundred rows of prose.
 
 If everything above rendered, the renderer is fine.
 
-<!-- imark quote="the renderer is fine" by="Miguel Silva" at="2026-08-02T18:00:00Z" color="green"
+<!-- imark quote="the renderer is fine" by="John Doe" at="2026-08-02T18:00:00Z" color="green"
 And if it is not, this is the file to open first.
 -->

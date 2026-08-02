@@ -1,7 +1,7 @@
 ---
 title: Plano Q3
 status: draft
-owner: miguel
+owner: john
 tags: [produto, roadmap]
 ---
 
@@ -18,7 +18,7 @@ Texto de **teste** com _ênfase_ e um [link externo](https://example.com).
 
 Ligação wiki: [[notas-reuniao]] e [[exemplo|com etiqueta]].
 
-<!-- imark quote="Ligação" by="Miguel Silva" at="2026-08-02T13:25:02Z"
+<!-- imark quote="Ligação" by="John Doe" at="2026-08-02T13:25:02Z"
 bmn
 -->
 
