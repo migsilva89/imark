@@ -85,6 +85,8 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         window?.title = target.lastPathComponent
         window?.representedURL = target
         content.setStatus(path: target)
+        // One document's folded sections should not carry over to the next.
+        sidebar.resetOutlineState()
         refreshSiblings()
         load()
 

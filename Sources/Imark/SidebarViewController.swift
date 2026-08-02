@@ -4,12 +4,12 @@ import ImarkRender
 /// Table of contents plus the sibling `.md` files, in one column.
 ///
 /// A flat table with section-header rows rather than an outline view: the
-/// headings already carry their depth as indentation, and nothing here needs
-/// to be expanded or collapsed.
+/// headings already carry their depth as indentation, and the collapsing is
+/// simple enough to do by filtering the list.
 final class SidebarViewController: NSViewController {
     enum Row {
         case header(String)
-        case heading(TocEntry)
+        case heading(TocEntry, hasChildren: Bool, isCollapsed: Bool)
         case file(URL)
     }
 
@@ -17,13 +17,21 @@ final class SidebarViewController: NSViewController {
     var onSelectFile: ((URL) -> Void)?
 
     private let scroll = NSScrollView()
-    private let table = NSTableView()
+    private let table = OutlineTable()
 
     private var rows: [Row] = []
     private var toc: [TocEntry] = []
     private var files: [URL] = []
     private var currentFile: URL?
     private var activeID: String?
+
+    /// Headings whose descendants are hidden.
+    private var collapsed: Set<String> = []
+    private var hasChosenDefaultState = false
+
+    /// Beyond this many entries an outline stops being scannable, and the
+    /// second level gets folded away until asked for.
+    private static let autoCollapseThreshold = 20
 
     override func loadView() {
         view = NSView()
@@ -39,6 +47,7 @@ final class SidebarViewController: NSViewController {
         table.target = self
         table.action = #selector(rowClicked)
         table.addTableColumn(NSTableColumn(identifier: .init("main")))
+        table.onArrow = { [weak self] expand in self?.arrowPressed(expand: expand) }
 
         scroll.documentView = table
         scroll.drawsBackground = false
@@ -58,8 +67,18 @@ final class SidebarViewController: NSViewController {
 
     // MARK: - Content
 
+    /// Called when the window switches documents, so one file's folded state
+    /// does not carry over to the next.
+    func resetOutlineState() {
+        collapsed.removeAll()
+        hasChosenDefaultState = false
+    }
+
     func update(toc: [TocEntry]) {
         self.toc = toc
+        // A live reload rebuilds the outline; keep whatever is still folded.
+        collapsed.formIntersection(Set(toc.map(\.id)))
+        chooseDefaultStateIfNeeded()
         rebuild()
     }
 
@@ -72,16 +91,74 @@ final class SidebarViewController: NSViewController {
     func setActive(_ id: String) {
         guard activeID != id else { return }
         activeID = id
-        // Only the two affected rows need redrawing, but the list is short and
-        // reloading it outright avoids bookkeeping bugs.
-        table.reloadData()
+        // Following the document into a folded branch should open it, or the
+        // highlight lands on a row nobody can see.
+        if revealAncestors(of: id) {
+            rebuild()
+        } else {
+            table.reloadData()
+        }
+    }
+
+    private func chooseDefaultStateIfNeeded() {
+        guard !hasChosenDefaultState, !toc.isEmpty else { return }
+        hasChosenDefaultState = true
+        guard toc.count > Self.autoCollapseThreshold else { return }
+
+        // Fold everything below the shallowest level. On a changelog that
+        // leaves one row per version instead of three.
+        let top = toc.map(\.level).min() ?? 1
+        for (index, entry) in toc.enumerated() where entry.level > top {
+            if hasChildren(at: index) { collapsed.insert(entry.id) }
+        }
+    }
+
+    private func hasChildren(at index: Int) -> Bool {
+        guard index + 1 < toc.count else { return false }
+        return toc[index + 1].level > toc[index].level
+    }
+
+    /// Opens every folded heading that contains `id`. Returns whether anything
+    /// actually changed.
+    @discardableResult
+    private func revealAncestors(of id: String) -> Bool {
+        guard let position = toc.firstIndex(where: { $0.id == id }) else { return false }
+        var changed = false
+        var level = toc[position].level
+        for index in stride(from: position - 1, through: 0, by: -1) where toc[index].level < level {
+            level = toc[index].level
+            if collapsed.remove(toc[index].id) != nil { changed = true }
+        }
+        return changed
+    }
+
+    /// The outline minus anything inside a folded heading.
+    private func visibleHeadings() -> [(entry: TocEntry, index: Int)] {
+        var result: [(TocEntry, Int)] = []
+        var hidingBelow: Int?
+
+        for (index, entry) in toc.enumerated() {
+            if let level = hidingBelow {
+                if entry.level > level { continue }
+                hidingBelow = nil
+            }
+            result.append((entry, index))
+            if collapsed.contains(entry.id) { hidingBelow = entry.level }
+        }
+        return result
     }
 
     private func rebuild() {
         var built: [Row] = []
         if !toc.isEmpty {
             built.append(.header("Contents"))
-            built.append(contentsOf: toc.map(Row.heading))
+            for (entry, index) in visibleHeadings() {
+                built.append(.heading(
+                    entry,
+                    hasChildren: hasChildren(at: index),
+                    isCollapsed: collapsed.contains(entry.id)
+                ))
+            }
         }
         // A lone file is just the document you already have open.
         if files.count > 1 {
@@ -92,6 +169,23 @@ final class SidebarViewController: NSViewController {
         table.reloadData()
     }
 
+    // MARK: - Folding
+
+    private func toggle(_ id: String) {
+        if collapsed.remove(id) == nil { collapsed.insert(id) }
+        rebuild()
+    }
+
+    private func arrowPressed(expand: Bool) {
+        let index = table.selectedRow
+        guard rows.indices.contains(index),
+              case .heading(let entry, let hasChildren, let isCollapsed) = rows[index],
+              hasChildren, isCollapsed == expand
+        else { return }
+        toggle(entry.id)
+        table.selectRowIndexes([index], byExtendingSelection: false)
+    }
+
     @objc private func rowClicked() {
         activate(row: table.clickedRow)
     }
@@ -100,7 +194,7 @@ final class SidebarViewController: NSViewController {
         guard rows.indices.contains(row) else { return }
         switch rows[row] {
         case .header: break
-        case .heading(let entry): onSelectHeading?(entry.id)
+        case .heading(let entry, _, _): onSelectHeading?(entry.id)
         case .file(let url): onSelectFile?(url)
         }
     }
@@ -133,15 +227,16 @@ extension SidebarViewController: NSTableViewDataSource, NSTableViewDelegate {
     ) -> NSView? {
         switch rows[row] {
         case .header(let title):
-            return HeaderCell(title: title, isFirst: row == 0)
+            return HeaderCell(title: title)
 
-        case .heading(let entry):
-            let cell = ItemCell(
+        case .heading(let entry, let hasChildren, let isCollapsed):
+            return ItemCell(
                 text: entry.title,
                 indent: CGFloat(max(0, entry.level - 1)) * 13,
-                isActive: entry.id == activeID
+                isActive: entry.id == activeID,
+                disclosure: hasChildren ? isCollapsed : nil,
+                onToggle: { [weak self] in self?.toggle(entry.id) }
             )
-            return cell
 
         case .file(let url):
             return ItemCell(
@@ -154,10 +249,26 @@ extension SidebarViewController: NSTableViewDataSource, NSTableViewDelegate {
     }
 }
 
+// MARK: - Table
+
+/// Left and right collapse and expand, the way every outline on this platform
+/// behaves. NSTableView has no notion of it, so the keys are caught here.
+private final class OutlineTable: NSTableView {
+    var onArrow: ((Bool) -> Void)?
+
+    override func keyDown(with event: NSEvent) {
+        switch event.keyCode {
+        case 123: onArrow?(false)
+        case 124: onArrow?(true)
+        default: super.keyDown(with: event)
+        }
+    }
+}
+
 // MARK: - Cells
 
 private final class HeaderCell: NSTableCellView {
-    init(title: String, isFirst: Bool) {
+    init(title: String) {
         super.init(frame: .zero)
         let label = NSTextField(labelWithString: title.uppercased())
         label.font = .systemFont(ofSize: 10, weight: .semibold)
@@ -175,7 +286,17 @@ private final class HeaderCell: NSTableCellView {
 }
 
 private final class ItemCell: NSTableCellView {
-    init(text: String, indent: CGFloat, isActive: Bool, symbol: String? = nil) {
+    private let onToggle: (() -> Void)?
+
+    init(
+        text: String,
+        indent: CGFloat,
+        isActive: Bool,
+        symbol: String? = nil,
+        disclosure: Bool? = nil,
+        onToggle: (() -> Void)? = nil
+    ) {
+        self.onToggle = onToggle
         super.init(frame: .zero)
 
         let pill = NSVisualEffectView()
@@ -208,13 +329,36 @@ private final class ItemCell: NSTableCellView {
         stack.addArrangedSubview(label)
         addSubview(stack)
 
+        // The triangle sits in the margin to the left of the text, so folding a
+        // section never shifts the outline sideways.
+        var chevronLead: CGFloat = 0
+        if let collapsed = disclosure {
+            let image = NSImage(
+                systemSymbolName: collapsed ? "chevron.right" : "chevron.down",
+                accessibilityDescription: nil
+            )
+            let button = NSButton(image: image ?? NSImage(), target: self, action: #selector(toggled))
+            button.isBordered = false
+            button.contentTintColor = .tertiaryLabelColor
+            button.symbolConfiguration = .init(pointSize: 9, weight: .semibold)
+            button.translatesAutoresizingMaskIntoConstraints = false
+            addSubview(button)
+            NSLayoutConstraint.activate([
+                button.widthAnchor.constraint(equalToConstant: 16),
+                button.heightAnchor.constraint(equalToConstant: 16),
+                button.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 2 + indent),
+                button.centerYAnchor.constraint(equalTo: centerYAnchor),
+            ])
+            chevronLead = 2
+        }
+
         NSLayoutConstraint.activate([
             pill.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
             pill.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
             pill.topAnchor.constraint(equalTo: topAnchor),
             pill.bottomAnchor.constraint(equalTo: bottomAnchor),
 
-            stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16 + indent),
+            stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 18 + indent + chevronLead),
             stack.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -12),
             stack.centerYAnchor.constraint(equalTo: centerYAnchor),
         ])
@@ -222,4 +366,6 @@ private final class ItemCell: NSTableCellView {
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("not supported") }
+
+    @objc private func toggled() { onToggle?() }
 }
