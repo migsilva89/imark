@@ -24,7 +24,9 @@
 
 | Document window | Quick Look preview |
 |:---:|:---:|
-| ![Document window with a folded outline](.github/assets/imark-window.png) | ![Quick Look preview with the outline rail](.github/assets/imark-quicklook.png) |
+| ![A document window with the outline sidebar and syntax-highlighted code](.github/assets/imark-window.png) | ![The Finder preview panel, with the outline rail down the left edge](.github/assets/imark-quicklook.png) |
+
+Both are rendering [`testdata/showcase.md`](testdata/showcase.md), which exercises everything the renderer supports and is worth opening first.
 
 ## Features
 
