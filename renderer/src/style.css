@@ -818,6 +818,15 @@ img[data-blocked] {
   gap: 5px;
 }
 
+/* Anchored to a dot in the margin instead of to the rail, so it opens to the
+   left and should grow from the edge nearest the dot rather than away from it. */
+.note-tip.at-dot {
+  transform: translateX(6px) scale(0.98);
+  transform-origin: right center;
+}
+
+.note-tip.at-dot.is-visible { transform: none; }
+
 .note-tip em {
   font-style: normal;
   font-size: 10.5px;
