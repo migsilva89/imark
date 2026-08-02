@@ -204,11 +204,28 @@ final class ContentViewController: NSViewController {
         refreshStatus()
     }
 
+    /// The comment count carries the accent the notes are marked with, so the
+    /// status bar says *there is something to read here* at a glance instead of
+    /// hiding it in the same grey as the word count.
     private func refreshStatus() {
         let formatted = words.formatted(.number.grouping(.automatic))
-        var parts = ["\(formatted) words", "\(minutes) min read"]
-        if comments > 0 { parts.append(comments == 1 ? "1 comment" : "\(comments) comments") }
-        statusLeft.stringValue = parts.joined(separator: " · ")
+        let line = NSMutableAttributedString(
+            string: "\(formatted) words · \(minutes) min read",
+            attributes: [
+                .font: NSFont.systemFont(ofSize: 11),
+                .foregroundColor: NSColor.tertiaryLabelColor,
+            ]
+        )
+        if comments > 0 {
+            line.append(NSAttributedString(
+                string: "  ·  " + (comments == 1 ? "1 comment" : "\(comments) comments"),
+                attributes: [
+                    .font: NSFont.systemFont(ofSize: 11, weight: .medium),
+                    .foregroundColor: NSColor.imarkAccent,
+                ]
+            ))
+        }
+        statusLeft.attributedStringValue = line
     }
 
     func setStatus(path: URL) {

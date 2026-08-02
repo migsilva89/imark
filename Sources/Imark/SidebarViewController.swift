@@ -336,8 +336,9 @@ private final class ItemCell: NSTableCellView {
         addSubview(stack)
 
         // The triangle sits in the margin to the left of the text, so folding a
-        // section never shifts the outline sideways.
-        var chevronLead: CGFloat = 0
+        // section never shifts the outline sideways. That margin has to be wide
+        // enough for it: at the old numbers the glyph started 2pt to the left of
+        // the selection pill and hung off its edge.
         if let collapsed = disclosure {
             let image = NSImage(
                 systemSymbolName: collapsed ? "chevron.right" : "chevron.down",
@@ -352,19 +353,20 @@ private final class ItemCell: NSTableCellView {
             NSLayoutConstraint.activate([
                 button.widthAnchor.constraint(equalToConstant: 16),
                 button.heightAnchor.constraint(equalToConstant: 16),
-                button.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 2 + indent),
+                button.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 4 + indent),
                 button.centerYAnchor.constraint(equalTo: centerYAnchor),
             ])
-            chevronLead = 2
         }
 
         NSLayoutConstraint.activate([
-            pill.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
-            pill.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
+            pill.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 4),
+            pill.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -6),
             pill.topAnchor.constraint(equalTo: topAnchor),
             pill.bottomAnchor.constraint(equalTo: bottomAnchor),
 
-            stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 18 + indent + chevronLead),
+            // Same for every row, with or without a triangle: a heading that can
+            // fold used to sit 2pt right of one that cannot.
+            stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 22 + indent),
             stack.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -12),
             stack.centerYAnchor.constraint(equalTo: centerYAnchor),
         ])
