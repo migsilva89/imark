@@ -4,10 +4,9 @@
 //
 //   swift Support/make-icon.swift
 //
-// The symbol follows the rules in docs/DESIGN.md: a lowercase "i" taken apart
-// into three solid shapes — circle, even-width stem, and a baseline bar. Drawn
-// rather than exported so every size is rendered at its own resolution and
-// stays crisp at 16px instead of being downsampled into mush.
+// The mark is a half-disc: flat on the left, a true semicircle on the right.
+// Drawn rather than exported so every size is rendered at its own resolution
+// and stays crisp at 16px instead of being downsampled into mush.
 
 import AppKit
 
@@ -16,34 +15,57 @@ import AppKit
 let accent = NSColor(srgbRed: 0xF5 / 255, green: 0xF5 / 255, blue: 0xF7 / 255, alpha: 1)
 let background = NSColor(srgbRed: 0x13 / 255, green: 0x13 / 255, blue: 0x16 / 255, alpha: 1)
 
-/// Fractions of the canvas. They are not constant across sizes: a symbol that
-/// looks right at 512px has 1px limbs at 16px and dissolves. Small sizes get a
-/// bigger, chunkier mark with less padding — the same trick Apple's own icons
-/// use rather than scaling one drawing down.
+/// Fractions of the canvas. They are not constant across sizes: a mark that
+/// looks right at 512px is too timid at 16px, where there is no room for
+/// padding. Small sizes get a bigger mark and a tighter squircle margin — the
+/// same trick Apple's own icons use rather than scaling one drawing down.
 struct Metric {
     let squircleInset: CGFloat
-    let stem: CGFloat
-    let gap: CGFloat
-    let baselineWidth: CGFloat
-    let groupHeight: CGFloat
+    let markHeight: CGFloat
+    let flatCorner: CGFloat      // rounding on the two corners of the flat edge
 
     static let cornerRatio: CGFloat = 0.2237   // macOS squircle, near enough
-    static let opticalLift: CGFloat = 0.012    // the baseline is bottom-heavy
-
-    var circle: CGFloat { stem * 1.6 }
+    static let aspect: CGFloat = 0.62          // width as a fraction of height
 
     static func forSize(_ size: CGFloat) -> Metric {
         if size <= 32 {
-            return Metric(squircleInset: 0.055, stem: 0.115, gap: 0.058,
-                          baselineWidth: 0.44, groupHeight: 0.62)
+            return Metric(squircleInset: 0.055, markHeight: 0.60, flatCorner: 0.06)
         }
         if size <= 64 {
-            return Metric(squircleInset: 0.075, stem: 0.088, gap: 0.052,
-                          baselineWidth: 0.37, groupHeight: 0.52)
+            return Metric(squircleInset: 0.075, markHeight: 0.53, flatCorner: 0.08)
         }
-        return Metric(squircleInset: 0.098, stem: 0.0605, gap: 0.045,
-                      baselineWidth: 0.293, groupHeight: 0.42)
+        return Metric(squircleInset: 0.098, markHeight: 0.46, flatCorner: 0.10)
     }
+}
+
+func halfDisc(in rect: NSRect, flatCorner: CGFloat) -> NSBezierPath {
+    let path = NSBezierPath()
+    let radius = rect.height / 2
+    let corner = min(flatCorner, radius)
+
+    let left = rect.minX
+    let right = rect.maxX
+    let bottom = rect.minY
+    let top = rect.maxY
+    let arcCentre = NSPoint(x: right - radius, y: bottom + radius)
+
+    path.move(to: NSPoint(x: left + corner, y: bottom))
+    path.line(to: NSPoint(x: arcCentre.x, y: bottom))
+    // The whole right side is one semicircle, bottom to top.
+    path.appendArc(withCenter: arcCentre, radius: radius, startAngle: -90, endAngle: 90)
+    path.line(to: NSPoint(x: left + corner, y: top))
+    path.appendArc(
+        from: NSPoint(x: left, y: top),
+        to: NSPoint(x: left, y: bottom),
+        radius: corner
+    )
+    path.appendArc(
+        from: NSPoint(x: left, y: bottom),
+        to: NSPoint(x: right, y: bottom),
+        radius: corner
+    )
+    path.close()
+    return path
 }
 
 func drawIcon(size: CGFloat) -> NSBitmapImageRep {
@@ -67,9 +89,6 @@ func drawIcon(size: CGFloat) -> NSBitmapImageRep {
     NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
     NSGraphicsContext.current?.imageInterpolation = .high
 
-    // AppKit draws from the bottom-left; the layout below reads top-down.
-    func fromTop(_ y: CGFloat, _ height: CGFloat) -> CGFloat { size - y - height }
-
     let inset = size * m.squircleInset
     let plate = NSRect(x: inset, y: inset, width: size - inset * 2, height: size - inset * 2)
     background.setFill()
@@ -79,43 +98,19 @@ func drawIcon(size: CGFloat) -> NSBitmapImageRep {
         yRadius: plate.width * Metric.cornerRatio
     ).fill()
 
-    let stem = size * m.stem
-    let circle = size * m.circle
-    let gap = size * m.gap
-    let baselineWidth = size * m.baselineWidth
-    let baselineHeight = stem
-    let stemHeight = size * m.groupHeight - circle - baselineHeight - gap * 2
-
-    var top = (size - size * m.groupHeight) / 2 - size * Metric.opticalLift
-    let centre = size / 2
+    let height = size * m.markHeight
+    let width = height * Metric.aspect
+    // Optically centred, not mathematically: the mass sits to the right of the
+    // flat edge, so the shape has to sit a little left of centre to look level.
+    let mark = NSRect(
+        x: (size - width) / 2 - size * 0.012,
+        y: (size - height) / 2,
+        width: width,
+        height: height
+    )
 
     accent.setFill()
-
-    NSBezierPath(ovalIn: NSRect(
-        x: centre - circle / 2,
-        y: fromTop(top, circle),
-        width: circle,
-        height: circle
-    )).fill()
-    top += circle + gap
-
-    NSBezierPath(
-        roundedRect: NSRect(x: centre - stem / 2, y: fromTop(top, stemHeight), width: stem, height: stemHeight),
-        xRadius: stem / 2,
-        yRadius: stem / 2
-    ).fill()
-    top += stemHeight + gap
-
-    NSBezierPath(
-        roundedRect: NSRect(
-            x: centre - baselineWidth / 2,
-            y: fromTop(top, baselineHeight),
-            width: baselineWidth,
-            height: baselineHeight
-        ),
-        xRadius: baselineHeight / 2,
-        yRadius: baselineHeight / 2
-    ).fill()
+    halfDisc(in: mark, flatCorner: size * m.flatCorner * 0.5).fill()
 
     NSGraphicsContext.restoreGraphicsState()
     return rep
