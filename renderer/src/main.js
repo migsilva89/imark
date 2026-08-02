@@ -442,7 +442,39 @@ function updateRail(centre) {
 
 /* ---------------------------------------------------------- rail tooltip */
 
-const flatten = (el) => el.textContent.replace(/\s+/g, ' ').trim()
+// A comment card lives inside the block it is attached to, so the plain text of
+// a block is not its text content any more — without this the preview quoted
+// somebody's note back as if it were the document.
+const flatten = (el) => {
+  const copy = el.cloneNode(true)
+  for (const note of copy.querySelectorAll('.note-card, .note-dot, .note-actions')) note.remove()
+  return copy.textContent.replace(/\s+/g, ' ').trim()
+}
+
+// A commented block is wrapped, so its neighbours are the wrapper's neighbours.
+const outermost = (el) =>
+  el.parentElement?.classList.contains('note-holder') ? el.parentElement : el
+
+const headingIn = (el) =>
+  /^H[1-6]$/.test(el.tagName) ? el : el.querySelector('h1, h2, h3, h4, h5, h6')
+
+/// How many notes fall under this heading, down to the next one at the same
+/// level or higher. The rail on the other edge says where the notes are; this
+/// says whether the section you are about to jump to has any, which is the
+/// question you have while reading the outline.
+function notesInSection(heading) {
+  const start = outermost(heading)
+  const level = headingLevel(heading)
+  let count = start.querySelectorAll('.note-dot').length
+
+  for (let node = start.nextElementSibling; node; node = node.nextElementSibling) {
+    const inner = headingIn(node)
+    const innerLevel = inner ? headingLevel(inner) : 0
+    if (innerLevel > 0 && innerLevel <= level) break
+    count += node.querySelectorAll('.note-dot').length
+  }
+  return count
+}
 
 function tipContent(index) {
   const heading = railBlocks[index]
@@ -452,8 +484,8 @@ function tipContent(index) {
   // to come from the DOM rather than from railBlocks — the prose that follows
   // is no longer in the list.
   let body = ''
-  let sibling = heading.nextElementSibling
-  while (sibling && !/^H[1-6]$/.test(sibling.tagName)) {
+  let sibling = outermost(heading).nextElementSibling
+  while (sibling && !headingIn(sibling)) {
     body = flatten(sibling)
     if (body) break
     sibling = sibling.nextElementSibling
@@ -465,6 +497,7 @@ function tipContent(index) {
     label: `${Math.round(position * 100)}% in`,
     title: flatten(heading),
     body,
+    notes: notesInSection(heading),
   }
 }
 
@@ -477,6 +510,12 @@ function showTip(index, tick) {
 
   const label = document.createElement('em')
   label.textContent = content.label
+  if (content.notes) {
+    const badge = document.createElement('i')
+    badge.className = 'rail-tip-notes'
+    badge.textContent = content.notes === 1 ? '1 comment' : `${content.notes} comments`
+    label.appendChild(badge)
+  }
   railTip.appendChild(label)
 
   const heading = document.createElement('strong')

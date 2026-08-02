@@ -39,8 +39,9 @@ Down the left edge of every document — in a window and in the Finder's preview
 panel alike — sits one tick per heading. The marks taper around wherever you are
 in the document, and around wherever you point, whichever is more recent: move
 onto the rail and the funnel follows the pointer, so you can survey the whole
-file without moving the page. A card names the section and quotes its first
-line. Click to jump, or press and drag to scrub.
+file without moving the page. A card names the section, quotes its first line,
+and says whether anyone has commented on it. Click to jump, or press and drag to
+scrub.
 
 It exists because the preview panel has no room for a sidebar. It stayed in the
 window because reading a long document and knowing where you are in it turn out

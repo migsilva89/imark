@@ -749,3 +749,23 @@ img[data-blocked] {
 
 /* Quick Look is a reading panel and nothing in it is clickable. */
 :root[data-preview='true'] .note-rail { display: none; }
+
+/* Whether the section you are about to jump to has been commented on. The dot
+   is the same one that marks a note in the margin, so it reads as the same
+   thing rather than as a new kind of badge. */
+.rail-tip-notes {
+  font-style: normal;
+  margin-left: 7px;
+  color: var(--accent);
+}
+
+.rail-tip-notes::before {
+  content: '';
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  margin-right: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  vertical-align: 1px;
+}
