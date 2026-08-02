@@ -54,7 +54,7 @@ swift Support/make-icon.swift
 
 ## Diagrams
 
-<!-- imark quote="Diagrams" by="Miguel Silva" at="2026-08-02T12:28:34Z"
+<!-- imark quote="Diagrams" by="John Doe" at="2026-08-02T12:28:34Z"
 nbnbm
 -->
 

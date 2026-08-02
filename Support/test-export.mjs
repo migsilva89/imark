@@ -28,7 +28,7 @@ const check = (name, condition, detail = '') => {
     [
       'The deadline is generous but achievable.',
       '',
-      '<!-- imark quote="generous but achievable" by="miguel" at="2026-08-02T14:31Z"',
+      '<!-- imark quote="generous but achievable" by="john" at="2026-08-02T14:31Z"',
       'Achievable with which team?',
       '-->',
       '',
@@ -39,7 +39,7 @@ const check = (name, condition, detail = '') => {
   check('nothing of the block survives', !out.includes('<!--') && !out.includes('-->'))
   check('the document is untouched', out.includes('The deadline is generous but achievable.'))
   check('and so is what came after', out.includes('Rollback writes a reversal record.'))
-  check('the author is in the quote', out.includes('**miguel,'))
+  check('the author is in the quote', out.includes('**john,'))
   check('so is the phrase it is about', out.includes('on *“generous but achievable”*'))
   check('the note is quoted', out.includes('> Achievable with which team?'))
   check('every line of the block is a quote line', out.split('\n').filter((l) => l.startsWith('>')).length === 3)

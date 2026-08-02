@@ -70,14 +70,14 @@ enum CommentsTest {
         // "First paragraph." is lines 2..3 with an exclusive end, so 3.
         let index = try Comments.insert(
             quote: "First", body: "Why first?", after: 3, occurrence: 1,
-            by: "miguel", on: date, into: url, expecting: Comments.Stamp(of: url)
+            by: "john", on: date, into: url, expecting: Comments.Stamp(of: url)
         )
         let lines = read(url)
         check("lands right after the block", lines[4].hasPrefix("<!-- imark"), lines.joined(separator: "⏎"))
         check("blank line before the note", lines[3].isEmpty)
         check("original text untouched", lines[2] == "First paragraph." && lines.last == "Second paragraph.")
         check("first note has index 0", index == 0)
-        check("quote and author written", lines[4].contains("quote=\"First\"") && lines[4].contains("by=\"miguel\""))
+        check("quote and author written", lines[4].contains("quote=\"First\"") && lines[4].contains("by=\"john\""))
         check("no nth for a first occurrence", !lines[4].contains("nth="))
         check("body on its own line", lines[5] == "Why first?")
         check("closed", lines[6] == "-->")
@@ -173,7 +173,7 @@ enum CommentsTest {
         let url = fixture("""
         Text.
 
-        <!-- imark quote="Text" by="nikus" at="2026-08-01T09:00Z" nth="2"
+        <!-- imark quote="Text" by="jane" at="2026-08-01T09:00Z" nth="2"
         first thought
         -->
         """)
@@ -182,7 +182,7 @@ enum CommentsTest {
         let lines = read(url)
         check("the body is replaced", lines[3] == "second thought")
         check("the anchor is untouched",
-              lines[2] == "<!-- imark quote=\"Text\" by=\"nikus\" at=\"2026-08-01T09:00Z\" nth=\"2\"",
+              lines[2] == "<!-- imark quote=\"Text\" by=\"jane\" at=\"2026-08-01T09:00Z\" nth=\"2\"",
               lines[2])
         check("still closed", lines[4] == "-->")
 
@@ -245,7 +245,7 @@ enum CommentsTest {
               (try String(contentsOf: url, encoding: .utf8)).contains("color=\"amber\""))
 
         // Changing it must not disturb anything else on the line.
-        let header = "<!-- imark quote=\"a\" by=\"nikus\" at=\"2026-08-01T09:00Z\" nth=\"2\""
+        let header = "<!-- imark quote=\"a\" by=\"jane\" at=\"2026-08-01T09:00Z\" nth=\"2\""
         check("colour added without touching the rest",
               Comments.recolour(header, to: .green) == header + " color=\"green\"",
               Comments.recolour(header, to: .green))
@@ -264,14 +264,14 @@ enum CommentsTest {
         let edited = fixture("""
         Text.
 
-        <!-- imark quote="Text" by="nikus" at="2026-08-01T09:00Z" color="red"
+        <!-- imark quote="Text" by="jane" at="2026-08-01T09:00Z" color="red"
         first
         -->
         """)
         try Comments.update(lines: 2...4, body: "second", colour: .blue, in: edited, expecting: nil)
         let lines = read(edited)
         check("editing keeps quote, author and date",
-              lines[2].contains("quote=\"Text\"") && lines[2].contains("by=\"nikus\"")
+              lines[2].contains("quote=\"Text\"") && lines[2].contains("by=\"jane\"")
                   && lines[2].contains("at=\"2026-08-01T09:00Z\""), lines[2])
         check("and swaps the colour", lines[2].contains("color=\"blue\"")
                   && !lines[2].contains("color=\"red\""), lines[2])

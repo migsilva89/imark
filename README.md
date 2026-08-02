@@ -66,7 +66,7 @@ The note is stored **inside the `.md` file**, as an HTML comment:
 ```markdown
 Rows move in batches of 500, and the deadline is generous but achievable.
 
-<!-- imark quote="generous but achievable" by="miguel" at="2026-08-02T14:31Z"
+<!-- imark quote="generous but achievable" by="john" at="2026-08-02T14:31Z"
 Achievable with which team? This needs a number, not an adjective.
 -->
 ```
@@ -102,7 +102,7 @@ blockquote, for the review the other person has to read on GitHub:
 ```markdown
 Rows move in batches of 500, and the deadline is generous but achievable.
 
-> **miguel, 2 Aug 2026** on *“generous but achievable”*
+> **john, 2 Aug 2026** on *“generous but achievable”*
 >
 > Achievable with which team? This needs a number, not an adjective.
 ```

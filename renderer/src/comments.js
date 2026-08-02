@@ -1,6 +1,6 @@
 // Comments live inside the document, as HTML comments:
 //
-//   <!-- imark quote="exequível" by="miguel" at="2026-08-02T14:31Z"
+//   <!-- imark quote="exequível" by="john" at="2026-08-02T14:31Z"
 //   Exequível com que equipa?
 //   -->
 //
