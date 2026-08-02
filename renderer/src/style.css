@@ -705,3 +705,47 @@ img[data-blocked] {
 .note-delete:hover {
   color: #d9544f;
 }
+
+/* ------------------------------------------------------- comments rail */
+
+/* Opposite edge to the outline. Marks sit where the notes are in the document,
+   not spread evenly — three notes clustered in one section is worth seeing. */
+.note-rail {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 18px;
+  z-index: 6;
+  pointer-events: none;
+}
+
+.note-mark {
+  position: absolute;
+  right: 6px;
+  width: 6px;
+  height: 6px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: 0.55;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+
+.note-mark:hover {
+  opacity: 1;
+  transform: scale(1.6);
+}
+
+.note-mark.orphan {
+  background: transparent;
+  border: 1px solid var(--secondary);
+}
+
+:root[data-note-rail] body { padding-right: calc(var(--step) * 6); }
+
+/* Quick Look is a reading panel and nothing in it is clickable. */
+:root[data-preview='true'] .note-rail { display: none; }

@@ -355,4 +355,85 @@ export function stepNote(delta) {
 export function restoreNoteState() {
   cursor = -1
   if (reviewing) setReviewing(true)
+  buildNoteRail()
+}
+
+/* ------------------------------------------------------------------- rail */
+
+/// One mark per note down the right edge, opposite the outline. Unlike the
+/// heading rail these are placed where the notes actually are in the document
+/// rather than spread evenly: with notes, *where* they are is the whole point —
+/// three clustered in one section says something an even list would hide.
+export function buildNoteRail() {
+  document.querySelector('.note-rail')?.remove()
+  const all = dots()
+  if (all.length < 2) {
+    delete document.documentElement.dataset.noteRail
+    return
+  }
+
+  const rail = document.createElement('nav')
+  rail.className = 'note-rail'
+  rail.setAttribute('aria-label', 'Comments')
+
+  const height = document.documentElement.scrollHeight || 1
+  for (const [index, dot] of all.entries()) {
+    const card = document.querySelector(`.note-card[data-note="${dot.dataset.note}"]`)
+    const mark = document.createElement('button')
+    mark.type = 'button'
+    mark.className = dot.classList.contains('orphan') ? 'note-mark orphan' : 'note-mark'
+    mark.style.top = `${((dot.getBoundingClientRect().top + window.scrollY) / height) * 100}%`
+    mark.title = card?.querySelector('.note-text')?.textContent ?? 'Comment'
+    mark.addEventListener('click', () => {
+      cursor = index - 1
+      stepNote(1)
+    })
+    rail.appendChild(mark)
+  }
+
+  document.body.appendChild(rail)
+  document.documentElement.dataset.noteRail = 'true'
+}
+
+// Positions are a fraction of the document height, so they are wrong the moment
+// it reflows.
+window.addEventListener('resize', () => buildNoteRail())
+
+/* ----------------------------------------------------------------- export */
+
+/// Turns the notes into blockquotes anybody can see. HTML comments are perfect
+/// for notes between people who both use Imark and useless for a review the
+/// other person has to read on GitHub — this is the bridge, and it produces a
+/// copy rather than touching the document it came from.
+export function toVisibleText(source) {
+  const lines = source.split('\n')
+  const out = []
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const open = OPEN.exec(lines[index])
+    if (!open) {
+      out.push(lines[index])
+      continue
+    }
+    let end = index
+    while (end < lines.length && !lines[end].includes('-->')) end += 1
+    if (end >= lines.length) {
+      out.push(lines[index])
+      continue
+    }
+
+    const attributes = {}
+    for (const [, key, value] of open[1].matchAll(ATTR)) attributes[key] = unescapeHTML(value)
+
+    const who = [attributes.by, formatDate(attributes.at)].filter(Boolean).join(', ')
+    const head = [`**${who || 'Note'}**`, attributes.quote ? `on *“${attributes.quote}”*` : '']
+      .filter(Boolean)
+      .join(' ')
+    const body = unwrap(unescapeHTML(lines.slice(index + 1, end).join('\n').trim()))
+
+    out.push(`> ${head}`, '>', ...body.split('\n').map((line) => (line ? `> ${line}` : '>')))
+    index = end
+  }
+
+  return out.join('\n')
 }

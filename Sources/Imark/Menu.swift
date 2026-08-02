@@ -61,6 +61,11 @@ enum Menu {
         let reveal = menu.addItem(withTitle: "Reveal in Finder", action: #selector(DocumentWindowController.revealInFinder(_:)), keyEquivalent: "r")
         reveal.keyEquivalentModifierMask = [.command, .shift]
         menu.addItem(withTitle: "Print…", action: #selector(DocumentWindowController.printDocument(_:)), keyEquivalent: "p")
+        menu.addItem(
+            withTitle: "Export Comments as Text…",
+            action: #selector(DocumentWindowController.exportComments(_:)),
+            keyEquivalent: ""
+        )
         return menu
     }
 

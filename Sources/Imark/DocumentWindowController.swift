@@ -409,7 +409,8 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         case #selector(toggleAllComments(_:)):
             item.state = reviewingComments ? .on : .off
             return noteCount > 0
-        case #selector(nextComment(_:)), #selector(previousComment(_:)):
+        case #selector(nextComment(_:)), #selector(previousComment(_:)),
+             #selector(exportComments(_:)):
             return noteCount > 0
         default:
             return true
@@ -453,6 +454,32 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         info.rightMargin = 36
         content.renderer.printOperation(with: info)
             .runModal(for: window, delegate: nil, didRun: nil, contextInfo: nil)
+    }
+
+    /// Writes a copy with the notes turned into blockquotes. A copy, not the
+    /// document: HTML comments are the right home for a note between two people
+    /// who both use Imark, and useless for a review the other person has to read
+    /// on GitHub. Converting in place would trade one for the other.
+    @objc func exportComments(_ sender: Any?) {
+        guard noteCount > 0 else { return NSSound.beep() }
+        content.renderer.exportComments { [weak self] text in
+            guard let self, let text, let window = self.window else { return NSSound.beep() }
+
+            let panel = NSSavePanel()
+            panel.nameFieldStringValue = self.url.deletingPathExtension().lastPathComponent
+                + "-comments." + (self.url.pathExtension.isEmpty ? "md" : self.url.pathExtension)
+            panel.directoryURL = self.url.deletingLastPathComponent()
+            panel.message = "The comments become blockquotes. Your document is not changed."
+            panel.beginSheetModal(for: window) { response in
+                guard response == .OK, let target = panel.url else { return }
+                do {
+                    try text.write(to: target, atomically: true, encoding: .utf8)
+                    NSWorkspace.shared.activateFileViewerSelecting([target])
+                } catch {
+                    self.report(error, doing: "export the comments")
+                }
+            }
+        }
     }
 
     @objc func revealInFinder(_ sender: Any?) {

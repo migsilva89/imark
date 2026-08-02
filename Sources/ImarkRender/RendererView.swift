@@ -171,6 +171,15 @@ public final class RendererView: NSView {
         call("window.imark.setReviewing", on)
     }
 
+    /// The document with every note turned into a visible blockquote. Built in
+    /// the renderer because that is where the notes are already parsed — a
+    /// second parser in Swift would be a second parser to keep in step.
+    public func exportComments(_ done: @escaping (String?) -> Void) {
+        webView.evaluateJavaScript("window.imark.exportComments()") { value, _ in
+            done(value as? String)
+        }
+    }
+
     /// Moves to the next (+1) or previous (-1) note, wrapping around.
     public func stepNote(_ delta: Int) {
         call("window.imark.stepNote", delta)

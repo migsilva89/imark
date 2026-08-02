@@ -19,6 +19,7 @@ import {
   restoreNoteState,
   setReviewing as applyReviewing,
   stepNote,
+  toVisibleText,
 } from './comments.js'
 import './style.css'
 
@@ -603,8 +604,12 @@ const content = () => document.getElementById('content')
 let activeHeadings = []
 let renderToken = 0
 
+// Kept so comments can be exported without asking Swift to hand the file back.
+let lastSource = ''
+
 async function render({ markdown, path, theme, preview, rail }) {
   const token = ++renderToken
+  lastSource = markdown ?? ''
   docDir = path ? path.slice(0, path.lastIndexOf('/')) || '/' : '/'
   slugCounts.clear()
 
@@ -939,6 +944,7 @@ window.imark = {
     bridge({ type: 'comments', count: applyReviewing(on), reviewing: on })
   },
   stepNote,
+  exportComments: () => toVisibleText(lastSource),
   /// Opens the note that was just written, so a comment lands visibly rather
   /// than silently changing a file.
   revealNote(index) {

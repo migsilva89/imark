@@ -84,7 +84,24 @@ no fuzzy matching, because a note in the wrong place is worse than a note withou
 an exact one.
 
 `⌘⇧C` opens every note at once, laid out under its block, for reading a document
-somebody has been through end to end. `⌘'` and `⌘⇧'` step between them.
+somebody has been through end to end. `⌘'` and `⌘⇧'` step between them, and a rail
+down the right edge marks where they all are — placed where the notes actually
+fall in the document, so three clustered in one section is visible at a glance.
+
+**File › Export Comments as Text…** writes a copy with every note turned into a
+blockquote, for the review the other person has to read on GitHub:
+
+```markdown
+Rows move in batches of 500, and the deadline is generous but achievable.
+
+> **miguel, 2 Aug 2026** on *“generous but achievable”*
+>
+> Achievable with which team? This needs a number, not an adjective.
+```
+
+A copy, not the document. HTML comments are the right home for a note between two
+people who both use Imark, and useless for a review on the web; converting in
+place would trade one for the other.
 
 > [!IMPORTANT]
 > This is the only feature that writes to your files. It writes to a temporary
@@ -94,7 +111,7 @@ somebody has been through end to end. `⌘'` and `⌘⇧'` step between them.
 
 ## Features
 
-- **Comments in the file** — select, comment, edit or delete, and the note lives in the document as an HTML comment, so it survives being emailed, committed, or opened in anything else. `⌘Z` undoes any of it
+- **Comments in the file** — select, comment, edit or delete, and the note lives in the document as an HTML comment, so it survives being emailed, committed, or opened in anything else. `⌘Z` undoes any of it, and they export as visible blockquotes when the review has to happen on GitHub
 - **Actions on a selection** — copy as Markdown rather than flattened text, look the words up, translate them on device, hear them read, or send them to the search engine you actually chose
 - **Quick Look previews** — the space bar in the Finder renders the document, not raw text, using the same engine as the app
 - **Live reload** — saving in your editor updates the view in under 300ms, keeping your scroll position, and it survives the delete-and-rename that editors call an atomic save
@@ -206,6 +223,7 @@ tests of its own:
 
 ```bash
 swiftc -parse-as-library Sources/Imark/Comments.swift Support/test-comments.swift -o /tmp/imark-test && /tmp/imark-test
+node Support/test-export.mjs
 ```
 
 Two helpers exist for looking at the UI without photographing the whole desktop — `Support/shoot.swift` renders a page in an off-screen web view, and `Support/window-id.swift` resolves a window id so a screenshot can be taken of one window:
