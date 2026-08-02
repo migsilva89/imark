@@ -59,13 +59,15 @@ enum Settings {
     /// where every other colour in the document already lives. Adding a theme is
     /// two blocks of CSS and a case here, and nothing else.
     enum Palette: String, CaseIterable {
-        case classic, warm, cool
+        case classic, warm, cool, forest, contrast
 
         var label: String {
             switch self {
             case .classic: return "Classic"
             case .warm: return "Warm"
             case .cool: return "Cool"
+            case .forest: return "Forest"
+            case .contrast: return "High Contrast"
             }
         }
 

@@ -168,6 +168,107 @@
   --syn-number: #ff9e64;
 }
 
+/* Forest, light. Green is the one hue the other themes leave alone, and it is
+   the only one that stays calm at full strength on a page of prose. */
+:root[data-theme='forest-light'] {
+  --bg: #f4f7f2;
+  --text: #1c2a1f;
+  --secondary: #5c7060;
+  --accent: #2f7d4f;
+  --accent-soft: #dcebe0;
+  --code-bg: #eaf1e9;
+  --surface: #ffffff;
+  --border: #d3e0d4;
+  --diagram: #3d8f5e;
+
+  --note: var(--accent);
+  --note-amber: #96700c;
+  --note-green: #2f7d4f;
+  --note-blue: #2f6a94;
+  --note-red: #a83f36;
+
+  --syn-keyword: #6d5aa8;
+  --syn-string: #2f7d4f;
+  --syn-comment: #85958a;
+  --syn-number: #8a6a1c;
+}
+
+/* Forest, dark. */
+:root[data-theme='forest-dark'] {
+  --bg: #0d1410;
+  --text: #dfe8e0;
+  --secondary: #8a9c8e;
+  --accent: #6cc48c;
+  --accent-soft: #17301f;
+  --code-bg: #121b15;
+  --surface: #16211a;
+  --border: #253026;
+  --diagram: #7cd39a;
+
+  --note: var(--accent);
+  --note-amber: #d8b06a;
+  --note-green: #6cc48c;
+  --note-blue: #79b4d8;
+  --note-red: #e08a80;
+
+  --syn-keyword: #b39ce0;
+  --syn-string: #8fd6a0;
+  --syn-comment: #6a7a6e;
+  --syn-number: #d8a86a;
+}
+
+/* High contrast, light. Black on white with the borders pushed up to where they
+   can actually be seen. Not a taste — the others are all mid-tone greys on
+   near-white, and that is the first thing to fail in bright sun or on tired
+   eyes. The syntax and note colours are darkened to match, because a palette
+   that only fixes the prose leaves half the page behind. */
+:root[data-theme='contrast-light'] {
+  --bg: #ffffff;
+  --text: #000000;
+  --secondary: #3a3a3a;
+  --accent: #0040c0;
+  --accent-soft: #dde4ff;
+  --code-bg: #f0f0f0;
+  --surface: #ffffff;
+  --border: #767676;
+  --diagram: #0040c0;
+
+  --note: var(--accent);
+  --note-amber: #8a5a00;
+  --note-green: #006622;
+  --note-blue: #0033aa;
+  --note-red: #aa0000;
+
+  --syn-keyword: #6600cc;
+  --syn-string: #006622;
+  --syn-comment: #4a4a4a;
+  --syn-number: #994400;
+}
+
+/* High contrast, dark. True black, true white. */
+:root[data-theme='contrast-dark'] {
+  --bg: #000000;
+  --text: #ffffff;
+  --secondary: #c8c8c8;
+  --accent: #7fb2ff;
+  --accent-soft: #001a4d;
+  --code-bg: #101010;
+  --surface: #141414;
+  --border: #8a8a8a;
+  --diagram: #7fb2ff;
+
+  --note: var(--accent);
+  --note-amber: #ffc04d;
+  --note-green: #5ee88a;
+  --note-blue: #7fc4ff;
+  --note-red: #ff8a80;
+
+  --syn-keyword: #c9a4ff;
+  --syn-string: #7fe89a;
+  --syn-comment: #a0a0a0;
+  --syn-number: #ffb84d;
+}
+
 :root[data-width='narrow'] { --measure: 60ch; }
 :root[data-width='wide'] { --measure: 90ch; }
 :root[data-width='full'] { --measure: none; }
