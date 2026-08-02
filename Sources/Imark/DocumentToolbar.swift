@@ -6,6 +6,7 @@ private extension NSToolbarItem.Identifier {
     static let export = NSToolbarItem.Identifier("export")
     static let openIn = NSToolbarItem.Identifier("openIn")
     static let theme = NSToolbarItem.Identifier("theme")
+    static let comments = NSToolbarItem.Identifier("comments")
 }
 
 extension DocumentWindowController: NSToolbarDelegate {
@@ -20,7 +21,7 @@ extension DocumentWindowController: NSToolbarDelegate {
 
     public func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
         [.toggleSidebar, .sidebarTrackingSeparator, .flexibleSpace,
-         .find, .text, .theme, .export, .openIn]
+         .find, .comments, .text, .theme, .export, .openIn]
     }
 
     public func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
@@ -36,6 +37,10 @@ extension DocumentWindowController: NSToolbarDelegate {
         case .find:
             return button(identifier, symbol: "magnifyingglass", label: "Find",
                           action: #selector(performFind(_:)))
+
+        case .comments:
+            return button(identifier, symbol: "bubble.left.and.bubble.right", label: "Comments",
+                          action: #selector(toggleAllComments(_:)))
 
         case .export:
             return button(identifier, symbol: "square.and.arrow.up", label: "Export",

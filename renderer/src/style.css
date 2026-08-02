@@ -549,3 +549,114 @@ img[data-blocked] {
   color: var(--secondary);
   font-size: 14px;
 }
+
+/* ------------------------------------------------------------- comments */
+
+/* Wrapping every commented block is what lets the dot and the card be placed
+   against it — a table or a list will not take stray children of its own. */
+.note-holder {
+  position: relative;
+}
+
+.note-anchor {
+  background: var(--accent-soft);
+  border-bottom: 1.5px solid var(--accent);
+  border-radius: 2px;
+  padding: 0 1px;
+  cursor: pointer;
+}
+
+.note-dot {
+  position: absolute;
+  top: 2px;
+  right: calc(var(--step) * -6);
+  width: 11px;
+  height: 11px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  transition: transform 0.12s ease;
+  /* Above the card, which overlaps it — the dot is also how you close it. */
+  z-index: 6;
+}
+
+.note-dot:hover,
+.note-dot.open {
+  transform: scale(1.35);
+}
+
+/* An orphan has lost the words it pointed at. Hollow rather than hidden: the
+   note is still there and still worth reading, it just has no exact place. */
+.note-dot.orphan {
+  background: transparent;
+  border: 1.5px solid var(--secondary);
+}
+
+/* Floats over the right edge of the text rather than beside it. A reading
+   column is centred and rarely leaves 250px of clear margin, so a card that
+   insisted on free space would drop below the paragraph every time — which is
+   the permanent side column this was meant to avoid. */
+.note-card {
+  position: absolute;
+  top: 0;
+  right: calc(var(--step) * -8);
+  width: 250px;
+  z-index: 5;
+  padding: calc(var(--step) * 3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 6px 22px rgb(0 0 0 / 12%);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* Genuinely narrow — Quick Look, a split window — so overlapping would bury
+   the paragraph entirely. Sit under it instead. */
+.note-card.below {
+  right: auto;
+  position: static;
+  width: auto;
+  margin: calc(var(--step) * 3) 0;
+}
+
+.note-card header {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--secondary);
+  margin-bottom: calc(var(--step) * 2);
+}
+
+.note-card .note-text {
+  margin: 0;
+  white-space: pre-wrap;
+  font-size: 13px;
+}
+
+.note-card .note-orphan {
+  margin: 0 0 calc(var(--step) * 2);
+  padding-bottom: calc(var(--step) * 2);
+  border-bottom: 1px solid var(--border);
+  color: var(--secondary);
+  font-size: 12px;
+}
+
+/* Quick Look is a reading panel: show that a note is there, but the panel is
+   too narrow to open cards in and nothing in it is clickable anyway. */
+:root[data-preview='true'] .note-dot { pointer-events: none; }
+:root[data-preview='true'] .note-card { display: none; }
+
+/* Review mode: every note open at once, under the block it belongs to. Reads
+   the way the file itself reads in a plain-text editor. */
+:root[data-notes='all'] .note-card {
+  border-left: 2px solid var(--accent);
+  box-shadow: none;
+}
+
+:root[data-notes='all'] .note-dot {
+  transform: none;
+}

@@ -10,6 +10,16 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     private let content = ContentViewController()
     private var sidebarItem: NSSplitViewItem!
 
+    private let selectionPopover = SelectionPopover()
+    private var selection: Selection?
+    /// The file as it was when we read it, and the moment we last wrote it
+    /// ourselves — one guards against clobbering somebody else's edit, the
+    /// other stops our own write from being announced as an outside change.
+    private var stamp: Comments.Stamp?
+    private var lastWrite = Date.distantPast
+    private(set) var noteCount = 0
+    private(set) var reviewingComments = false
+
     private var watcher: FileWatcher?
     private var back: [URL] = []
     private var forward: [URL] = []
@@ -58,6 +68,10 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         content.onFindClosed = { [weak self] in
             self?.window?.makeFirstResponder(self?.content.renderer)
         }
+        selectionPopover.onCopyMarkdown = { [weak self] in self?.copySelectedMarkdown() }
+        selectionPopover.onFind = { [weak self] text in self?.content.showFind(with: text) }
+        selectionPopover.onSaveComment = { [weak self] body in self?.saveComment(body) }
+
         sidebar.onSelectHeading = { [weak self] id in self?.content.renderer.scrollTo(anchor: id) }
         sidebar.onSelectFile = { [weak self] url in self?.show(url, pushingHistory: true) }
 
@@ -98,6 +112,10 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
             guard let self else { return }
             switch event {
             case .changed:
+                // Our own atomic save trips the watcher; announcing it as an
+                // outside change would be a lie and would fight the reload we
+                // are already doing.
+                guard Date().timeIntervalSince(self.lastWrite) > 1.0 else { return }
                 self.load()
                 self.content.flashReloaded()
             case .vanished:
@@ -120,6 +138,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
             text = prefix + "\n\n---\n\n> **Truncated.** Above 5 MB Imark shows only the beginning."
         }
 
+        stamp = Comments.Stamp(of: url)
         content.renderer.render(markdown: text, path: url.path)
     }
 
@@ -187,8 +206,79 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
                 NSSound.beep()
             }
 
+        case .selection(let found):
+            selection = found
+            selectionPopover.show(text: found.text, at: found.rect, in: content.renderer)
+
+        case .selectionCleared:
+            selection = nil
+            selectionPopover.dismiss()
+
+        case .comments(let count, let reviewing):
+            noteCount = count
+            reviewingComments = reviewing
+            content.setStatus(comments: count)
+
         case .ready, .rendered, .find:
             break
+        }
+    }
+
+    /// Copies the source that produced the selection, not the flattened text —
+    /// the whole point of the line map. Falls back to the plain text when the
+    /// selection is not inside a block we can locate.
+    private func copySelectedMarkdown() {
+        guard let selection else { return }
+        var copied = selection.text
+
+        if let block = selection.block,
+           let source = try? String(contentsOf: url, encoding: .utf8) {
+            let lines = source.components(separatedBy: .newlines)
+            let start = max(0, block.start)
+            let end = min(lines.count, block.end)
+            if start < end {
+                copied = lines[start..<end].joined(separator: "\n")
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+        }
+
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(copied, forType: .string)
+    }
+
+    /// Writes the note into the file, immediately after the block the selection
+    /// came from. This is the first thing Imark does that changes a document, so
+    /// it goes through an atomic replace and refuses to write over a file that
+    /// moved underneath it.
+    private func saveComment(_ body: String) {
+        guard let selection, let block = selection.block else {
+            selectionPopover.reportCommentFailure("Couldn't tell where that selection came from")
+            return
+        }
+        do {
+            let index = try Comments.insert(
+                quote: selection.text,
+                body: body,
+                after: block.end,
+                occurrence: selection.occurrence,
+                by: NSFullUserName(),
+                on: Date(),
+                into: url,
+                expecting: stamp
+            )
+            lastWrite = Date()
+            selectionPopover.dismiss()
+            content.renderer.clearSelection()
+            load()
+            // After the re-render, not before: the note does not exist in the
+            // DOM until the document has been rebuilt from the new file.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
+                self?.content.renderer.revealNote(index)
+            }
+        } catch {
+            selectionPopover.reportCommentFailure(
+                (error as? LocalizedError)?.errorDescription ?? "Couldn't save the comment"
+            )
         }
     }
 
@@ -214,6 +304,34 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     }
 
     @objc func performFind(_ sender: Any?) { content.showFind() }
+
+    @objc func toggleAllComments(_ sender: Any?) {
+        guard noteCount > 0 else { return NSSound.beep() }
+        reviewingComments.toggle()
+        content.renderer.setReviewingComments(reviewingComments)
+    }
+
+    @objc func nextComment(_ sender: Any?) {
+        noteCount > 0 ? content.renderer.stepNote(1) : NSSound.beep()
+    }
+
+    @objc func previousComment(_ sender: Any?) {
+        noteCount > 0 ? content.renderer.stepNote(-1) : NSSound.beep()
+    }
+
+    /// Greys the comment commands out in a document with no notes, and ticks
+    /// the toggle when review mode is on.
+    func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        switch item.action {
+        case #selector(toggleAllComments(_:)):
+            item.state = reviewingComments ? .on : .off
+            return noteCount > 0
+        case #selector(nextComment(_:)), #selector(previousComment(_:)):
+            return noteCount > 0
+        default:
+            return true
+        }
+    }
 
     @objc func findNext(_ sender: Any?) { content.findNext() }
 

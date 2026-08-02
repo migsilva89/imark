@@ -112,9 +112,10 @@ final class ContentViewController: NSViewController {
         return button
     }
 
-    func showFind() {
+    func showFind(with text: String? = nil) {
         findBar.isHidden = false
         findHeight.constant = 40
+        if let text, !text.isEmpty { searchField.stringValue = text }
         view.window?.makeFirstResponder(searchField)
         if !searchField.stringValue.isEmpty {
             renderer.find(searchField.stringValue)
@@ -179,9 +180,26 @@ final class ContentViewController: NSViewController {
         return bar
     }
 
+    private var words = 0
+    private var minutes = 0
+    private var comments = 0
+
     func setStatus(words: Int, minutes: Int) {
+        self.words = words
+        self.minutes = minutes
+        refreshStatus()
+    }
+
+    func setStatus(comments: Int) {
+        self.comments = comments
+        refreshStatus()
+    }
+
+    private func refreshStatus() {
         let formatted = words.formatted(.number.grouping(.automatic))
-        statusLeft.stringValue = "\(formatted) words · \(minutes) min read"
+        var parts = ["\(formatted) words", "\(minutes) min read"]
+        if comments > 0 { parts.append(comments == 1 ? "1 comment" : "\(comments) comments") }
+        statusLeft.stringValue = parts.joined(separator: " · ")
     }
 
     func setStatus(path: URL) {

@@ -13,6 +13,28 @@ public enum RendererMessage {
     case openWiki(String)
     case openLocal(String)
     case openExternal(URL)
+    case selection(Selection)
+    case selectionCleared
+    case comments(count: Int, reviewing: Bool)
+}
+
+/// A live selection in the document, and where it came from in the file.
+public struct Selection {
+    public struct Lines: Equatable {
+        public let start: Int
+        public let end: Int
+    }
+
+    public let text: String
+    /// In the renderer view's own coordinates, ready to anchor a popover to.
+    public let rect: NSRect
+    /// The tightest block that knows its lines — where a quote should be found.
+    public let inline: Lines?
+    /// The top-level block it belongs to — where a comment gets written.
+    public let block: Lines?
+    /// Which occurrence of this text inside the block it is, counting from one.
+    /// Two notes on the same word would otherwise both anchor to the first.
+    public let occurrence: Int
 }
 
 public struct TocEntry: Identifiable, Equatable {
@@ -125,9 +147,31 @@ public final class RendererView: NSView {
         call("window.imark.findStep", delta)
     }
 
+    public func clearSelection() {
+        webView.evaluateJavaScript("window.imark.clearSelection()")
+    }
+
+    /// Opens every note at once, for reading a document somebody commented on
+    /// rather than hunting the dots one by one.
+    public func setReviewingComments(_ on: Bool) {
+        call("window.imark.setReviewing", on)
+    }
+
+    /// Moves to the next (+1) or previous (-1) note, wrapping around.
+    public func stepNote(_ delta: Int) {
+        call("window.imark.stepNote", delta)
+    }
+
+    /// Scrolls to a note and opens it — a comment that changes the file without
+    /// visibly appearing is the same bug as a button that does nothing.
+    public func revealNote(_ index: Int) {
+        call("window.imark.revealNote", index)
+    }
+
     public func findClear() {
         webView.evaluateJavaScript("window.imark.findClear()")
     }
+
 
     private var isDarkMode: Bool {
         effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
@@ -214,6 +258,38 @@ public final class RendererView: NSView {
                 owner.onMessage?(.find(
                     count: body["count"] as? Int ?? 0,
                     index: body["index"] as? Int ?? 0
+                ))
+
+            case "selection":
+                guard let text = body["text"] as? String,
+                      let raw = body["rect"] as? [String: Any],
+                      let x = raw["x"] as? Double, let y = raw["y"] as? Double,
+                      let w = raw["width"] as? Double, let h = raw["height"] as? Double
+                else { break }
+
+                let lines = { (key: String) -> Selection.Lines? in
+                    guard let v = body[key] as? [String: Any],
+                          let s = v["start"] as? Int, let e = v["end"] as? Int
+                    else { return nil }
+                    return Selection.Lines(start: s, end: e)
+                }
+
+                // The page measures from the top-left; AppKit views from the
+                // bottom-left unless flipped.
+                let height = owner.bounds.height
+                let rect = NSRect(x: x, y: height - y - h, width: w, height: h)
+                owner.onMessage?(.selection(Selection(
+                    text: text, rect: rect, inline: lines("inline"), block: lines("block"),
+                    occurrence: body["occurrence"] as? Int ?? 1
+                )))
+
+            case "selectionCleared":
+                owner.onMessage?(.selectionCleared)
+
+            case "comments":
+                owner.onMessage?(.comments(
+                    count: body["count"] as? Int ?? 0,
+                    reviewing: body["reviewing"] as? Bool ?? false
                 ))
 
             case "wikilinks":

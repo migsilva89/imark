@@ -89,6 +89,25 @@ enum Menu {
         menu.addItem(withTitle: "Forward", action: #selector(DocumentWindowController.goForward(_:)), keyEquivalent: "]")
         menu.addItem(.separator())
         menu.addItem(withTitle: "Reload", action: #selector(DocumentWindowController.reloadDocument(_:)), keyEquivalent: "r")
+        menu.addItem(.separator())
+
+        let allComments = menu.addItem(
+            withTitle: "Show All Comments",
+            action: #selector(DocumentWindowController.toggleAllComments(_:)),
+            keyEquivalent: "c"
+        )
+        allComments.keyEquivalentModifierMask = [.command, .shift]
+        menu.addItem(
+            withTitle: "Next Comment",
+            action: #selector(DocumentWindowController.nextComment(_:)),
+            keyEquivalent: "'"
+        )
+        let previousComment = menu.addItem(
+            withTitle: "Previous Comment",
+            action: #selector(DocumentWindowController.previousComment(_:)),
+            keyEquivalent: "'"
+        )
+        previousComment.keyEquivalentModifierMask = [.command, .shift]
         return menu
     }
 }
