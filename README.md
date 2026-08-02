@@ -154,6 +154,34 @@ That builds the JavaScript bundle, compiles the Swift, assembles `Imark.app`, si
 | `./build.sh --no-install` | leave it in `dist/` |
 | `IMARK_INSTALL_DIR=~/Applications ./build.sh` | install elsewhere |
 
+## Giving it to somebody else
+
+```bash
+./release.sh
+```
+
+Produces `dist/Imark-<version>.dmg` — the app and a shortcut to Applications,
+so installing is a drag. It works as it stands, with one caveat: without a
+Developer ID the image is unsigned, and on macOS 15 or later the person opening
+it has to go to **System Settings › Privacy & Security › Open Anyway** the first
+time. Control-clicking no longer skips that step.
+
+With a certificate it signs the image too, and with notary credentials it waits
+for Apple's verdict and staples the result, so the app opens on a machine that
+has never seen it and is offline:
+
+```bash
+xcrun notarytool store-credentials imark \
+  --apple-id you@example.com --team-id TEAMID --password <app-specific-password>
+
+IMARK_SIGN_IDENTITY="Developer ID Application: Name (TEAMID)" \
+IMARK_NOTARY_PROFILE=imark ./release.sh
+```
+
+A Developer ID needs a paid Apple Developer Program membership. There is no free
+certificate that helps here: a free Apple ID only issues development
+certificates, which last seven days and only work on the machine that made them.
+
 ## Keyboard Shortcuts
 
 | | | | |
@@ -201,7 +229,11 @@ other.
 IMARK_SIGN_IDENTITY="Developer ID Application: Name (TEAMID)" ./build.sh
 ```
 
-With an identity it signs with `--options=runtime` and a timestamp, which is what notarisation expects. Without one it stays ad-hoc, which is enough for the machine that built it.
+With an identity it signs with `--options=runtime` and a timestamp, which is what notarisation expects. Without one it stays ad-hoc, which is enough for the machine that built it. For handing the app to somebody else, see [Giving it to somebody else](#giving-it-to-somebody-else).
+
+### Can I use somebody else's certificate?
+
+Technically yes, and it is a bad idea. It means asking them to export their signing key, which can sign anything at all as them. Either they run `release.sh` themselves, or you get your own membership.
 
 ## Repository
 
