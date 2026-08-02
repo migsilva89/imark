@@ -75,7 +75,7 @@ final class CommentsList {
             dot.layer?.borderWidth = 1
             dot.layer?.borderColor = NSColor.tertiaryLabelColor.cgColor
         } else {
-            dot.layer?.backgroundColor = NSColor.imarkAccent.cgColor
+            dot.layer?.backgroundColor = NoteColour(attribute: note.colour).colour.cgColor
         }
         dot.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([

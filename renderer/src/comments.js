@@ -15,6 +15,13 @@ const bridge = (payload) => {
 const OPEN = /^\s*<!--\s*imark\b(.*)$/
 const ATTR = /(\w+)="([^"]*)"/g
 
+/// The colours a note may carry. A closed set on purpose: the value comes out
+/// of somebody's file and ends up in a `data-color` attribute, so anything
+/// unrecognised has to become the default rather than reach the stylesheet.
+/// An absent colour is the default one and writes no attribute at all.
+const COLOURS = new Set(['amber', 'green', 'blue', 'red'])
+const colourOf = (raw) => (COLOURS.has(raw) ? raw : '')
+
 /// Pulls the comment blocks out of the source and blanks the lines they came
 /// from. Blanking rather than deleting is deliberate: every `data-line` in the
 /// rendered HTML counts from the top of the file, and removing lines here would
@@ -42,6 +49,7 @@ export function extractComments(body, lineOffset = 0) {
       by: attributes.by ?? '',
       at: attributes.at ?? '',
       nth: Number(attributes.nth) || 1,
+      colour: colourOf(attributes.color),
       text: unwrap(unescapeHTML(lines.slice(index + 1, end).join('\n').trim())),
       // Both ends, because editing and deleting have to find the block again.
       line: index + lineOffset,
@@ -140,7 +148,11 @@ function holderFor(block) {
 /// Returns the notes that found a home, in the order they appear, so Swift can
 /// list them without parsing the file a second time. A note whose block is gone
 /// is not in the list because it is not on screen either.
+/// Kept so the rail can build a card for each mark without re-reading the DOM.
+let attachedNotes = []
+
 export function attachComments(root, comments) {
+  attachedNotes = []
   if (!comments.length) return []
 
   // Resolved before anything is wrapped: wrapping changes root.children, and
@@ -151,7 +163,10 @@ export function attachComments(root, comments) {
   for (const { note, block } of resolved) {
     if (!block) continue
     const anchor = wrapQuote(block, note.quote, note.nth)
-    if (anchor) anchor.dataset.note = note.id
+    if (anchor) {
+      anchor.dataset.note = note.id
+      if (note.colour) anchor.dataset.color = note.colour
+    }
 
     const holder = holderFor(block)
     holder.classList.add('has-note')
@@ -160,6 +175,7 @@ export function attachComments(root, comments) {
     dot.type = 'button'
     dot.className = anchor ? 'note-dot' : 'note-dot orphan'
     dot.dataset.note = note.id
+    if (note.colour) dot.dataset.color = note.colour
     dot.setAttribute('aria-label', anchor ? 'Comment' : 'Comment with a missing quote')
     // Two notes on one paragraph would otherwise sit exactly on top of each
     // other and only the last one would be clickable.
@@ -169,6 +185,7 @@ export function attachComments(root, comments) {
     holder.appendChild(buildCard(note, !anchor))
     attached.push({
       quote: note.quote,
+      colour: note.colour,
       by: note.by,
       // Formatted here, not in Swift: a hand-written note can carry any shape
       // of timestamp, and this is already the one place that copes with that.
@@ -178,6 +195,7 @@ export function attachComments(root, comments) {
     })
   }
 
+  attachedNotes = attached
   return attached
 }
 
@@ -185,6 +203,7 @@ function buildCard(note, orphan) {
   const card = document.createElement('aside')
   card.className = 'note-card'
   card.dataset.note = note.id
+  if (note.colour) card.dataset.color = note.colour
   card.hidden = true
 
   const head = document.createElement('header')
@@ -241,6 +260,7 @@ function cardActions(note) {
         endLine: note.endLine,
         text: note.text,
         quote: note.quote,
+        colour: note.colour,
         rect: { x: box.left, y: box.top, width: box.width, height: box.height },
       })
     })
@@ -348,6 +368,11 @@ export function stepNote(delta) {
   cursor = (cursor + delta + all.length) % all.length
   const dot = all[cursor]
 
+  // The rail says which one you are on, so stepping does not feel like it
+  // lost your place.
+  for (const mark of document.querySelectorAll('.note-mark')) mark.classList.remove('is-active')
+  document.querySelectorAll('.note-mark')[cursor]?.classList.add('is-active')
+
   if (!reviewing) {
     closeCards(null)
     const card = document.querySelector(`.note-card[data-note="${dot.dataset.note}"]`)
@@ -377,6 +402,8 @@ export function restoreNoteState() {
 /// three clustered in one section says something an even list would hide.
 export function buildNoteRail() {
   document.querySelector('.note-rail')?.remove()
+  hideTip()
+
   const all = dots()
   if (all.length < 2) {
     delete document.documentElement.dataset.noteRail
@@ -389,13 +416,19 @@ export function buildNoteRail() {
 
   const height = document.documentElement.scrollHeight || 1
   for (const [index, dot] of all.entries()) {
-    const card = document.querySelector(`.note-card[data-note="${dot.dataset.note}"]`)
+    const note = attachedNotes[index]
     const mark = document.createElement('button')
     mark.type = 'button'
     mark.className = dot.classList.contains('orphan') ? 'note-mark orphan' : 'note-mark'
+    if (note?.colour) mark.dataset.color = note.colour
     mark.style.top = `${((dot.getBoundingClientRect().top + window.scrollY) / height) * 100}%`
-    mark.title = card?.querySelector('.note-text')?.textContent ?? 'Comment'
+    mark.setAttribute('aria-label', note?.quote || 'Comment')
+
+    // Hovering shows the note without going there; clicking goes there.
+    mark.addEventListener('mouseenter', () => showTip(note, mark))
+    mark.addEventListener('mouseleave', scheduleHide)
     mark.addEventListener('click', () => {
+      hideTip()
       cursor = index - 1
       stepNote(1)
     })
@@ -404,6 +437,74 @@ export function buildNoteRail() {
 
   document.body.appendChild(rail)
   document.documentElement.dataset.noteRail = 'true'
+}
+
+/* -------------------------------------------------------------- rail card */
+
+let tip = null
+let hideTimer = 0
+
+/// Built once and reused. Moving from one mark to the next fires a leave before
+/// the next enter, so hiding is deferred by a frame or two and cancelled by
+/// whichever mark you landed on — otherwise the card blinks between every pair.
+function showTip(note, mark) {
+  clearTimeout(hideTimer)
+  if (!note) return
+
+  if (!tip) {
+    tip = document.createElement('aside')
+    tip.className = 'note-tip'
+    document.body.appendChild(tip)
+  }
+  if (note.colour) tip.dataset.color = note.colour
+  else delete tip.dataset.color
+
+  tip.replaceChildren()
+  const who = document.createElement('em')
+  who.textContent = note.by || 'Note'
+  tip.appendChild(who)
+
+  const quote = document.createElement('strong')
+  quote.textContent = note.orphan
+    ? 'Quote no longer in the document'
+    : `“${note.quote}”`
+  tip.appendChild(quote)
+
+  if (note.text) {
+    const body = document.createElement('span')
+    body.textContent = note.text
+    tip.appendChild(body)
+  }
+  if (note.when) {
+    const when = document.createElement('b')
+    when.textContent = note.when
+    tip.appendChild(when)
+  }
+
+  tip.classList.add('is-visible')
+  mark.classList.add('is-active')
+
+  // Height has to be read after the content lands, or the first card of a
+  // session is positioned against the previous one's size.
+  const box = mark.getBoundingClientRect()
+  const height = tip.offsetHeight
+  tip.style.top = `${Math.min(
+    Math.max(10, box.top + box.height / 2 - height / 2),
+    window.innerHeight - height - 10,
+  )}px`
+}
+
+function scheduleHide() {
+  clearTimeout(hideTimer)
+  hideTimer = setTimeout(hideTip, 60)
+}
+
+function hideTip() {
+  clearTimeout(hideTimer)
+  tip?.classList.remove('is-visible')
+  for (const mark of document.querySelectorAll('.note-mark.is-active')) {
+    mark.classList.remove('is-active')
+  }
 }
 
 // Positions are a fraction of the document height, so they are wrong the moment

@@ -43,6 +43,9 @@ public struct Selection {
 /// in step.
 public struct NoteSummary {
     public let quote: String
+    /// The name written in the file, or empty for the default. Validated by the
+    /// renderer against a closed set before it gets here.
+    public let colour: String
     public let author: String
     /// Already formatted by the renderer, which is the only place that copes
     /// with the shapes a hand-written timestamp comes in.
@@ -61,6 +64,7 @@ public struct NoteCommand {
     public let lines: ClosedRange<Int>
     public let text: String
     public let quote: String
+    public let colour: String
     /// Where to put the composer, in the renderer view's coordinates.
     public let rect: NSRect
 }
@@ -206,6 +210,7 @@ public final class RendererView: NSView {
     }
 
 
+
     public func findClear() {
         webView.evaluateJavaScript("window.imark.findClear()")
     }
@@ -330,6 +335,7 @@ public final class RendererView: NSView {
                     notes: raw.map { item in
                         NoteSummary(
                             quote: item["quote"] as? String ?? "",
+                            colour: item["colour"] as? String ?? "",
                             author: item["by"] as? String ?? "",
                             when: item["when"] as? String ?? "",
                             text: item["text"] as? String ?? "",
@@ -353,6 +359,7 @@ public final class RendererView: NSView {
                     lines: start...end,
                     text: body["text"] as? String ?? "",
                     quote: body["quote"] as? String ?? "",
+                    colour: body["colour"] as? String ?? "",
                     rect: NSRect(x: x, y: owner.bounds.height - y - h, width: w, height: h)
                 )))
 

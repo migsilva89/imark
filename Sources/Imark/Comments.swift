@@ -70,20 +70,42 @@ enum Comments {
         }
     }
 
-    /// Rewrites the text of a note, keeping its opening line exactly as it was.
-    /// The quote, the author and the date are read back out of the file rather
-    /// than passed in: editing your own wording should not silently re-anchor
-    /// the note, restamp it, or put your name on somebody else's.
+    /// Rewrites the text of a note, and its colour if that changed. Everything
+    /// else on the opening line is kept exactly as it was and read back out of
+    /// the file rather than passed in: editing your own wording should not
+    /// silently re-anchor the note, restamp it, or put your name on somebody
+    /// else's.
     static func update(
         lines range: ClosedRange<Int>,
         body: String,
+        colour: NoteColour,
         in url: URL,
         expecting stamp: Stamp?
     ) throws {
         try edit(url, expecting: stamp) { lines in
             guard let bounds = clamp(range, to: lines) else { return }
-            lines.replaceSubrange(bounds, with: [lines[bounds.lowerBound], neutralize(body), "-->"])
+            lines.replaceSubrange(bounds, with: [
+                recolour(lines[bounds.lowerBound], to: colour),
+                neutralize(body),
+                "-->",
+            ])
         }
+    }
+
+    /// Swaps the `color=` on an opening line, leaving every other attribute and
+    /// the spacing between them untouched. Rebuilding the line from parsed
+    /// parts would be tidier and would quietly discard anything we do not know
+    /// about — including whatever a later version writes there.
+    static func recolour(_ line: String, to colour: NoteColour) -> String {
+        var out = line.replacingOccurrences(
+            of: #"\s*color="[^"]*""#,
+            with: "",
+            options: .regularExpression
+        )
+        if let attribute = colour.attribute {
+            out += " color=\"\(attribute)\""
+        }
+        return out
     }
 
     /// Puts a whole document back, for undo. No stamp check: the caller took
@@ -109,6 +131,7 @@ enum Comments {
     static func insert(
         quote: String,
         body: String,
+        colour: NoteColour = .standard,
         after line: Int,
         occurrence: Int,
         by author: String,
@@ -129,7 +152,10 @@ enum Comments {
         var lines = source.components(separatedBy: "\n")
         let at = min(max(line, 0), lines.count)
 
-        var block = [format(quote: quote, body: body, author: author, date: date, occurrence: occurrence)]
+        var block = [format(
+            quote: quote, body: body, colour: colour,
+            author: author, date: date, occurrence: occurrence
+        )]
         // A note glued to the paragraph above would be parsed as part of it by
         // some renderers, and reads badly in a plain-text editor either way.
         if at > 0, !lines[at - 1].trimmingCharacters(in: .whitespaces).isEmpty {
@@ -150,6 +176,7 @@ enum Comments {
     static func format(
         quote: String,
         body: String,
+        colour: NoteColour = .standard,
         author: String,
         date: Date,
         occurrence: Int
@@ -160,6 +187,9 @@ enum Comments {
         // Only written when it is needed to tell two identical quotes apart;
         // an nth="1" on every note would be noise in the file.
         if occurrence > 1 { attributes.append("nth=\"\(occurrence)\"") }
+        // The default writes nothing: a color= on every note would be noise in
+        // a document that mostly has one colour.
+        if let colour = colour.attribute { attributes.append("color=\"\(colour)\"") }
 
         return "<!-- imark \(attributes.joined(separator: " "))\n\(neutralize(body))\n-->"
     }

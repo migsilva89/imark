@@ -11,7 +11,7 @@ import Translation
 /// that it happened. An action that succeeds in silence is indistinguishable
 /// from a button that does nothing.
 final class SelectionPopover {
-    var onSaveComment: ((String) -> Void)?
+    var onSaveComment: ((String, NoteColour) -> Void)?
 
     private let popover = NSPopover()
     private let target = Target()
@@ -27,6 +27,8 @@ final class SelectionPopover {
     private var hostRect = NSRect.zero
     /// What the note being edited is anchored to, for the header of the composer.
     var quotedText = ""
+    private var picked = NoteColour.standard
+    private var swatches: [Swatch] = []
 
     init() {
         popover.behavior = .transient
@@ -172,6 +174,7 @@ final class SelectionPopover {
         }
         @objc func saveComment() { owner?.commitComment() }
         @objc func cancelComment() { owner?.dismiss() }
+        @objc func pickColour(_ sender: Swatch) { owner?.pick(sender.colour) }
 
     }
 
@@ -240,7 +243,8 @@ final class SelectionPopover {
 
     /// Opens the composer over an existing note rather than over a selection,
     /// so editing happens where the note is.
-    func compose(existing text: String, at rect: NSRect, in view: NSView) {
+    func compose(existing text: String, colour: NoteColour, at rect: NSRect, in view: NSView) {
+        picked = colour
         host = view
         hostRect = rect
         self.text = ""
@@ -255,6 +259,9 @@ final class SelectionPopover {
 
     private func beginComposing(prefill: String = "") {
         isComposing = true
+        // A new note starts on the default; an edit keeps whatever it already
+        // was, which `compose(existing:colour:…)` has already put in `picked`.
+        if prefill.isEmpty { picked = .standard }
         // A click elsewhere must not silently bin what is being typed.
         popover.behavior = .applicationDefined
 
@@ -284,6 +291,19 @@ final class SelectionPopover {
         hint.font = .systemFont(ofSize: 10)
         hint.textColor = .tertiaryLabelColor
 
+        swatches = NoteColour.allCases.map {
+            Swatch($0, target: target, action: #selector(Target.pickColour(_:)))
+        }
+        for swatch in swatches { swatch.isPicked = swatch.colour == picked }
+
+        let gap = NSView()
+        gap.setContentHuggingPriority(.defaultLow, for: .horizontal)
+
+        let palette = NSStackView(views: swatches + [gap, hint])
+        palette.orientation = .horizontal
+        palette.spacing = 1
+        palette.alignment = .centerY
+
         // Deliberately not the default button: a Return key equivalent is
         // consumed by the window before the text view ever sees it, and a
         // composer where Return saves instead of starting a line is useless.
@@ -299,11 +319,11 @@ final class SelectionPopover {
         let spacer = NSView()
         spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
-        let buttons = NSStackView(views: [hint, spacer, cancel, save])
+        let buttons = NSStackView(views: [spacer, cancel, save])
         buttons.orientation = .horizontal
         buttons.spacing = 6
 
-        let stack = NSStackView(views: [quoted, scroll, buttons])
+        let stack = NSStackView(views: [quoted, scroll, palette, buttons])
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 7
@@ -322,12 +342,17 @@ final class SelectionPopover {
         }
     }
 
+    fileprivate func pick(_ colour: NoteColour) {
+        picked = colour
+        for swatch in swatches { swatch.isPicked = swatch.colour == colour }
+    }
+
     private func commitComment() {
         let body = composer.string.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !body.isEmpty else { return NSSound.beep() }
         isComposing = false
         popover.behavior = .transient
-        onSaveComment?(body)
+        onSaveComment?(body, picked)
     }
 
     /// Called by the window controller when the write failed, so the note is

@@ -54,9 +54,10 @@ to be different jobs.
   <img src=".github/assets/imark-comments.png" width="620" alt="A phrase underlined in the text, a dot in the margin, and a card floating over the right margin with the note">
 </p>
 
-Select a phrase, press the speech bubble, write. The quoted words get underlined,
-a dot appears in the margin, and clicking either opens the note. The card carries
-**Edit** and **Delete**, and `⌘Z` undoes any of it — writing, editing or deleting.
+Select a phrase, press the speech bubble, write, press `↵`. The quoted words get
+underlined, a dot appears in the margin, and clicking either opens the note. Pick
+one of five colours while writing it, or change it later. The card carries **Edit**
+and **Delete**, and `⌘Z` undoes any of it — writing, editing or deleting.
 
 The note is stored **inside the `.md` file**, as an HTML comment:
 
@@ -91,7 +92,7 @@ clicking one jumps to it. `⌘⇧C` opens them all **in place**, each under its 
 block. `⌘'` and `⌘⇧'` **step** through one at a time. And a rail down the left
 edge, outboard of the outline, marks **where** they are — placed where the notes
 actually fall in the document, so three clustered in one section is visible at a
-glance.
+glance. Hovering a mark shows the note without going to it; clicking goes.
 
 **File › Export Comments as Text…** writes a copy with every note turned into a
 blockquote, for the review the other person has to read on GitHub:
@@ -278,7 +279,8 @@ Comments are the one thing that writes to your documents, so the file surgery ha
 tests of its own:
 
 ```bash
-swiftc -parse-as-library Sources/Imark/Comments.swift Support/test-comments.swift -o /tmp/imark-test && /tmp/imark-test
+swiftc -parse-as-library Sources/Imark/Comments.swift Sources/Imark/NoteColour.swift \
+  Support/test-comments.swift -o /tmp/imark-test && /tmp/imark-test
 node Support/test-export.mjs
 ```
 

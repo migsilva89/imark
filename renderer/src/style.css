@@ -12,6 +12,15 @@
   --border: #e5e5ea;
   --diagram: #8b7fd4;   /* read from JS, for mermaid's theme */
 
+  /* A note's colour. `--note` is what everything about a note paints with;
+     [data-color] swaps it. Named rather than free-form so the file stays
+     legible in plain text and nothing from a document can reach the CSS. */
+  --note: var(--accent);
+  --note-amber: #b9770e;
+  --note-green: #2f8f4e;
+  --note-blue: #2b6cb0;
+  --note-red: #c0392b;
+
   --syn-keyword: #8b5cf6;
   --syn-string: #3e9f5c;
   --syn-comment: #9a9aa0;
@@ -37,6 +46,11 @@
   --surface: #1e1e21;
   --border: #2a2a2c;
   --diagram: #9b8be8;
+
+  --note-amber: #e0a458;
+  --note-green: #5fbf82;
+  --note-blue: #6ba3e8;
+  --note-red: #e07a6f;
 
   --syn-keyword: #a78bfa;
   --syn-string: #4ade80;
@@ -458,7 +472,8 @@ img[data-blocked] {
 
 /* ------------------------------------------------------------- rail tip */
 
-.rail-tip {
+.rail-tip,
+.note-tip {
   position: fixed;
   width: 276px;
   padding: 15px 17px 16px;
@@ -484,6 +499,12 @@ img[data-blocked] {
   z-index: 7;
 }
 
+/* Both cards sit outboard of whatever rails are on that edge. The headings
+   card was placed when its rail was flush to zero; the notes rail now takes
+   the first 20pt, so both move over by that much. */
+:root[data-note-rail][data-rail='left'] .rail-tip,
+:root[data-note-rail][data-rail='left'] .note-tip { left: 66px; }
+
 :root[data-rail='left'] .rail-tip {
   left: 46px;
   transform: translateX(-6px) scale(0.98);
@@ -496,7 +517,8 @@ img[data-blocked] {
   transform-origin: right center;
 }
 
-.rail-tip.is-visible {
+.rail-tip.is-visible,
+.note-tip.is-visible {
   opacity: 1;
   transform: none;
 }
@@ -553,6 +575,11 @@ img[data-blocked] {
 
 /* ------------------------------------------------------------- comments */
 
+[data-color='amber'] { --note: var(--note-amber); }
+[data-color='green'] { --note: var(--note-green); }
+[data-color='blue'] { --note: var(--note-blue); }
+[data-color='red'] { --note: var(--note-red); }
+
 /* Wrapping every commented block is what lets the dot and the card be placed
    against it — a table or a list will not take stray children of its own. */
 .note-holder {
@@ -560,8 +587,8 @@ img[data-blocked] {
 }
 
 .note-anchor {
-  background: var(--accent-soft);
-  border-bottom: 1.5px solid var(--accent);
+  background: color-mix(in srgb, var(--note) 16%, transparent);
+  border-bottom: 1.5px solid var(--note);
   border-radius: 2px;
   padding: 0 1px;
   cursor: pointer;
@@ -576,7 +603,7 @@ img[data-blocked] {
   padding: 0;
   border: 0;
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--note);
   cursor: pointer;
   transition: transform 0.12s ease;
   /* Above the card, which overlaps it — the dot is also how you close it. */
@@ -654,7 +681,7 @@ img[data-blocked] {
 /* Review mode: every note open at once, under the block it belongs to. Reads
    the way the file itself reads in a plain-text editor. */
 :root[data-notes='all'] .note-card {
-  border-left: 2px solid var(--accent);
+  border-left: 2px solid var(--note);
   box-shadow: none;
 }
 
@@ -718,29 +745,30 @@ img[data-blocked] {
   top: 0;
   bottom: 0;
   left: 0;
-  width: 14px;
+  width: 20px;
   z-index: 7;
   pointer-events: none;
 }
 
 .note-mark {
   position: absolute;
-  left: 4px;
-  width: 6px;
-  height: 6px;
+  left: 5px;
+  width: 9px;
+  height: 9px;
   padding: 0;
   border: 0;
   border-radius: 50%;
-  background: var(--accent);
-  opacity: 0.55;
+  background: var(--note);
+  opacity: 0.6;
   cursor: pointer;
   pointer-events: auto;
   transition: opacity 0.12s ease, transform 0.12s ease;
 }
 
-.note-mark:hover {
+.note-mark:hover,
+.note-mark.is-active {
   opacity: 1;
-  transform: scale(1.6);
+  transform: scale(1.45);
 }
 
 .note-mark.orphan {
@@ -749,9 +777,9 @@ img[data-blocked] {
 }
 
 /* The outline rail steps aside to make room, and the text follows it. */
-:root[data-note-rail][data-rail='left'] .rail { left: 14px; }
-:root[data-note-rail][data-rail='left'] body { padding-left: calc(var(--step) * 18); }
-:root[data-note-rail]:not([data-rail]) body { padding-left: calc(var(--step) * 5); }
+:root[data-note-rail][data-rail='left'] .rail { left: 20px; }
+:root[data-note-rail][data-rail='left'] body { padding-left: calc(var(--step) * 20); }
+:root[data-note-rail]:not([data-rail]) body { padding-left: calc(var(--step) * 6); }
 
 /* Quick Look is a reading panel and nothing in it is clickable. */
 :root[data-preview='true'] .note-rail { display: none; }
@@ -774,4 +802,55 @@ img[data-blocked] {
   border-radius: 50%;
   background: var(--accent);
   vertical-align: 1px;
+}
+
+
+/* Sits just outside the notes rail, on the same edge. Narrower than the
+   headings card because a note is a sentence, not a section. */
+.note-tip {
+  width: 250px;
+  padding: 12px 14px 13px;
+  /* Clear of the notes rail. When the outline rail is there too, both cards
+     have to clear both rails — see below. */
+  left: 26px;
+  transform: translateX(-6px) scale(0.98);
+  transform-origin: left center;
+  gap: 5px;
+}
+
+.note-tip em {
+  font-style: normal;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--note);
+}
+
+.note-tip strong {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.note-tip span {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.note-tip b {
+  font-size: 10.5px;
+  font-weight: 400;
+  color: var(--secondary);
+  opacity: 0.75;
 }

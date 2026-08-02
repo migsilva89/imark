@@ -97,7 +97,9 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         content.onFindClosed = { [weak self] in
             self?.window?.makeFirstResponder(self?.content.renderer)
         }
-        selectionPopover.onSaveComment = { [weak self] body in self?.saveComment(body) }
+        selectionPopover.onSaveComment = { [weak self] body, colour in
+            self?.saveComment(body, colour: colour)
+        }
         content.onShowComments = { [weak self] anchor in
             guard let self else { return }
             self.commentsList.show(self.notes, from: anchor)
@@ -267,9 +269,9 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     /// came from. This is the first thing Imark does that changes a document, so
     /// it goes through an atomic replace and refuses to write over a file that
     /// moved underneath it.
-    private func saveComment(_ body: String) {
+    private func saveComment(_ body: String, colour: NoteColour) {
         if let range = editingNote {
-            return updateComment(body, at: range)
+            return updateComment(body, colour: colour, at: range)
         }
         guard let selection, let block = selection.block else {
             selectionPopover.reportCommentFailure("Couldn't tell where that selection came from")
@@ -280,6 +282,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
             let index = try Comments.insert(
                 quote: selection.text,
                 body: body,
+                colour: colour,
                 after: block.end,
                 occurrence: selection.occurrence,
                 by: NSFullUserName(),
@@ -310,7 +313,12 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         case .edit:
             editingNote = command.lines
             selectionPopover.quotedText = command.quote
-            selectionPopover.compose(existing: command.text, at: command.rect, in: content.renderer)
+            selectionPopover.compose(
+                existing: command.text,
+                colour: NoteColour(attribute: command.colour),
+                at: command.rect,
+                in: content.renderer
+            )
 
         case .delete:
             do {
@@ -324,11 +332,11 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
-    private func updateComment(_ body: String, at range: ClosedRange<Int>) {
+    private func updateComment(_ body: String, colour: NoteColour, at range: ClosedRange<Int>) {
         editingNote = nil
         do {
             snapshot("Edit Comment")
-            try Comments.update(lines: range, body: body, in: url, expecting: stamp)
+            try Comments.update(lines: range, body: body, colour: colour, in: url, expecting: stamp)
             selectionPopover.dismiss()
             finishWrite()
         } catch {

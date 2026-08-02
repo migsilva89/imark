@@ -1,6 +1,7 @@
 // Tests for the one thing in Imark that writes to your files.
 //
 //   swiftc -parse-as-library Sources/Imark/Comments.swift \
+//          Sources/Imark/NoteColour.swift \
 //          Support/test-comments.swift -o /tmp/imark-test && /tmp/imark-test
 //
 // A script rather than a test target because Imark is an executable with a
@@ -49,6 +50,7 @@ enum CommentsTest {
         try editing()
         try undoing()
         try staleRanges()
+        try colours()
 
         try? FileManager.default.removeItem(at: folder)
         print(failures == 0 ? "\nall good" : "\n\(failures) failing")
@@ -175,8 +177,8 @@ enum CommentsTest {
         first thought
         -->
         """)
-        try Comments.update(lines: 2...4, body: "second thought", in: url,
-                            expecting: Comments.Stamp(of: url))
+        try Comments.update(lines: 2...4, body: "second thought", colour: .standard,
+                            in: url, expecting: Comments.Stamp(of: url))
         let lines = read(url)
         check("the body is replaced", lines[3] == "second thought")
         check("the anchor is untouched",
@@ -184,7 +186,8 @@ enum CommentsTest {
               lines[2])
         check("still closed", lines[4] == "-->")
 
-        try Comments.update(lines: 2...4, body: "an arrow --> here", in: url, expecting: nil)
+        try Comments.update(lines: 2...4, body: "an arrow --> here", colour: .standard,
+                            in: url, expecting: nil)
         let text = try String(contentsOf: url, encoding: .utf8)
         check("an edit escapes --> too", text.contains("--&gt;"))
         check("and cannot close the block early", text.components(separatedBy: "-->").count == 2)
@@ -216,13 +219,67 @@ enum CommentsTest {
         check("refuses to delete lines that are not a note",
               try String(contentsOf: url, encoding: .utf8) == before)
 
-        try Comments.update(lines: 0...2, body: "hello", in: url, expecting: nil)
+        try Comments.update(lines: 0...2, body: "hello", colour: .standard, in: url, expecting: nil)
         check("and refuses to rewrite them",
               try String(contentsOf: url, encoding: .utf8) == before)
 
         try Comments.remove(lines: 90...99, from: url, expecting: nil)
         check("a range past the end of the file is harmless",
               try String(contentsOf: url, encoding: .utf8) == before)
+    }
+
+    // MARK: - Colour
+
+    static func colours() throws {
+        // The default writes nothing at all.
+        let plain = fixture("Text.\n")
+        _ = try Comments.insert(quote: "Text", body: "n", after: 1, occurrence: 1,
+                                by: "m", on: date, into: plain, expecting: nil)
+        check("the default colour writes no attribute",
+              !(try String(contentsOf: plain, encoding: .utf8)).contains("color="))
+
+        let url = fixture("Text.\n")
+        _ = try Comments.insert(quote: "Text", body: "n", colour: .amber, after: 1,
+                                occurrence: 1, by: "m", on: date, into: url, expecting: nil)
+        check("a chosen colour is written",
+              (try String(contentsOf: url, encoding: .utf8)).contains("color=\"amber\""))
+
+        // Changing it must not disturb anything else on the line.
+        let header = "<!-- imark quote=\"a\" by=\"nikus\" at=\"2026-08-01T09:00Z\" nth=\"2\""
+        check("colour added without touching the rest",
+              Comments.recolour(header, to: .green) == header + " color=\"green\"",
+              Comments.recolour(header, to: .green))
+        check("colour replaced, not appended twice",
+              Comments.recolour(header + " color=\"red\"", to: .blue) == header + " color=\"blue\"",
+              Comments.recolour(header + " color=\"red\"", to: .blue))
+        check("back to default removes it",
+              Comments.recolour(header + " color=\"red\"", to: .standard) == header,
+              Comments.recolour(header + " color=\"red\"", to: .standard))
+        check("a colour in the middle is found too",
+              Comments.recolour("<!-- imark color=\"red\" quote=\"a\"", to: .standard)
+                  == "<!-- imark quote=\"a\"",
+              Comments.recolour("<!-- imark color=\"red\" quote=\"a\"", to: .standard))
+
+        // An edit goes through the same path and must keep the anchor.
+        let edited = fixture("""
+        Text.
+
+        <!-- imark quote="Text" by="nikus" at="2026-08-01T09:00Z" color="red"
+        first
+        -->
+        """)
+        try Comments.update(lines: 2...4, body: "second", colour: .blue, in: edited, expecting: nil)
+        let lines = read(edited)
+        check("editing keeps quote, author and date",
+              lines[2].contains("quote=\"Text\"") && lines[2].contains("by=\"nikus\"")
+                  && lines[2].contains("at=\"2026-08-01T09:00Z\""), lines[2])
+        check("and swaps the colour", lines[2].contains("color=\"blue\"")
+                  && !lines[2].contains("color=\"red\""), lines[2])
+
+        check("an unknown name from a file is not a colour",
+              NoteColour(attribute: "chartreuse") == .standard)
+        check("and neither is nothing", NoteColour(attribute: nil) == .standard)
+
     }
 
     // MARK: - The acceptance criterion from the plan
