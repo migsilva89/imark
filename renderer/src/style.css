@@ -291,7 +291,16 @@ body {
   /* The toolbar stands on the top of this page, so the first line starts below
      it. Set by Swift from the window's safe area — a hard-coded number is wrong
      the moment the toolbar changes height, which it does in full screen. */
-  padding: calc(var(--step) * 8 + var(--top-inset, 0px)) calc(var(--step) * 8) calc(var(--step) * 24);
+  /* Wider on the right than on the left: a note's dot hangs 24px past the end
+     of its block, and macOS lays its scrollbar over the last 15px of the
+     window. At an even margin the two met and the dots came out clipped —
+     which only showed at full width, where there is no leftover column to
+     hide in. */
+  padding:
+    calc(var(--step) * 8 + var(--top-inset, 0px))
+    calc(var(--step) * 12)
+    calc(var(--step) * 24)
+    calc(var(--step) * 8);
   color: var(--text);
   font-family: var(--font-body);
   font-size: var(--size-body);
@@ -592,7 +601,14 @@ img[data-blocked] {
 /* --------------------------------------------------- Quick Look preview */
 
 :root[data-preview='true'] body {
-  padding: calc(var(--step) * 10) calc(var(--step) * 6) calc(var(--step) * 10);
+  /* Same asymmetry as the window, and for the same reason: the dots are still
+     shown here — you cannot press them, but you can see there are notes — and
+     at an even margin they hung off the edge of the panel. */
+  padding:
+    calc(var(--step) * 10)
+    calc(var(--step) * 10)
+    calc(var(--step) * 10)
+    calc(var(--step) * 6);
   font-size: 14px;
 }
 
