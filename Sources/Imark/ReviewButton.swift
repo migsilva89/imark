@@ -9,6 +9,10 @@ import AppKit
 /// under the toolbar material on macOS 26, which left Approve and Send Back
 /// looking like the same button with different words.
 final class ReviewButton: NSButton {
+    /// What a standard toolbar item stands at. These sit in the same row as the
+    /// system's own group and any difference reads as one of them being wrong.
+    private static let height: CGFloat = 28
+
     private let filled: Bool
     private let tint: NSColor
 
@@ -31,10 +35,8 @@ final class ReviewButton: NSButton {
         imagePosition = .imageLeading
         imageHugsTitle = true
         bezelStyle = .texturedRounded
-        // Neither one is bordered. The filled button draws its own pill, and the
-        // other is plain text: two pills side by side were the same size and the
-        // same shape, and the one you must not press by accident looked exactly
-        // like the one you meant.
+        // Both pills are drawn below rather than asked for: the system bezel is
+        // restyled by the toolbar material and would not take the colour.
         isBordered = false
         self.target = target
         self.action = action
@@ -44,7 +46,8 @@ final class ReviewButton: NSButton {
         // competing with the one that ends the review in the other direction.
         wantsLayer = true
         layer?.cornerCurve = .continuous
-        layer?.cornerRadius = 12
+        // Half the height: a capsule, like everything else in that row.
+        layer?.cornerRadius = Self.height / 2
         if filled {
             contentTintColor = .white
         } else {
@@ -53,7 +56,7 @@ final class ReviewButton: NSButton {
         }
         self.title = title
 
-        heightAnchor.constraint(equalToConstant: 24).isActive = true
+        heightAnchor.constraint(equalToConstant: Self.height).isActive = true
     }
 
     @available(*, unavailable)
@@ -97,7 +100,7 @@ final class ReviewButton: NSButton {
     override var intrinsicContentSize: NSSize {
         var size = super.intrinsicContentSize
         size.width += 22
-        size.height = 24
+        size.height = Self.height
         return size
     }
 
