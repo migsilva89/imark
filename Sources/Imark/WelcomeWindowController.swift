@@ -150,17 +150,12 @@ final class WelcomeWindowController: NSWindowController {
             label.font = .systemFont(ofSize: 11)
             label.textColor = .secondaryLabelColor
 
-            // Deleting a handful of files, offered where they were created. An
-            // install with no way back is a trap, and hiding the way back in a
-            // menu is the same trap with a longer fuse.
-            let remove = NSButton(title: "Remove", target: self, action: #selector(removeAgentSetup))
-            remove.bezelStyle = .inline
-            remove.controlSize = .small
-            remove.font = .systemFont(ofSize: 11)
-
+            // A tick and a sentence, the same shape as the row above it. The
+            // Remove button that used to sit here made this row a different
+            // width from that one, which is what stopped the column looking
+            // like a column. Undoing it is deleting the files the alert named.
             agentRow.addArrangedSubview(check)
             agentRow.addArrangedSubview(label)
-            agentRow.addArrangedSubview(remove)
             return
         }
 
@@ -214,11 +209,6 @@ final class WelcomeWindowController: NSWindowController {
             failure.informativeText = (error as? LocalizedError)?.errorDescription ?? "\(error)"
             failure.runModal()
         }
-        refreshAgentRow()
-    }
-
-    @objc private func removeAgentSetup() {
-        try? AgentSetup.uninstall()
         refreshAgentRow()
     }
 

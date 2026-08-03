@@ -275,8 +275,9 @@ is the whole bridge.
 ```
 
 Launched with no document, Imark offers to **set itself up for the coding
-agents on your machine** — one skill, written into each one's `skills` folder,
-and Remove deletes exactly what it wrote. Claude Code and Codex read the same
+agents on your machine** — one skill, written into each one's `skills` folder.
+The alert names every file before writing it, and undoing it is deleting those.
+Claude Code and Codex read the same
 `SKILL.md`, so it is the same file in both; only Claude Code also takes the two
 loose commands.
 
