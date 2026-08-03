@@ -201,6 +201,10 @@ function imarkInstalled() {
 }
 
 function openInImark(file) {
+  // The round-trip test drives the decision from Swift rather than from a
+  // click, so it needs the waiting without a window appearing on somebody's
+  // screen every time the suite runs.
+  if (process.env.IMARK_TEST_NO_OPEN) return
   const result = spawnSync('/usr/bin/open', ['-a', 'Imark', file], { encoding: 'utf8' })
   if (result.status !== 0) throw new Error(result.stderr?.trim() || 'open falhou')
 }
