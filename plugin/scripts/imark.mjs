@@ -279,6 +279,21 @@ function reviewsDir(root) {
 const slug = (value) =>
   fold(value).slice(0, 40) || 'revisao'
 
+/**
+ * A document, ready to be pasted inside another one.
+ *
+ * Its front matter has to go: fenced between `---` in the middle of a file it
+ * is no longer front matter, it is a setext heading — `title: …` with a line of
+ * dashes under it — which put the reviewed file's metadata in the outline as a
+ * clipped two-line entry nobody could read. Kept as a fenced block instead, so
+ * it is still there to read and cannot become anything.
+ */
+function embed(text) {
+  const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/.exec(text)
+  if (!match) return text
+  return `\`\`\`yaml\n${match[1]}\n\`\`\`\n\n${text.slice(match[0].length)}`
+}
+
 function writeReview(root, { title, body, kind }) {
   const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
   const file = path.join(reviewsDir(root), `${slug(kind)}-${stamp}.md`)
@@ -342,8 +357,7 @@ async function cmdReview(argv) {
     if (wrong.length > 0) {
       throw new Error(`só markdown: ${wrong.join(', ')}`)
     }
-    document = files
-      .map((file) => `# ${file}\n\n${fs.readFileSync(file, 'utf8')}`)
+    document = files.map((file) => `# ${file}\n\n${embed(fs.readFileSync(file, 'utf8'))}`)
       .join('\n\n---\n\n')
     // Without the extension: `SPEC.md` folded to `specmd`, which named every
     // review after a file nobody has.

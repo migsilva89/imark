@@ -242,7 +242,22 @@ public final class RendererView: NSView {
         else { return }
         // The array wrapper keeps JSONSerialization happy with bare strings and
         // gives us correct escaping for free.
-        webView.evaluateJavaScript("\(function).apply(null, \(json))")
+        let script = "\(function).apply(null, \(json))"
+        // Before the bundle has parsed there is no `window.imark` to call, and
+        // the call is thrown away without a word. Every setting applied at
+        // startup went that way: the document opened on the defaults, and going
+        // to Settings and picking the same value again was what made it stick.
+        guard isReady else { return queued.append(script) }
+        webView.evaluateJavaScript(script)
+    }
+
+    /// Calls made before the page was ready, in the order they were made.
+    private var queued: [String] = []
+
+    private func drainQueue() {
+        let scripts = queued
+        queued.removeAll()
+        for script in scripts { webView.evaluateJavaScript(script) }
     }
 
     // MARK: - Appearance
@@ -284,6 +299,9 @@ public final class RendererView: NSView {
             switch type {
             case "ready":
                 owner.isReady = true
+                // Settings first, then the document: rendering under the wrong
+                // width and correcting it afterwards is a visible flinch.
+                owner.drainQueue()
                 if let pending = owner.pending {
                     owner.pending = nil
                     owner.render(markdown: pending.markdown, path: pending.path)
