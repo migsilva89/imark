@@ -252,11 +252,31 @@ Resources/               build output — not edited by hand
 Support/                 Info.plist, entitlements, generators, and tests
 testdata/                documents that exercise the renderer
 docs/                    design, flows and acceptance criteria
+plugin/                  the Claude Code plugin — uses the app, is not part of it
 ```
 
 The renderer is the only part that knows how to turn Markdown into anything. The Swift side handles windows, files and navigation, and talks to it in messages.
 
 Design and acceptance criteria live in [docs/DESIGN.md](docs/DESIGN.md); the build order and what each milestone had to satisfy is in [docs/PLAN.md](docs/PLAN.md). Comments have their own pair — [docs/EDITOR.md](docs/EDITOR.md) for why they are stored the way they are, [docs/PLAN-COMMENTS.md](docs/PLAN-COMMENTS.md) for the order it was built in and what went wrong on the way.
+
+## Reviewing an agent's work
+
+A plan from a coding agent is markdown. So is a diff, once it is wrapped in a
+fenced block. Because comments live in the file, an agent can hand you a
+document, you can annotate it in Imark, and the agent can read your notes back
+out — with no server, no port and nothing installed on the other side. The file
+is the whole bridge.
+
+[`plugin/`](plugin/README.md) is a Claude Code plugin that does exactly that:
+
+```
+/imark:imark-review              # the uncommitted changes
+/imark:imark-review docs/PLAN.md # a document
+/imark:imark-notes ficheiro.md   # notes you already left
+```
+
+It uses the app as it stands and asks nothing of it. If it ever goes away, Imark
+is not left holding a button with nothing behind it.
 
 ## Licences
 

@@ -1,0 +1,17 @@
+{
+  "name": "imark",
+  "owner": {
+    "name": "migsilva89"
+  },
+  "metadata": {
+    "description": "Review plans, diffs and documents in Imark, the offline macOS markdown reader.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "imark",
+      "source": "./plugin",
+      "description": "Review plans, diffs and documents in Imark. The agent writes markdown, you comment on it in the app, and your notes come back — through the file, with no server in between."
+    }
+  ]
+}
