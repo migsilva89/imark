@@ -259,7 +259,13 @@ extension DocumentWindowController: NSToolbarDelegate {
     private func finishReview(_ decision: Review.Decision) {
         do {
             try Review.decide(decision, notes: noteCount, for: url)
+            // The button says what happened before the window goes, so the press
+            // is acknowledged rather than just answered by everything vanishing.
+            // The state is kept on disk too: reopening the file later shows it.
             buildToolbar()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                self?.window?.performClose(nil)
+            }
         } catch {
             let alert = NSAlert(error: error)
             alert.messageText = "Imark couldn't record that decision."

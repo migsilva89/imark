@@ -133,6 +133,31 @@ function verdict(notes) {
   return null
 }
 
+/**
+ * What the agent is told when the review comes back.
+ *
+ * Written as an instruction rather than a report. An earlier version opened
+ * with "the review asked for changes", and that reads to an agent as an
+ * opinion it can weigh against its own plan — which is exactly the argument
+ * the reviewer already had and won.
+ */
+function sendBackFeedback(result, file, toolName) {
+  return [
+    'THE REVIEWER DID NOT APPROVE THIS.',
+    `You MUST address ALL of the notes below before calling ${toolName} again.`,
+    '- Do not resubmit the same thing unchanged.',
+    '- Answer every note. Say what you changed for each one, quoting the words it',
+    '  is attached to — that is how the reviewer sees them.',
+    '- A note marked orphan has lost its anchor; the paragraph above it is not',
+    '  reliably what it is about. Ask rather than guess.',
+    `- The annotated document is at ${file}. Read it if a note needs its context.`,
+    '',
+    result.decision.body || '',
+    '',
+    formatNotes(result.notes),
+  ].join('\n')
+}
+
 const DECISION = `
 ---
 
@@ -289,11 +314,17 @@ function diffDocument(root, args, { untracked = false } = {}) {
 const say = (text) => process.stdout.write(`${text}\n`)
 
 function report(file, result) {
-  say(`Documento: ${file}`)
-  if (!result) { say('\nSem decisão — o tempo de espera acabou.'); return }
-  say(`\nDecisão: ${result.approved ? 'SEGUIR' : 'REVER'}`)
-  if (result.decision.body) say(`\n${result.decision.body}`)
-  say(`\n## Notas (${result.notes.length})\n\n${formatNotes(result.notes)}`)
+  if (!result) return say(`Sem decisão — o tempo de espera acabou. O documento ficou em ${file}.`)
+
+  if (!result.approved) return say(sendBackFeedback(result, file, 'this command'))
+
+  say('APPROVED — the reviewer accepted this.')
+  if (result.notes.length > 0) {
+    say(`\nThey still left ${result.notes.length} note(s). Act on them as you go, `
+      + 'and say what you did for each.\n')
+    say(formatNotes(result.notes))
+  }
+  say(`\nThe reviewed document is at ${file}.`)
 }
 
 // ----------------------------------------------------------------- commands
@@ -333,7 +364,9 @@ async function cmdReview(argv) {
         ? `# ${file}\n\n${text}`
         : `# ${file}\n\n\`\`\`${path.extname(file).slice(1)}\n${text}\n\`\`\``
     }).join('\n\n---\n\n')
-    kind = path.basename(files[0])
+    // Without the extension: `SPEC.md` folded to `specmd`, which named every
+    // review after a file nobody has.
+    kind = path.parse(files[0]).name
   } else {
     document = fs.readFileSync(0, 'utf8')
     kind = 'nota'
@@ -349,7 +382,7 @@ async function cmdReview(argv) {
   }
   openInImark(file)
   if (!wait) { say(`Aberto no Imark: ${file}`); return }
-  say(`Aberto no Imark: ${file}\nÀ espera de uma nota em "seguir" ou "rever"…`)
+  say(`Aberto no Imark: ${file}\nÀ espera do Approve ou do Send Back na janela…`)
   report(file, await waitForDecision(file))
 }
 
@@ -396,12 +429,7 @@ async function cmdPlanHook() {
     }))
   }
 
-  const feedback = [
-    'A revisão no Imark pediu alterações ao plano.',
-    result.decision.body ? `\n${result.decision.body}` : '',
-    `\n${formatNotes(result.notes)}`,
-    `\nO documento anotado está em ${file}.`,
-  ].join('\n')
+  const feedback = sendBackFeedback(result, file, 'ExitPlanMode')
 
   say(JSON.stringify({
     hookSpecificOutput: {
