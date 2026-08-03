@@ -257,6 +257,9 @@ plugin/                  the Claude Code plugin — uses the app, is not part of
 
 The renderer is the only part that knows how to turn Markdown into anything. The Swift side handles windows, files and navigation, and talks to it in messages.
 
+Where the project stands, what is tested and what is not, and what is next, is
+in [docs/HANDOFF.md](docs/HANDOFF.md).
+
 Design and acceptance criteria live in [docs/DESIGN.md](docs/DESIGN.md); the build order and what each milestone had to satisfy is in [docs/PLAN.md](docs/PLAN.md). Comments have their own pair — [docs/EDITOR.md](docs/EDITOR.md) for why they are stored the way they are, [docs/PLAN-COMMENTS.md](docs/PLAN-COMMENTS.md) for the order it was built in and what went wrong on the way.
 
 ## Reviewing an agent's work
