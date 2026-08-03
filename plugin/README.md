@@ -19,11 +19,13 @@ Needs Imark in `/Applications` and Node 20.
 ## Use
 
 ```
-/imark:imark-review              # as alterações por commitar
-/imark:imark-review --staged     # só o que está em staging
-/imark:imark-review docs/PLAN.md # ficheiros
-/imark:imark-notes ficheiro.md   # lê notas que já lá estão
+/imark:imark-review docs/PLAN.md  # review a markdown document
+/imark:imark-notes ficheiro.md    # notes you already left
 ```
+
+Markdown only — plans, specs, RFCs, docs. Imark is a markdown reader, and
+reviewing code is a real job this is not the tool for; that is what GitHub,
+Plannotator or your editor is for.
 
 `imark-review` writes a document to `.imark/reviews/`, opens it in Imark, and
 **blocks**. You read it, comment where you want to, and finish with the two
@@ -65,8 +67,9 @@ wrote, so it revises instead of building.
 ## What it does not do
 
 - **No drawing.** Text on a phrase, which is what Imark does.
-- **No side-by-side diff.** A diff here is a fenced block with `+` and `-` —
-  syntax-highlighted, commentable line by line, but not a diff view.
+- **No code review.** Markdown documents only. A ```diff block *inside* a plan
+  renders properly — agents write those all the time — but there is no command
+  that turns a repository's changes into a review.
 - **No idea when you closed the window.** Open a review and go to lunch and the
   agent waits. That is the price of there being no channel back.
 

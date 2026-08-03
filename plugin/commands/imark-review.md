@@ -1,6 +1,6 @@
 ---
 description: Open something in Imark for review and wait for the reviewer's notes
-argument-hint: "[--diff | --staged | <ficheiro…>] [--no-wait]"
+argument-hint: "<ficheiro.md> [--no-wait]"
 allowed-tools: Bash(node:*)
 ---
 
@@ -12,8 +12,9 @@ Corre isto, passando os argumentos tal como vieram:
 node "${CLAUDE_PLUGIN_ROOT}/scripts/imark.mjs" review $ARGUMENTS
 ```
 
-Sem argumentos, revê as alterações por commitar — o mesmo que `--diff`. Com
-nomes de ficheiro, revê esses ficheiros.
+Só markdown — planos, specs, RFCs, docs. Se te pedirem para rever código,
+diz que o Imark é um leitor de markdown e que isso é trabalho do GitHub, do
+Plannotator ou do editor.
 
 O comando bloqueia até o utilizador comentar em **seguir** ou em **rever** dentro
 da app. Isso é esperado e pode demorar: não o interrompas, não lhe ponhas

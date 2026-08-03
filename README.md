@@ -270,9 +270,8 @@ is the whole bridge.
 [`plugin/`](plugin/README.md) is a Claude Code plugin that does exactly that:
 
 ```
-/imark:imark-review              # the uncommitted changes
-/imark:imark-review docs/PLAN.md # a document
-/imark:imark-notes ficheiro.md   # notes you already left
+/imark:imark-review docs/PLAN.md  # review a markdown document
+/imark:imark-notes ficheiro.md    # notes you already left
 ```
 
 A document under review gets two buttons in the toolbar — **Approve** and **Send

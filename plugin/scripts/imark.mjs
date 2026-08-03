@@ -6,7 +6,7 @@
 // The escaping here is the mirror image of Sources/Imark/Comments.swift. If one
 // side ever grows a rule the other must grow it too.
 
-import { execFileSync, spawnSync } from 'node:child_process'
+import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 
@@ -288,45 +288,6 @@ function writeReview(root, { title, body, kind }) {
   return file
 }
 
-function git(root, args) {
-  try {
-    return execFileSync('/usr/bin/git', args, { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
-  } catch (error) {
-    throw new Error(`git ${args.join(' ')} falhou: ${error.stderr?.trim() || error.message}`)
-  }
-}
-
-/** One fenced block per file, because a note anchors inside a code block and
- *  a single 4000-line diff gives the outline nothing to hold on to. */
-function diffDocument(root, args, { untracked = false } = {}) {
-  const names = git(root, ['diff', '--name-only', ...args]).split('\n').filter(Boolean)
-  const blocks = names.map((name) => {
-    const patch = git(root, ['diff', ...args, '--', name]).trimEnd()
-    return `## ${name}\n\n\`\`\`diff\n${patch}\n\`\`\``
-  })
-
-  // A new file is the change most worth reviewing and the one `git diff` says
-  // nothing about. --no-index against /dev/null gives it the same shape as
-  // everything else, so it reads the same in the document.
-  if (untracked) {
-    for (const name of git(root, ['ls-files', '--others', '--exclude-standard']).split('\n').filter(Boolean)) {
-      // --no-index exits 1 whenever there is a difference, which here is always,
-      // so the patch arrives on the error rather than the return value.
-      let patch = ''
-      try {
-        patch = execFileSync('/usr/bin/git', ['diff', '--no-index', '--', '/dev/null', name], {
-          cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024,
-        })
-      } catch (error) { patch = error.stdout || '' }
-      names.push(name)
-      blocks.push(`## ${name} (novo)\n\n\`\`\`diff\n${patch.trimEnd()}\n\`\`\``)
-    }
-  }
-
-  if (names.length === 0) return null
-  return `# Alterações\n\n${names.length} ficheiro(s).\n\n${blocks.join('\n\n')}`
-}
-
 // ------------------------------------------------------------------- output
 
 const say = (text) => process.stdout.write(`${text}\n`)
@@ -362,33 +323,32 @@ async function cmdReview(argv) {
 
   let document
   let kind
-  // No arguments means the working tree: the common case, and the one where
-  // reading stdin instead would hang a slash command with nothing to read.
-  if (argv.includes('--diff') || (files.length === 0 && !argv.includes('--staged') && !argv.includes('--stdin'))) {
-    // Against HEAD, not the index: "what I have not committed" is one question,
-    // and splitting it in two by whether something happens to be staged is not
-    // a distinction anybody reviewing wants to make.
-    document = diffDocument(root, ['HEAD'], { untracked: true })
-    kind = 'diff'
-    if (!document) { say('Nada por commitar — não há o que rever.'); return }
-  } else if (argv.includes('--staged')) {
-    document = diffDocument(root, ['--cached'])
-    kind = 'staged'
-    if (!document) { say('Nada em staging — não há o que rever.'); return }
-  } else if (files.length > 0) {
-    document = files.map((file) => {
-      const text = fs.readFileSync(file, 'utf8')
-      return file.endsWith('.md')
-        ? `# ${file}\n\n${text}`
-        : `# ${file}\n\n\`\`\`${path.extname(file).slice(1)}\n${text}\n\`\`\``
-    }).join('\n\n---\n\n')
+  if (files.length > 0) {
+    // Markdown only. Imark is a markdown reader, and a review of a `.js` here
+    // would be prose typography wrapped around something that has no prose in
+    // it. Reviewing code is a real job and this is not the tool for it.
+    const wrong = files.filter((file) => !file.endsWith('.md'))
+    if (wrong.length > 0) {
+      throw new Error(`só markdown: ${wrong.join(', ')}`)
+    }
+    document = files
+      .map((file) => `# ${file}\n\n${fs.readFileSync(file, 'utf8')}`)
+      .join('\n\n---\n\n')
     // Without the extension: `SPEC.md` folded to `specmd`, which named every
     // review after a file nobody has.
     kind = path.parse(files[0]).name
   } else {
+    // Reading fd 0 from a terminal blocks forever, so the usage line has to
+    // come before the read rather than after it: the version that checked for
+    // empty input afterwards simply hung.
+    if (process.stdin.isTTY) {
+      throw new Error('uso: imark.mjs review <ficheiro.md> [--no-wait]')
+    }
     document = fs.readFileSync(0, 'utf8')
     kind = 'nota'
-    if (!document.trim()) throw new Error('nada no stdin e nenhum ficheiro dado')
+    if (!document.trim()) {
+      throw new Error('uso: imark.mjs review <ficheiro.md> [--no-wait]')
+    }
   }
 
   const title = argv.includes('--title') ? argv[argv.indexOf('--title') + 1] : `Revisão — ${kind}`
