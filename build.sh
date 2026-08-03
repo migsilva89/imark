@@ -93,6 +93,15 @@ else
 	echo "aviso: sem ícone — corre 'swift Support/make-icon.swift'" >&2
 fi
 
+# The agent integration travels inside the app: the script that does the work,
+# and the skill and commands that point a coding agent at it. One source — the
+# same files the plugin ships — so the two can never drift apart, and the paths
+# inside them are rewritten to this bundle when somebody installs them.
+mkdir -p "$APP/Contents/Resources/agent/commands"
+cp "$ROOT/plugin/scripts/imark.mjs" "$APP/Contents/Resources/agent/imark.mjs"
+cp "$ROOT/plugin/skills/imark-comments/SKILL.md" "$APP/Contents/Resources/agent/SKILL.md"
+cp "$ROOT"/plugin/commands/*.md "$APP/Contents/Resources/agent/commands/"
+
 # macOS shows Credits.html in the standard About panel on its own, so the
 # third-party notices travel with the binary without a line of UI code.
 if [ -f "$ROOT/Support/Credits.html" ]; then

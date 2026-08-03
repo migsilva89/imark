@@ -9,6 +9,10 @@ final class WelcomeWindowController: NSWindowController {
     /// Holds either the "make me the default" button or the confirmation that
     /// Imark already is, and is rebuilt when that changes.
     private let defaultRow = NSStackView()
+    /// The same, for the coding-agent integration. Only built at all when an
+    /// agent is on the machine: an offer to set up something you do not have is
+    /// a puzzle, not a feature.
+    private let agentRow = NSStackView()
 
     init() {
         let window = NSWindow(
@@ -60,13 +64,19 @@ final class WelcomeWindowController: NSWindowController {
         defaultRow.alignment = .centerY
         refreshDefaultRow()
 
-        let stack = NSStackView(views: [icon, title, subtitle, openButton, defaultRow])
+        agentRow.orientation = .horizontal
+        agentRow.spacing = 5
+        agentRow.alignment = .centerY
+        refreshAgentRow()
+
+        let stack = NSStackView(views: [icon, title, subtitle, openButton, defaultRow, agentRow])
         stack.orientation = .vertical
         stack.alignment = .centerX
         stack.spacing = 10
         stack.setCustomSpacing(14, after: icon)
         stack.setCustomSpacing(26, after: subtitle)
         stack.setCustomSpacing(22, after: openButton)
+        stack.setCustomSpacing(16, after: defaultRow)
 
         stack.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(stack)
@@ -109,6 +119,109 @@ final class WelcomeWindowController: NSWindowController {
         defaultRow.addArrangedSubview(button)
     }
 
+    // MARK: - Coding agents
+
+    private func refreshAgentRow() {
+        agentRow.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        let found = AgentSetup.found
+        // Nothing to install into, so nothing to say. Somebody who uses no
+        // coding agent should not have to work out what this row is for.
+        guard !found.isEmpty else {
+            agentRow.isHidden = true
+            return
+        }
+        agentRow.isHidden = false
+        // Two names fit in a button; four do not, and a button that wraps or
+        // truncates says less than one that says "your coding agents" and lets
+        // the alert do the naming.
+        let names = found.count > 2
+            ? "your coding agents"
+            : found.map(\.name).joined(separator: " and ")
+
+        guard !AgentSetup.isInstalled else {
+            let check = NSImageView(
+                image: NSImage(systemSymbolName: "checkmark.circle.fill", accessibilityDescription: nil)
+                    ?? NSImage()
+            )
+            check.contentTintColor = .secondaryLabelColor
+            check.symbolConfiguration = .init(pointSize: 11, weight: .regular)
+
+            let label = NSTextField(labelWithString: "Set up for \(names)")
+            label.font = .systemFont(ofSize: 11)
+            label.textColor = .secondaryLabelColor
+
+            // Deleting a handful of files, offered where they were created. An
+            // install with no way back is a trap, and hiding the way back in a
+            // menu is the same trap with a longer fuse.
+            let remove = NSButton(title: "Remove", target: self, action: #selector(removeAgentSetup))
+            remove.bezelStyle = .inline
+            remove.controlSize = .small
+            remove.font = .systemFont(ofSize: 11)
+
+            agentRow.addArrangedSubview(check)
+            agentRow.addArrangedSubview(label)
+            agentRow.addArrangedSubview(remove)
+            return
+        }
+
+        let button = NSButton(
+            title: "Set up for \(names)",
+            target: self,
+            action: #selector(installAgentSetup)
+        )
+        // Small, like the row above it. Both are setup offers made once and
+        // then never again, and neither should out-shout Open.
+        button.bezelStyle = .rounded
+        button.controlSize = .small
+        button.font = .systemFont(ofSize: 11)
+        button.toolTip = "Adds a skill so your agent can open documents here for review"
+        agentRow.addArrangedSubview(button)
+    }
+
+    /// Says what it will write before it writes it, path by path. This is the
+    /// one thing Imark does outside its own files and somebody's documents, and
+    /// it lands in folders other programs own.
+    @objc private func installAgentSetup() {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let paths = AgentSetup.plannedFiles
+            .map { $0.path.replacingOccurrences(of: home, with: "~") }
+            .joined(separator: "\n")
+
+        let skipped = AgentSetup.unsupportedFound
+        let alert = NSAlert()
+        alert.messageText = "Set Imark up for your coding agents?"
+        alert.informativeText = [
+            "This writes:",
+            "",
+            paths,
+            "",
+            "Your agent can then open a document here for you to comment on, and "
+                + "read your notes back out of the file. Nothing else is touched, "
+                + "and Remove deletes exactly these.",
+            skipped.isEmpty ? "" : "\nAlso found, and left alone: "
+                + skipped.map(\.name).joined(separator: ", ")
+                + ". Imark doesn't know where those keep their skills.",
+        ].joined(separator: "\n")
+        alert.addButton(withTitle: "Set Up")
+        alert.addButton(withTitle: "Cancel")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+
+        do {
+            try AgentSetup.install()
+        } catch {
+            let failure = NSAlert()
+            failure.messageText = "Imark couldn't set that up."
+            failure.informativeText = (error as? LocalizedError)?.errorDescription ?? "\(error)"
+            failure.runModal()
+        }
+        refreshAgentRow()
+    }
+
+    @objc private func removeAgentSetup() {
+        try? AgentSetup.uninstall()
+        refreshAgentRow()
+    }
+
     @objc private func openPanel() {
         let panel = NSOpenPanel()
         panel.allowsMultipleSelection = true
@@ -130,6 +243,7 @@ final class WelcomeWindowController: NSWindowController {
         super.showWindow(sender)
         // The user may have changed the handler in the Finder since last time.
         refreshDefaultRow()
+        refreshAgentRow()
         window?.makeKeyAndOrderFront(nil)
     }
 
