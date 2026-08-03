@@ -211,6 +211,15 @@ export function attachComments(root, comments) {
     const holder = holderFor(block)
     holder.classList.add('has-note')
 
+    // A quoted note underlines its words. A block note has no words of its own
+    // to underline, so the block itself takes the note's colour as a wash —
+    // otherwise the only sign it exists is a dot in the margin, and you have to
+    // click it to find out what it is attached to.
+    if (aboutBlock) {
+      block.classList.add('note-block')
+      if (note.colour) block.dataset.color = note.colour
+    }
+
     const dot = document.createElement('button')
     dot.type = 'button'
     dot.className = lost ? 'note-dot orphan' : (aboutBlock ? 'note-dot block' : 'note-dot')

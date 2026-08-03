@@ -882,6 +882,19 @@ img[data-blocked] {
 
 /* Wrapping every commented block is what lets the dot and the card be placed
    against it — a table or a list will not take stray children of its own. */
+/* A block carrying a note of its own. Weak on purpose: it has to survive being
+   a whole table or a long paragraph, where the same strength that reads as a
+   highlight on one line reads as a different theme on twenty. The bar down the
+   left is what actually says "this one" — the wash alone is too quiet to find
+   when you are scrolling. */
+.note-block {
+  background: color-mix(in srgb, var(--note) 8%, transparent);
+  box-shadow: inset 3px 0 0 0 var(--note);
+  border-radius: 4px;
+  padding: calc(var(--step) * 2) calc(var(--step) * 3);
+  margin-left: calc(var(--step) * -3);
+}
+
 .note-holder {
   position: relative;
 }

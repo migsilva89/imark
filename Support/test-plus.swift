@@ -111,6 +111,29 @@ await window.imark.render({
 await sleep(300)
 results.oneNoteMakesADot = document.querySelectorAll('.note-dot').length === 1
 results.oneNoteMakesARailMark = document.querySelectorAll('.note-mark').length === 1
+// A quoted note underlines; it must not also wash the block.
+results.quotedNoteDoesNotWashTheBlock = document.querySelectorAll('.note-block').length === 0
+
+// 7. A note with no quote washes its block instead, in the note's own colour.
+await window.imark.render({
+  markdown: [
+    '# Título',
+    '',
+    'Um parágrafo comentado inteiro.',
+    '',
+    '<!-- imark by="miguel" at="2026-08-03T14:00Z" color="green"',
+    'Sobre o bloco todo.',
+    '-->',
+    '',
+  ].join('\\n'),
+  path: '/tmp/t.md',
+  theme: 'dark',
+})
+await sleep(300)
+const washed = document.querySelector('.note-block')
+results.blockNoteWashesTheBlock = !!washed
+results.blockNoteKeepsItsColour = washed?.dataset.color === 'green'
+results.blockNoteIsNotAnOrphan = document.querySelectorAll('.note-dot.orphan').length === 0
 
 return JSON.stringify(results)
 """
