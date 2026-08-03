@@ -135,6 +135,28 @@ results.blockNoteWashesTheBlock = !!washed
 results.blockNoteKeepsItsColour = washed?.dataset.color === 'green'
 results.blockNoteIsNotAnOrphan = document.querySelectorAll('.note-dot.orphan').length === 0
 
+// 7b. The pointer beside the column, not on the words: the whole reading width
+//     answers, because aiming at text to reach a margin button is backwards.
+await window.imark.render({
+  markdown: '# Título\\n\\nUm parágrafo com palavras que chegam para uma linha.\\n',
+  path: '/tmp/t.md',
+  theme: 'dark',
+})
+await sleep(300)
+const wideRoot = document.getElementById('content')
+const wide = [...wideRoot.children].find((el) => el.tagName === 'P')
+const wideBox = wide.getBoundingClientRect()
+move(document.body, wideBox.left - 70, wideBox.top + 5)
+await sleep(40)
+results.plusAppearsBesideTheColumn =
+  document.querySelector('.block-plus').style.display !== 'none'
+
+// And not out at the window edge, where the rails live.
+move(document.body, 2, wideBox.top + 5)
+await sleep(400)
+results.plusStaysAwayFromTheRails =
+  document.querySelector('.block-plus').style.display === 'none'
+
 // 8. In the Quick Look panel there is nothing to write to, so no `+` — but the
 //    notes already in the file still have to show.
 window.imark.setPreview(true)
@@ -166,7 +188,9 @@ return JSON.stringify(results)
 """
 
 final class Harness: NSObject, WKNavigationDelegate {
-    let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 900, height: 1_100))
+    // Wide enough to have the margins a real window has: on a narrow one the
+    // reading column fills the frame and the `+` reach has nothing to reach into.
+    let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 1_400, height: 1_000))
     private var window: NSWindow?
 
     func run() {
@@ -174,7 +198,7 @@ final class Harness: NSObject, WKNavigationDelegate {
         // requestAnimationFrame never fires without a window, and the renderer
         // waits on it. Parked off screen, as in shoot.swift.
         let window = NSWindow(
-            contentRect: NSRect(x: -6_000, y: 0, width: 900, height: 1_100),
+            contentRect: NSRect(x: -6_000, y: 0, width: 1_400, height: 1_000),
             styleMask: [.borderless], backing: .buffered, defer: false
         )
         window.contentView = webView

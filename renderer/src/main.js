@@ -642,6 +642,26 @@ function attachRail(rail) {
     return Math.min(Math.max(index, 0), railTicks.length - 1)
   }
 
+  /// Where the document should sit for a pointer anywhere along the rail —
+  /// between headings as well as on them.
+  ///
+  /// Snapping to the nearest heading is right for a click and wrong for a drag:
+  /// it made scrubbing jump from section to section, which reads as the rail
+  /// resisting rather than following. This interpolates between the heading
+  /// above and the one below, so the page moves with the hand the way a
+  /// scrollbar does, while the rail still means headings.
+  const scrollAt = (clientY) => {
+    const first = railTicks[0].getBoundingClientRect()
+    const row = (clientY - (first.top + first.height / 2)) / railPitch
+    // Rows are half-headings — one tick per heading, one gradation between.
+    const at = Math.min(Math.max(row / 2, 0), railBlocks.length - 1)
+    const lower = Math.floor(at)
+    const upper = Math.min(lower + 1, railBlocks.length - 1)
+    const topOf = (i) => railBlocks[i].getBoundingClientRect().top + window.scrollY - 24
+    const from = topOf(lower)
+    return from + (topOf(upper) - from) * (at - lower)
+  }
+
   // A gradation takes you to the heading it sits under. It is not a place of
   // its own, and a row that swallows a click is worse than one that is not
   // there.
@@ -664,12 +684,19 @@ function attachRail(rail) {
   // is skipped outright while the pointer stays within the same tick, which is
   // most pointer moves.
   const track = (clientY) => {
+    // The page follows the pointer continuously, on every move — outside the
+    // tick check below, which exists to skip repainting the funnel and would
+    // otherwise make the scroll steppy again for a different reason.
+    if (scrubbing) {
+      cancelAnimationFrame(scrollAnimation)
+      window.scrollTo(0, scrollAt(clientY))
+    }
     const index = nearest(clientY)
     if (index === railHoverIndex) return
     railHoverIndex = index
     paintRail()
     showTip(index, railTicks[index])
-    if (scrubbing) goTo(index, false)
+    if (scrubbing) railScrollIndex = index
   }
 
   rail.addEventListener('pointermove', (event) => track(event.clientY))
@@ -931,6 +958,35 @@ const scheduleHide = () => {
   plusHideTimer = setTimeout(hidePlus, 220)
 }
 
+/// The block on the same line as the pointer, whatever the pointer is actually
+/// over. A reading column is centred and narrow, so most of the window beside a
+/// paragraph belongs to nothing — and aiming at the words to reach a button
+/// that lives in the margin is backwards.
+///
+/// Bounded rather than the whole width: the rails sit at the window edges and
+/// have their own hover behaviour to answer for.
+function blockAtHeight(clientX, clientY) {
+  const root = content()
+  const box = root.getBoundingClientRect()
+  // Never into the outer strip, whatever the reach works out to: the rails live
+  // there and answer to the pointer themselves. On a narrow window this is what
+  // decides, and the reach never comes into it.
+  const from = Math.max(box.left - PLUS_REACH, RAIL_GUTTER)
+  const to = Math.min(box.right + PLUS_REACH, window.innerWidth - RAIL_GUTTER)
+  if (clientX < from || clientX > to) return null
+  for (const child of root.children) {
+    if (!lineRange(child)) continue
+    const rect = child.getBoundingClientRect()
+    if (clientY >= rect.top && clientY <= rect.bottom) return child
+  }
+  return null
+}
+
+/// How far past the text column the `+` still answers, in points.
+const PLUS_REACH = 120
+/// And how much of each edge it never touches, because the rails are there.
+const RAIL_GUTTER = 56
+
 const topLevelBlock = (node) => {
   const root = content()
   let block = node
@@ -1006,12 +1062,14 @@ function setUpBlockPlus() {
     // way to add one there is offering something that cannot happen.
     if (document.documentElement.dataset.preview === 'true') return hidePlus()
     if (event.target === plusButton) return cancelHide()
-    const root = content()
-    if (!root.contains(event.target)) return scheduleHide()
     // Not while a selection is live: the popover is already open on words the
     // reader chose, and a second way in would fight it.
     if (hadSelection) return hidePlus()
-    const block = topLevelBlock(event.target)
+    // By line first, so the whole width of the reading area answers; the
+    // element under the pointer only decides it when the two disagree, which
+    // is inside a note card or a holder.
+    const onText = content().contains(event.target) ? topLevelBlock(event.target) : null
+    const block = onText ?? blockAtHeight(event.clientX, event.clientY)
     if (!block || !lineRange(block)) return scheduleHide()
     cancelHide()
     showPlus(block)
