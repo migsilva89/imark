@@ -135,6 +135,33 @@ results.blockNoteWashesTheBlock = !!washed
 results.blockNoteKeepsItsColour = washed?.dataset.color === 'green'
 results.blockNoteIsNotAnOrphan = document.querySelectorAll('.note-dot.orphan').length === 0
 
+// 8. In the Quick Look panel there is nothing to write to, so no `+` — but the
+//    notes already in the file still have to show.
+window.imark.setPreview(true)
+await window.imark.render({
+  markdown: [
+    '# Título',
+    '',
+    'Um parágrafo com uma nota.',
+    '',
+    '<!-- imark quote="uma nota" by="miguel" at="2026-08-03T14:00Z"',
+    'Visível em preview.',
+    '-->',
+    '',
+  ].join('\\n'),
+  path: '/tmp/t.md',
+  theme: 'dark',
+})
+await sleep(300)
+const previewPara = [...document.getElementById('content').children]
+  .find((el) => el.tagName === 'P' || el.querySelector?.('p'))
+move(previewPara, previewPara.getBoundingClientRect().left + 40,
+     previewPara.getBoundingClientRect().top + 5)
+await sleep(60)
+results.noPlusInPreview = document.querySelector('.block-plus').style.display === 'none'
+results.notesStillShowInPreview = document.querySelectorAll('.note-anchor').length > 0
+window.imark.setPreview(false)
+
 return JSON.stringify(results)
 """
 

@@ -1001,6 +1001,10 @@ function setUpBlockPlus() {
   })
 
   document.addEventListener('mousemove', (event) => {
+    // The Quick Look panel renders with the same bundle and cannot write to
+    // anything. Existing notes still show — that is reading — but offering a
+    // way to add one there is offering something that cannot happen.
+    if (document.documentElement.dataset.preview === 'true') return hidePlus()
     if (event.target === plusButton) return cancelHide()
     const root = content()
     if (!root.contains(event.target)) return scheduleHide()

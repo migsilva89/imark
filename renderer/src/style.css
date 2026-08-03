@@ -931,6 +931,10 @@ img[data-blocked] {
 
 .block-plus:hover { opacity: 1; }
 
+/* Belt and braces with the guard in the mousemove handler: the preview panel
+   has nothing to write to, and a `+` there is a promise the panel cannot keep. */
+:root[data-preview='true'] .block-plus { display: none !important; }
+
 /* What the note will attach to. Shown while the pointer is on the `+` and kept
    while the popover is open: a note about to be written into a file should say
    where it is going before it goes. */
