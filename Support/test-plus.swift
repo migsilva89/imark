@@ -157,6 +157,33 @@ await sleep(400)
 results.plusStaysAwayFromTheRails =
   document.querySelector('.block-plus').style.display === 'none'
 
+// 7c. A note about the document sits above everything, open, and never
+//     attaches itself to whatever block happens to be first.
+await window.imark.render({
+  markdown: [
+    '---',
+    'title: T',
+    '---',
+    '',
+    '<!-- imark scope="file" by="miguel" at="2026-08-03T16:00Z"',
+    'Sobre o documento inteiro.',
+    '-->',
+    '',
+    '# Título',
+    '',
+    'Um parágrafo que não é o dono desta nota.',
+    '',
+  ].join('\\n'),
+  path: '/tmp/t.md',
+  theme: 'dark',
+})
+await sleep(300)
+const panel = document.querySelector('.file-notes')
+results.fileNoteHasItsOwnPanel = !!panel
+results.fileNotePanelIsFirst = document.getElementById('content').firstElementChild === panel
+results.fileNoteCardIsOpen = panel?.querySelector('.note-card')?.hidden === false
+results.fileNoteDoesNotWashABlock = document.querySelectorAll('.note-block').length === 0
+
 // 8. In the Quick Look panel there is nothing to write to, so no `+` — but the
 //    notes already in the file still have to show.
 window.imark.setPreview(true)

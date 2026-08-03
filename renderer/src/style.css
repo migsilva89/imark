@@ -895,6 +895,25 @@ img[data-blocked] {
   margin-left: calc(var(--step) * -3);
 }
 
+/* Notes about the document itself, above everything. They have nothing in the
+   page to point at, so unlike every other card these are open from the start —
+   one that had to be found by clicking would never be read. */
+.file-notes {
+  position: relative;
+  margin: 0 0 calc(var(--step) * 6) 0;
+  padding-left: calc(var(--step) * 3);
+  border-left: 3px solid var(--note);
+}
+
+.file-notes .note-card.is-file {
+  position: static;
+  width: auto;
+  margin: 0 0 calc(var(--step) * 2) 0;
+  box-shadow: none;
+}
+
+.note-dot.file { display: none; }
+
 .note-holder {
   position: relative;
 }

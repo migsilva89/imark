@@ -46,6 +46,9 @@ export function extractComments(body, lineOffset = 0) {
     comments.push({
       id: `note-${comments.length}`,
       quote: attributes.quote ?? '',
+      // `scope="file"` is a note about the document, not about anything in it.
+      // Anything else, including nothing, is a note about a block.
+      scope: attributes.scope === 'file' ? 'file' : 'block',
       by: attributes.by ?? '',
       at: attributes.at ?? '',
       nth: Number(attributes.nth) || 1,
@@ -187,10 +190,50 @@ export function attachComments(root, comments) {
   attachedNotes = []
   if (!comments.length) return []
 
+  const attached = []
+
+  // Notes about the document come first, in the DOM and in the list. The rail
+  // pairs its marks with dots by index, so the two orders have to agree — and
+  // the top of the page is where a note about the whole thing belongs anyway.
+  const fileNotes = comments.filter((note) => note.scope === 'file')
+  if (fileNotes.length) {
+    const panel = document.createElement('section')
+    panel.className = 'file-notes note-holder has-note'
+    for (const note of fileNotes) {
+      const dot = document.createElement('button')
+      dot.type = 'button'
+      dot.className = 'note-dot file'
+      dot.dataset.note = note.id
+      if (note.colour) dot.dataset.color = note.colour
+      dot.setAttribute('aria-label', 'Comment on the document')
+      const stacked = panel.querySelectorAll('.note-dot').length
+      if (stacked) dot.style.top = `${2 + stacked * 17}px`
+      panel.appendChild(dot)
+      const card = buildCard(note, false)
+      // Always open. There is nothing in the page to point at, so a card that
+      // has to be found by clicking a dot would never be read.
+      card.hidden = false
+      card.classList.add('is-file')
+      if (note.colour) panel.dataset.color = note.colour
+      panel.appendChild(card)
+      attached.push({
+        quote: '',
+        colour: note.colour,
+        by: note.by,
+        when: formatDate(note.at),
+        text: note.text,
+        orphan: false,
+        scope: 'file',
+      })
+    }
+    root.prepend(panel)
+  }
+
   // Resolved before anything is wrapped: wrapping changes root.children, and
   // two notes on the same paragraph would then fail to find it.
-  const resolved = comments.map((note) => ({ note, block: blockAbove(root, note.line) }))
-  const attached = []
+  const resolved = comments
+    .filter((note) => note.scope !== 'file')
+    .map((note) => ({ note, block: blockAbove(root, note.line) }))
 
   for (const { note, block } of resolved) {
     if (!block) continue

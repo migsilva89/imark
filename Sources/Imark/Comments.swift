@@ -136,6 +136,7 @@ enum Comments {
         occurrence: Int,
         by author: String,
         on date: Date,
+        scope: Scope = .block,
         into url: URL,
         expecting stamp: Stamp?
     ) throws -> Int {
@@ -150,11 +151,14 @@ enum Comments {
         }
 
         var lines = source.components(separatedBy: "\n")
-        let at = min(max(line, 0), lines.count)
+        // A note about the file goes to the top, where somebody opening the
+        // document in an editor reads it before anything else. Anywhere further
+        // down and it would look like it belonged to whatever it followed.
+        let at = scope == .file ? topOfBody(lines) : min(max(line, 0), lines.count)
 
         var block = [format(
             quote: quote, body: body, colour: colour,
-            author: author, date: date, occurrence: occurrence
+            author: author, date: date, occurrence: occurrence, scope: scope
         )]
         // A note glued to the paragraph above would be parsed as part of it by
         // some renderers, and reads badly in a plain-text editor either way.
@@ -173,19 +177,45 @@ enum Comments {
 
     // MARK: - Shaping
 
+    /// What a note is about. A quoted note names its words; a block note is the
+    /// paragraph it follows; a file note is the document, and is the one kind
+    /// whose position in the file carries no meaning at all.
+    enum Scope: String {
+        case block
+        case file
+    }
+
+    /// The line a file note goes on: straight after the front matter, or the top
+    /// of the file when there is none. Written above the first heading rather
+    /// than below it, because a note about the document is not part of it.
+    static func topOfBody(_ lines: [String]) -> Int {
+        guard lines.first?.trimmingCharacters(in: .whitespaces) == "---" else { return 0 }
+        for index in 1..<max(lines.count, 1)
+        where lines[index].trimmingCharacters(in: .whitespaces) == "---" {
+            return index + 1
+        }
+        // Unterminated front matter is somebody's half-written header; putting a
+        // note inside it would make the document unparseable.
+        return 0
+    }
+
     static func format(
         quote: String,
         body: String,
         colour: NoteColour = .standard,
         author: String,
         date: Date,
-        occurrence: Int
+        occurrence: Int,
+        scope: Scope = .block
     ) -> String {
         // No quote means the note is about the whole block, written by the `+`
         // in the margin rather than by selecting words. Writing `quote=""` would
         // be a lie in the file — nothing was quoted — and the position already
         // says which block it is, which is why such a note can never come loose.
         var attributes: [String] = []
+        // Written first so it is the first thing read, in the app and in a text
+        // editor. `block` is the default and writes nothing.
+        if scope == .file { attributes.append("scope=\"file\"") }
         if !quote.isEmpty { attributes.append("quote=\"\(escapeAttribute(quote))\"") }
         if !author.isEmpty { attributes.append("by=\"\(escapeAttribute(author))\"") }
         attributes.append("at=\"\(ISO8601DateFormatter().string(from: date))\"")

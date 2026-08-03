@@ -8,6 +8,7 @@ private extension NSToolbarItem.Identifier {
     static let theme = NSToolbarItem.Identifier("theme")
     static let comments = NSToolbarItem.Identifier("comments")
     static let shortcuts = NSToolbarItem.Identifier("shortcuts")
+    static let commentFile = NSToolbarItem.Identifier("commentFile")
     static let reviewSendBack = NSToolbarItem.Identifier("reviewSendBack")
     static let reviewApprove = NSToolbarItem.Identifier("reviewApprove")
 }
@@ -39,7 +40,7 @@ extension DocumentWindowController: NSToolbarDelegate {
         // else is waiting on should not sit next to Find.
         let reading: [NSToolbarItem.Identifier] =
             [.toggleSidebar, .sidebarTrackingSeparator, .flexibleSpace,
-             .comments, .theme, .find, .export, .openIn]
+             .commentFile, .comments, .theme, .find, .export, .openIn]
         guard Review.isReview(url) else { return reading }
         // Once it is decided, only the button that was pressed stays. Hiding the
         // other one leaves its slot behind, and an empty pill in the toolbar
@@ -91,6 +92,13 @@ extension DocumentWindowController: NSToolbarDelegate {
             return button(identifier, symbol: "magnifyingglass", label: "Find",
                           tip: "Find in Document (⌘F)",
                           action: #selector(performFind(_:)))
+
+        case .commentFile:
+            // Next to Comments, which shows the ones that exist: one names the
+            // subject, the other adds to it.
+            return button(identifier, symbol: "text.bubble", label: "Comment on Document",
+                          tip: "Comment on the whole document",
+                          action: #selector(commentOnDocument(_:)))
 
         case .comments:
             // "Comments" alone names the subject, not the action, and left
@@ -241,6 +249,13 @@ extension DocumentWindowController: NSToolbarDelegate {
         reveal.image = icon(for: URL(fileURLWithPath: "/System/Library/CoreServices/Finder.app"))
         reveal.target = self
         return menu
+    }
+
+    /// Opens the composer for a note about the document itself. There is no
+    /// selection and nothing highlighted, so the popover is anchored to the top
+    /// of the page — the note is about all of it.
+    @objc func commentOnDocument(_ sender: Any?) {
+        beginFileNote()
     }
 
     // MARK: - Finishing a review

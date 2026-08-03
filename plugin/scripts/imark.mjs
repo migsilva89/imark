@@ -67,6 +67,7 @@ export function parseNotes(source) {
 
     notes.push({
       quote: attrs.quote ?? '',
+      scope: attrs.scope === 'file' ? 'file' : 'block',
       by: attrs.by ?? '',
       at: attrs.at ?? '',
       nth: attrs.nth ? Number(attrs.nth) : 1,
@@ -95,7 +96,9 @@ export function parseNotes(source) {
       if (!note.anchor && prose[j].trim()) note.anchor = prose[j].trim()
       if (/^#{1,6}\s/.test(prose[j])) { note.heading = prose[j].replace(/^#+\s*/, '').trim(); break }
     }
-    note.orphan = note.quote !== '' && !flat.includes(note.quote.replace(/\s+/g, ' ').trim())
+    note.orphan = note.scope !== 'file'
+      && note.quote !== ''
+      && !flat.includes(note.quote.replace(/\s+/g, ' ').trim())
   }
 
   return notes
@@ -111,11 +114,15 @@ export function formatNotes(notes) {
   if (notes.length === 0) return '_Sem notas._'
   return notes.map((note, i) => {
     const who = [note.by || 'anónimo', when(note.at)].filter(Boolean).join(', ')
-    const head = note.quote ? `sobre “${note.quote}”` : 'sobre o bloco acima'
+    const head = note.scope === 'file'
+      ? 'sobre o documento inteiro'
+      : (note.quote ? `sobre “${note.quote}”` : 'sobre o bloco acima')
     const lines = [`### Nota ${i + 1} — ${head}`, `${who} · linha ${note.line}`]
     if (note.heading) lines.push(`Secção: ${note.heading}`)
     if (note.orphan) lines.push('⚠️ Órfã — o texto citado já não existe no documento.')
-    if (note.anchor && !note.orphan) lines.push(`> ${note.anchor}`)
+    // A file note has nothing above it worth quoting — the front matter fence,
+    // usually — and it is not about whatever it happens to follow.
+    if (note.anchor && !note.orphan && note.scope !== 'file') lines.push(`> ${note.anchor}`)
     lines.push('', note.body || '_(vazia)_')
     return lines.join('\n')
   }).join('\n\n')
