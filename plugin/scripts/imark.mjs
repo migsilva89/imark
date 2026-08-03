@@ -83,13 +83,19 @@ export function parseNotes(source) {
   // Prose only — a quote that appears inside another note is not an anchor.
   const prose = lines.map((line, i) => (inside.has(i) ? '' : line))
 
+  // `quote=` holds the *rendered* text, so a paragraph the file wraps over two
+  // lines arrives with a space where the source has a newline. Comparing them
+  // literally marked freshly written notes as orphans, which tells an agent to
+  // distrust an anchor that is perfectly good.
+  const flat = prose.join('\n').replace(/\s+/g, ' ')
+
   for (const note of notes) {
     const at = note.line - 1
     for (let j = at - 1; j >= 0; j--) {
       if (!note.anchor && prose[j].trim()) note.anchor = prose[j].trim()
       if (/^#{1,6}\s/.test(prose[j])) { note.heading = prose[j].replace(/^#+\s*/, '').trim(); break }
     }
-    note.orphan = note.quote !== '' && !prose.join('\n').includes(note.quote)
+    note.orphan = note.quote !== '' && !flat.includes(note.quote.replace(/\s+/g, ' ').trim())
   }
 
   return notes
