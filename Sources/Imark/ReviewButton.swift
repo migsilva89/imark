@@ -39,13 +39,17 @@ final class ReviewButton: NSButton {
         self.target = target
         self.action = action
 
+        // Both get the same pill. The filled one takes the colour inside, the
+        // other only around the edge — enough to read as a button without
+        // competing with the one that ends the review in the other direction.
+        wantsLayer = true
+        layer?.cornerCurve = .continuous
+        layer?.cornerRadius = 12
         if filled {
-            wantsLayer = true
-            layer?.cornerCurve = .continuous
-            layer?.cornerRadius = 12
             contentTintColor = .white
         } else {
             contentTintColor = tint
+            layer?.borderWidth = 1
         }
         self.title = title
 
@@ -77,15 +81,22 @@ final class ReviewButton: NSButton {
     override var wantsUpdateLayer: Bool { true }
 
     override func updateLayer() {
-        guard filled else { return }
-        layer?.backgroundColor = (isEnabled ? tint : .disabledControlTextColor).cgColor
+        let colour = isEnabled ? tint : NSColor.disabledControlTextColor
+        if filled {
+            layer?.backgroundColor = colour.cgColor
+        } else {
+            // Lighter than the words it surrounds: a full-strength outline in
+            // the same red reads as a warning around the button rather than
+            // the edge of one.
+            layer?.borderColor = colour.withAlphaComponent(0.45).cgColor
+        }
     }
 
     /// A borderless button hugs its text. The fill needs room around the words
     /// or it reads as a highlight rather than a button.
     override var intrinsicContentSize: NSSize {
         var size = super.intrinsicContentSize
-        if filled { size.width += 22 }
+        size.width += 22
         size.height = 24
         return size
     }
