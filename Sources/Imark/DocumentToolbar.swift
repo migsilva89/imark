@@ -8,6 +8,8 @@ private extension NSToolbarItem.Identifier {
     static let theme = NSToolbarItem.Identifier("theme")
     static let comments = NSToolbarItem.Identifier("comments")
     static let shortcuts = NSToolbarItem.Identifier("shortcuts")
+    static let reviewSendBack = NSToolbarItem.Identifier("reviewSendBack")
+    static let reviewApprove = NSToolbarItem.Identifier("reviewApprove")
 }
 
 extension DocumentWindowController: NSToolbarDelegate {
@@ -29,8 +31,23 @@ extension DocumentWindowController: NSToolbarDelegate {
         // somewhere else. Find sits with the appearance rather than leading the
         // row: it is a thing you do to the page in front of you, not a way out
         // of it.
-        [.toggleSidebar, .sidebarTrackingSeparator, .flexibleSpace,
-         .comments, .theme, .find, .export, .openIn]
+        //
+        // A document under review ends the row with the two buttons that finish
+        // it. They go last, past the appearance and the way out, because they
+        // are the only items here that end something rather than change how you
+        // are looking at it — and because a button that closes a loop somebody
+        // else is waiting on should not sit next to Find.
+        let reading: [NSToolbarItem.Identifier] =
+            [.toggleSidebar, .sidebarTrackingSeparator, .flexibleSpace,
+             .comments, .theme, .find, .export, .openIn]
+        guard Review.isReview(url) else { return reading }
+        // Once it is decided, only the button that was pressed stays. Hiding the
+        // other one leaves its slot behind, and an empty pill in the toolbar
+        // looks like something that failed to load.
+        if let decision = Review.decision(for: url) {
+            return reading + [decision == .approve ? .reviewApprove : .reviewSendBack]
+        }
+        return reading + [.reviewSendBack, .reviewApprove]
     }
 
     public func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
@@ -123,9 +140,51 @@ extension DocumentWindowController: NSToolbarDelegate {
             }
             return item
 
+        case .reviewSendBack:
+            return reviewButton(identifier, title: "Send Back", symbol: "arrowshape.turn.up.left",
+                                tip: "Return the review with your notes",
+                                action: #selector(sendReviewBack(_:)))
+
+        case .reviewApprove:
+            // The only filled button in the app. It is the one place where a
+            // button does something outside this window, and the row would
+            // otherwise read as five equal ways of looking at a document.
+            return reviewButton(identifier, title: "Approve", symbol: "checkmark",
+                                tip: "Approve and let the agent continue",
+                                action: #selector(approveReview(_:)), filled: true)
+
         default:
             return nil
         }
+    }
+
+    /// Wide enough to carry a word, because these two have to be read rather
+    /// than recognised: nobody has seen them before, and getting them the wrong
+    /// way round sends work back that was meant to go ahead.
+    private func reviewButton(
+        _ identifier: NSToolbarItem.Identifier,
+        title: String,
+        symbol: String,
+        tip: String,
+        action: Selector,
+        filled: Bool = false
+    ) -> NSToolbarItem {
+        let button = ReviewButton(title: title, symbol: symbol, filled: filled,
+                                  target: self, action: action)
+
+        // Decided already: the pair stops offering a choice that has been made
+        // and becomes a record of it, so reopening the file tells you what you
+        // said instead of inviting you to say it twice.
+        if Review.decision(for: url) != nil {
+            button.isEnabled = false
+            button.title = filled ? "Approved" : "Sent Back"
+        }
+
+        let item = NSToolbarItem(itemIdentifier: identifier)
+        item.view = button
+        item.label = title
+        item.toolTip = tip
+        return item
     }
 
     private func button(
@@ -173,6 +232,39 @@ extension DocumentWindowController: NSToolbarDelegate {
         reveal.image = icon(for: URL(fileURLWithPath: "/System/Library/CoreServices/Finder.app"))
         reveal.target = self
         return menu
+    }
+
+    // MARK: - Finishing a review
+
+    @objc func approveReview(_ sender: Any?) {
+        finishReview(.approve)
+    }
+
+    @objc func sendReviewBack(_ sender: Any?) {
+        // Sending back an unannotated document tells the agent to try again and
+        // nothing about what to change, which is the one outcome nobody wants.
+        guard noteCount > 0 else {
+            let alert = NSAlert()
+            alert.messageText = "Send this back with no notes?"
+            alert.informativeText = "You haven't commented on anything. "
+                + "The agent will be told to revise without being told what to change."
+            alert.addButton(withTitle: "Send Back Anyway")
+            alert.addButton(withTitle: "Cancel")
+            guard alert.runModal() == .alertFirstButtonReturn else { return }
+            return finishReview(.sendBack)
+        }
+        finishReview(.sendBack)
+    }
+
+    private func finishReview(_ decision: Review.Decision) {
+        do {
+            try Review.decide(decision, notes: noteCount, for: url)
+            buildToolbar()
+        } catch {
+            let alert = NSAlert(error: error)
+            alert.messageText = "Imark couldn't record that decision."
+            alert.runModal()
+        }
     }
 
     private func icon(for app: URL) -> NSImage {

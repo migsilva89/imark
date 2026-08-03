@@ -177,6 +177,12 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func load() {
+        // Asked again from disk: a different document, or the same one after an
+        // edit, may have stopped being a review — and the toolbar is built from
+        // the answer.
+        Review.forget()
+        buildToolbar()
+
         guard var text = try? String(contentsOf: url, encoding: .utf8) else {
             content.renderer.render(
                 markdown: "# Can't read this file\n\n`\(url.path)`\n\nIt exists, but it isn't UTF-8 text.",

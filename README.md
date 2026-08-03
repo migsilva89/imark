@@ -275,8 +275,10 @@ is the whole bridge.
 /imark:imark-notes ficheiro.md   # notes you already left
 ```
 
-It uses the app as it stands and asks nothing of it. If it ever goes away, Imark
-is not left holding a button with nothing behind it.
+A document under review gets two buttons in the toolbar — **Approve** and **Send
+Back** — and pressing one ends the wait on the other side. They appear only on a
+document that asked to be reviewed, marked `imark: review` in its front matter;
+every other file opens exactly as it always did.
 
 ## Licences
 

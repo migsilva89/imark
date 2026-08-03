@@ -121,6 +121,8 @@ const fold = (value) =>
   value.normalize('NFD').replace(/[̀-ͯ]/g, '')
     .toLowerCase().replace(/[^a-z0-9]/g, '')
 
+const verdictWord = (note) => APPROVE.has(fold(note.quote)) || REVISE.has(fold(note.quote))
+
 /** The reviewer's verdict, or null while there still isn't one. */
 function verdict(notes) {
   for (const note of notes) {
@@ -136,9 +138,13 @@ const DECISION = `
 
 ## Decisão
 
-Comenta em **seguir** para aprovar, ou em **rever** para devolver as notas ao
-agente. Tudo o resto que comentares acima é feedback e não decide nada — podes
-anotar o documento inteiro e só no fim escolher.
+Os botões **Approve** e **Send Back**, no topo da janela, fecham esta revisão.
+*Send Back* devolve ao agente tudo o que comentaste; *Approve* deixa-o seguir.
+
+Comenta onde quiseres até lá — nada do que escreveres decide seja o que for.
+
+Se estiveres a ler isto numa versão do Imark sem esses botões, comentar em
+**seguir** ou em **rever** faz o mesmo.
 `
 
 // ------------------------------------------------------------------ the app
@@ -163,8 +169,26 @@ function openInImark(file) {
  */
 async function waitForDecision(file, { timeoutMs = 4 * 60 * 60 * 1000 } = {}) {
   const started = Date.now()
+  const sidecar = file.replace(/\.md$/, '.decision.json')
   let seen = ''
+
   while (Date.now() - started < timeoutMs) {
+    // The buttons in the app's toolbar, which is how anybody finds this. They
+    // write beside the document rather than into it, so the notes stay the only
+    // thing in the file the reviewer put there.
+    try {
+      const answer = JSON.parse(fs.readFileSync(sidecar, 'utf8'))
+      const notes = parseNotes(fs.readFileSync(file, 'utf8'))
+      return {
+        approved: answer.decision === 'approve',
+        decision: { body: '' },
+        notes: notes.filter((note) => !verdictWord(note)),
+      }
+    } catch { /* no decision yet */ }
+
+    // The words, still — for a document opened in a build of Imark without the
+    // toolbar, and because a review that only one version of one app can finish
+    // is not the file-is-the-bridge thing this was supposed to be.
     try {
       const stat = fs.statSync(file)
       const stamp = `${stat.size}:${stat.mtimeMs}`
@@ -181,6 +205,7 @@ async function waitForDecision(file, { timeoutMs = 4 * 60 * 60 * 1000 } = {}) {
         }
       }
     } catch { /* the file is mid-rename; look again in half a second */ }
+
     await new Promise((resolve) => setTimeout(resolve, 500))
   }
   return null
@@ -203,10 +228,15 @@ const slug = (value) =>
 function writeReview(root, { title, body, kind }) {
   const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
   const file = path.join(reviewsDir(root), `${slug(kind)}-${stamp}.md`)
+  // `imark: review` is what puts Approve and Send Back in the app's toolbar.
+  // Without it the document is just a document, which is what every other
+  // markdown file Imark opens has to stay.
   const front = [
     '---',
+    'imark: review',
     `title: ${JSON.stringify(title)}`,
     `date: ${new Date().toISOString()}`,
+    `by: ${process.env.CLAUDE_CODE_ENTRYPOINT ? 'Claude Code' : 'terminal'}`,
     '---',
     '',
     '',

@@ -188,7 +188,9 @@ function renderFrontMatter(data) {
   if (!data) return ''
   const title = data.title ?? data.name
   const rows = Object.entries(data)
-    .filter(([key]) => key !== 'title' && key !== 'name')
+    // `imark:` is how a document tells the app what it is — machinery, not
+    // something the person reading it put there or needs to see.
+    .filter(([key]) => key !== 'title' && key !== 'name' && key !== 'imark')
     .map(([key, value]) => {
       const shown = Array.isArray(value)
         ? value.map((v) => `<span class="fm-chip">${escapeHtml(v)}</span>`).join('')

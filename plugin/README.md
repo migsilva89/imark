@@ -26,14 +26,24 @@ Needs Imark in `/Applications` and Node 20.
 ```
 
 `imark-review` writes a document to `.imark/reviews/`, opens it in Imark, and
-**blocks**. You read it, comment where you want to, and end the wait by
-commenting on one of two words the document tells you about:
+**blocks**. You read it, comment where you want to, and finish with the two
+buttons at the top of the window:
 
-> Comenta em **seguir** para aprovar, ou em **rever** para devolver as notas ao
-> agente.
+| | |
+|---|---|
+| **Approve** | the agent carries on, with any notes you left |
+| **Send Back** | the agent gets every note and revises instead |
 
-Everything else you comment on along the way is feedback and decides nothing —
-annotate the whole document and choose at the end.
+They appear only on a review — a document carrying `imark: review` in its front
+matter. Every other markdown file opens exactly as it always did.
+
+Pressing one writes a `.decision.json` beside the document, never into it: the
+document is yours and carries your notes, and the machinery keeps its own
+bookkeeping somewhere you can delete without losing anything.
+
+On a build of Imark without those buttons, commenting on the words **seguir** or
+**rever** does the same thing. A review only one version of one app can finish
+would not be much of a bridge.
 
 `.imark/` writes its own one-line `.gitignore`, so your project's does not have
 to change.
@@ -60,12 +70,16 @@ wrote, so it revises instead of building.
 - **No idea when you closed the window.** Open a review and go to lunch and the
   agent waits. That is the price of there being no channel back.
 
-## The one file
+## Where the code is
 
-Everything is [`scripts/imark.mjs`](scripts/imark.mjs) — the parser, the review
-documents and the hook. It has no dependencies, and its escaping is the mirror
-image of `Sources/Imark/Comments.swift`. If one side grows a rule, the other
-has to grow it too.
+The plugin is one file — [`scripts/imark.mjs`](scripts/imark.mjs), the parser,
+the review documents and the hook, with no dependencies. Its escaping is the
+mirror image of `Sources/Imark/Comments.swift`; if one side grows a rule, the
+other has to grow it too.
+
+The app's side is `Sources/Imark/Review.swift` and `ReviewButton.swift`. That is
+the only part of Imark that knows another tool exists, and it is meant to stay
+that way.
 
 ```bash
 node scripts/imark.mjs notes ../testdata/comments.md
