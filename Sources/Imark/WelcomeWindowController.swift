@@ -76,7 +76,7 @@ final class WelcomeWindowController: NSWindowController {
         stack.setCustomSpacing(14, after: icon)
         stack.setCustomSpacing(26, after: subtitle)
         stack.setCustomSpacing(22, after: openButton)
-        stack.setCustomSpacing(10, after: defaultRow)
+        stack.setCustomSpacing(16, after: defaultRow)
 
         stack.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(stack)
@@ -131,7 +131,12 @@ final class WelcomeWindowController: NSWindowController {
             return
         }
         agentRow.isHidden = false
-        let names = found.map(\.name).joined(separator: " and ")
+        // Two names fit in a button; four do not, and a button that wraps or
+        // truncates says less than one that says "your coding agents" and lets
+        // the alert do the naming.
+        let names = found.count > 2
+            ? "your coding agents"
+            : found.map(\.name).joined(separator: " and ")
 
         guard !AgentSetup.isInstalled else {
             let check = NSImageView(
@@ -164,7 +169,11 @@ final class WelcomeWindowController: NSWindowController {
             target: self,
             action: #selector(installAgentSetup)
         )
+        // Small, like the row above it. Both are setup offers made once and
+        // then never again, and neither should out-shout Open.
         button.bezelStyle = .rounded
+        button.controlSize = .small
+        button.font = .systemFont(ofSize: 11)
         button.toolTip = "Adds a skill so your agent can open documents here for review"
         agentRow.addArrangedSubview(button)
     }
@@ -178,6 +187,7 @@ final class WelcomeWindowController: NSWindowController {
             .map { $0.path.replacingOccurrences(of: home, with: "~") }
             .joined(separator: "\n")
 
+        let skipped = AgentSetup.unsupportedFound
         let alert = NSAlert()
         alert.messageText = "Set Imark up for your coding agents?"
         alert.informativeText = [
@@ -188,6 +198,9 @@ final class WelcomeWindowController: NSWindowController {
             "Your agent can then open a document here for you to comment on, and "
                 + "read your notes back out of the file. Nothing else is touched, "
                 + "and Remove deletes exactly these.",
+            skipped.isEmpty ? "" : "\nAlso found, and left alone: "
+                + skipped.map(\.name).joined(separator: ", ")
+                + ". Imark doesn't know where those keep their skills.",
         ].joined(separator: "\n")
         alert.addButton(withTitle: "Set Up")
         alert.addButton(withTitle: "Cancel")

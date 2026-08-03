@@ -28,10 +28,30 @@ enum AgentSetup {
         let commands: String?
     }
 
+    /// Only agents whose skills folder is actually known. An agent added here on
+    /// a guess would have Imark writing files into a place nothing reads, which
+    /// looks exactly like working until somebody tries to use it. Others get
+    /// named in the alert as found-but-not-handled instead.
     static let known = [
         Agent(name: "Claude Code", home: ".claude", skills: ".claude/skills", commands: ".claude/commands"),
         Agent(name: "Codex", home: ".codex", skills: ".codex/skills", commands: nil),
     ]
+
+    /// Agents on the machine that this does not know how to set up. Named rather
+    /// than ignored: somebody with Gemini installed should be told it was seen
+    /// and skipped, not left wondering whether it was handled quietly.
+    static let others = [
+        Agent(name: "Cursor", home: ".cursor", skills: "", commands: nil),
+        Agent(name: "Gemini CLI", home: ".gemini", skills: "", commands: nil),
+        Agent(name: "Copilot", home: ".copilot", skills: "", commands: nil),
+        Agent(name: "OpenCode", home: ".config/opencode", skills: "", commands: nil),
+    ]
+
+    static var unsupportedFound: [Agent] {
+        others.filter {
+            FileManager.default.fileExists(atPath: homeDirectory.appendingPathComponent($0.home).path)
+        }
+    }
 
     private static var homeDirectory: URL {
         // Redirected for the test, which installs and uninstalls for real and
