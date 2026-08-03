@@ -42,15 +42,21 @@ extension DocumentWindowController: NSToolbarDelegate {
             [.toggleSidebar, .sidebarTrackingSeparator, .flexibleSpace,
              .commentFile, .comments, .theme, .find, .export, .openIn]
         guard Review.isReview(url) else { return reading }
+
+        // A review keeps only what a reviewer does. Open in and Export are ways
+        // of taking a document somewhere else, and this one is a copy that
+        // exists to be answered — editing it in Cursor changes nothing anybody
+        // will read, and printing it is printing a working file.
+        let reviewing = reading.filter { $0 != .export && $0 != .openIn }
         // Once it is decided, only the button that was pressed stays. Hiding the
         // other one leaves its slot behind, and an empty pill in the toolbar
         // looks like something that failed to load.
         if let decision = Review.decision(for: url) {
-            return reading + [decision == .approve ? .reviewApprove : .reviewSendBack]
+            return reviewing + [decision == .approve ? .reviewApprove : .reviewSendBack]
         }
         // A gap between them, because the cost of pressing the wrong one is
         // asymmetric: approving by mistake sets work going that nobody checked.
-        return reading + [.reviewSendBack, .space, .reviewApprove]
+        return reviewing + [.reviewSendBack, .space, .reviewApprove]
     }
 
     public func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
