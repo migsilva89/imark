@@ -9,6 +9,10 @@ final class WelcomeWindowController: NSWindowController {
     /// Holds either the "make me the default" button or the confirmation that
     /// Imark already is, and is rebuilt when that changes.
     private let defaultRow = NSStackView()
+    /// The same, for the Claude Code integration. Only built at all when there
+    /// is a `~/.claude` to install into: an offer to set up something you do not
+    /// have is a puzzle, not a feature.
+    private let agentRow = NSStackView()
 
     init() {
         let window = NSWindow(
@@ -60,13 +64,19 @@ final class WelcomeWindowController: NSWindowController {
         defaultRow.alignment = .centerY
         refreshDefaultRow()
 
-        let stack = NSStackView(views: [icon, title, subtitle, openButton, defaultRow])
+        agentRow.orientation = .horizontal
+        agentRow.spacing = 5
+        agentRow.alignment = .centerY
+        refreshAgentRow()
+
+        let stack = NSStackView(views: [icon, title, subtitle, openButton, defaultRow, agentRow])
         stack.orientation = .vertical
         stack.alignment = .centerX
         stack.spacing = 10
         stack.setCustomSpacing(14, after: icon)
         stack.setCustomSpacing(26, after: subtitle)
         stack.setCustomSpacing(22, after: openButton)
+        stack.setCustomSpacing(10, after: defaultRow)
 
         stack.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(stack)
@@ -109,6 +119,91 @@ final class WelcomeWindowController: NSWindowController {
         defaultRow.addArrangedSubview(button)
     }
 
+    // MARK: - Coding agents
+
+    private func refreshAgentRow() {
+        agentRow.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        // Nothing to install into, so nothing to say. Somebody who does not use
+        // Claude Code should not have to work out what this row is for.
+        guard AgentSetup.claudeCodeFound else {
+            agentRow.isHidden = true
+            return
+        }
+        agentRow.isHidden = false
+
+        guard !AgentSetup.isInstalled else {
+            let check = NSImageView(
+                image: NSImage(systemSymbolName: "checkmark.circle.fill", accessibilityDescription: nil)
+                    ?? NSImage()
+            )
+            check.contentTintColor = .secondaryLabelColor
+            check.symbolConfiguration = .init(pointSize: 11, weight: .regular)
+
+            let label = NSTextField(labelWithString: "Set up for Claude Code")
+            label.font = .systemFont(ofSize: 11)
+            label.textColor = .secondaryLabelColor
+
+            // Deleting three files, offered where they were created. An install
+            // with no way back is a trap, and hiding the way back in a menu is
+            // the same trap with a longer fuse.
+            let remove = NSButton(title: "Remove", target: self, action: #selector(removeAgentSetup))
+            remove.bezelStyle = .inline
+            remove.controlSize = .small
+            remove.font = .systemFont(ofSize: 11)
+
+            agentRow.addArrangedSubview(check)
+            agentRow.addArrangedSubview(label)
+            agentRow.addArrangedSubview(remove)
+            return
+        }
+
+        let button = NSButton(
+            title: "Set up for Claude Code",
+            target: self,
+            action: #selector(installAgentSetup)
+        )
+        button.bezelStyle = .rounded
+        button.toolTip = "Adds a skill and two commands to ~/.claude"
+        agentRow.addArrangedSubview(button)
+    }
+
+    /// Says what it will write before it writes it. This is the one thing Imark
+    /// does outside its own files and somebody's documents, and it lands in a
+    /// folder another program owns.
+    @objc private func installAgentSetup() {
+        let alert = NSAlert()
+        alert.messageText = "Set Imark up for Claude Code?"
+        alert.informativeText = [
+            "This writes three files to your home folder:",
+            "",
+            "~/.claude/skills/imark-comments/SKILL.md",
+            "~/.claude/commands/imark-review.md",
+            "~/.claude/commands/imark-notes.md",
+            "",
+            "You get /imark-review and /imark-notes, which open a document here "
+                + "for you to comment on and read your notes back. Nothing else "
+                + "is touched, and Remove deletes exactly these three.",
+        ].joined(separator: "\n")
+        alert.addButton(withTitle: "Set Up")
+        alert.addButton(withTitle: "Cancel")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+
+        do {
+            try AgentSetup.install()
+        } catch {
+            let failure = NSAlert()
+            failure.messageText = "Imark couldn't set that up."
+            failure.informativeText = (error as? LocalizedError)?.errorDescription ?? "\(error)"
+            failure.runModal()
+        }
+        refreshAgentRow()
+    }
+
+    @objc private func removeAgentSetup() {
+        try? AgentSetup.uninstall()
+        refreshAgentRow()
+    }
+
     @objc private func openPanel() {
         let panel = NSOpenPanel()
         panel.allowsMultipleSelection = true
@@ -130,6 +225,7 @@ final class WelcomeWindowController: NSWindowController {
         super.showWindow(sender)
         // The user may have changed the handler in the Finder since last time.
         refreshDefaultRow()
+        refreshAgentRow()
         window?.makeKeyAndOrderFront(nil)
     }
 

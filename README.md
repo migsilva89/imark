@@ -274,6 +274,12 @@ is the whole bridge.
 /imark:imark-notes ficheiro.md    # notes you already left
 ```
 
+Launched with no document, Imark offers to **set itself up for Claude Code** —
+it writes a skill and two commands to `~/.claude`, and Remove deletes exactly
+those. Skills and commands only, never the plugin: a plugin is not a folder of
+files but a registry another program owns, and writing into that is how you
+break what somebody already had.
+
 A document under review gets two buttons in the toolbar — **Approve** and **Send
 Back** — and pressing one ends the wait on the other side. They appear only on a
 document that asked to be reviewed, marked `imark: review` in its front matter;
@@ -307,6 +313,7 @@ swiftc -parse-as-library Sources/Imark/Comments.swift Sources/Imark/NoteColour.s
 node Support/test-export.mjs
 swift Support/test-plus.swift
 Support/test-review.sh
+Support/test-setup.sh
 ```
 
 Two helpers exist for looking at the UI without photographing the whole desktop — `Support/shoot.swift` renders a page in an off-screen web view, and `Support/window-id.swift` resolves a window id so a screenshot can be taken of one window:
