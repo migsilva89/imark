@@ -10,9 +10,18 @@ import AppKit
 /// looking like the same button with different words.
 final class ReviewButton: NSButton {
     private let filled: Bool
+    private let tint: NSColor
 
-    init(title: String, symbol: String, filled: Bool, target: AnyObject, action: Selector) {
+    init(
+        title: String,
+        symbol: String,
+        filled: Bool,
+        tint: NSColor,
+        target: AnyObject,
+        action: Selector
+    ) {
         self.filled = filled
+        self.tint = tint
         super.init(frame: .zero)
 
         image = NSImage(
@@ -36,7 +45,7 @@ final class ReviewButton: NSButton {
             layer?.cornerRadius = 12
             contentTintColor = .white
         } else {
-            contentTintColor = .secondaryLabelColor
+            contentTintColor = tint
         }
         self.title = title
 
@@ -50,8 +59,11 @@ final class ReviewButton: NSButton {
     /// works — the button changes its own wording once a decision is taken.
     override var title: String {
         didSet {
+            // Once decided the pair stops being a choice, and a red word on a
+            // question nobody is being asked any more reads as an error.
+            let colour: NSColor = filled ? .white : (isEnabled ? tint : .secondaryLabelColor)
             attributedTitle = NSAttributedString(string: title, attributes: [
-                .foregroundColor: filled ? NSColor.white : .secondaryLabelColor,
+                .foregroundColor: colour,
                 .font: NSFont.systemFont(
                     ofSize: NSFont.smallSystemFontSize,
                     weight: filled ? .semibold : .regular
@@ -66,7 +78,7 @@ final class ReviewButton: NSButton {
 
     override func updateLayer() {
         guard filled else { return }
-        layer?.backgroundColor = (isEnabled ? NSColor.imarkAccent : .disabledControlTextColor).cgColor
+        layer?.backgroundColor = (isEnabled ? tint : .disabledControlTextColor).cgColor
     }
 
     /// A borderless button hugs its text. The fill needs room around the words

@@ -143,9 +143,13 @@ extension DocumentWindowController: NSToolbarDelegate {
             return item
 
         case .reviewSendBack:
+            // The palette's own red, the same one you can paint a note with.
+            // Borrowing GitHub's would have put a colour in the window that
+            // appears nowhere else in the app.
             return reviewButton(identifier, title: "Request Changes",
                                 symbol: "arrow.uturn.backward",
                                 tip: "Send your notes back and hold the work",
+                                tint: NoteColour.red.colour,
                                 action: #selector(sendReviewBack(_:)))
 
         case .reviewApprove:
@@ -154,6 +158,7 @@ extension DocumentWindowController: NSToolbarDelegate {
             // otherwise read as five equal ways of looking at a document.
             return reviewButton(identifier, title: "Approve", symbol: "checkmark",
                                 tip: "Approve and let the agent continue",
+                                tint: .imarkApprove,
                                 action: #selector(approveReview(_:)), filled: true)
 
         default:
@@ -169,11 +174,12 @@ extension DocumentWindowController: NSToolbarDelegate {
         title: String,
         symbol: String,
         tip: String,
+        tint: NSColor,
         action: Selector,
         filled: Bool = false
     ) -> NSToolbarItem {
         let button = ReviewButton(title: title, symbol: symbol, filled: filled,
-                                  target: self, action: action)
+                                  tint: tint, target: self, action: action)
 
         // Decided already: the pair stops offering a choice that has been made
         // and becomes a record of it, so reopening the file tells you what you
