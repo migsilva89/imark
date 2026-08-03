@@ -305,6 +305,7 @@ tests of its own:
 swiftc -parse-as-library Sources/Imark/Comments.swift Sources/Imark/NoteColour.swift \
   Support/test-comments.swift -o /tmp/imark-test && /tmp/imark-test
 node Support/test-export.mjs
+swift Support/test-plus.swift
 ```
 
 Two helpers exist for looking at the UI without photographing the whole desktop — `Support/shoot.swift` renders a page in an off-screen web view, and `Support/window-id.swift` resolves a window id so a screenshot can be taken of one window:

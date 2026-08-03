@@ -920,6 +920,16 @@ function countBefore(block, range, text) {
 /// one it is, and it can never come loose the way a quote can.
 let plusButton = null
 let plusTarget = null
+/// Hiding is delayed, because the way to the button leads out of the text: the
+/// pointer crosses the margin, which belongs to no block, and hiding on the
+/// first frame outside meant the button vanished exactly as you reached for it.
+let plusHideTimer = 0
+
+const cancelHide = () => clearTimeout(plusHideTimer)
+const scheduleHide = () => {
+  clearTimeout(plusHideTimer)
+  plusHideTimer = setTimeout(hidePlus, 220)
+}
 
 const topLevelBlock = (node) => {
   const root = content()
@@ -934,7 +944,7 @@ const topLevelBlock = (node) => {
 }
 
 function hidePlus() {
-  plusTarget?.classList.remove('block-target')
+  plusTarget?.classList.remove('block-target', 'block-armed')
   plusTarget = null
   if (plusButton) plusButton.style.display = 'none'
 }
@@ -942,13 +952,16 @@ function hidePlus() {
 function showPlus(block) {
   if (!plusButton) return
   if (plusTarget === block) return
-  plusTarget?.classList.remove('block-target')
+  plusTarget?.classList.remove('block-target', 'block-armed')
   plusTarget = block
+  // Lit as soon as the button appears, not only once the pointer reaches it.
+  // Waiting meant the highlight never showed at all if you never got there.
+  block.classList.add('block-target')
 
   const rect = block.getBoundingClientRect()
   plusButton.style.display = 'flex'
   plusButton.style.top = `${rect.top + 1}px`
-  plusButton.style.left = `${rect.left - 34}px`
+  plusButton.style.left = `${Math.max(4, rect.left - 34)}px`
 }
 
 function setUpBlockPlus() {
@@ -960,10 +973,14 @@ function setUpBlockPlus() {
   plusButton.style.display = 'none'
   document.body.appendChild(plusButton)
 
-  // Held down rather than clicked-through: the block lights up while the
-  // pointer is on the button, which is what says where the note will land.
-  plusButton.addEventListener('mouseenter', () => plusTarget?.classList.add('block-target'))
-  plusButton.addEventListener('mouseleave', () => plusTarget?.classList.remove('block-target'))
+  plusButton.addEventListener('mouseenter', () => {
+    cancelHide()
+    plusTarget?.classList.add('block-armed')
+  })
+  plusButton.addEventListener('mouseleave', () => {
+    plusTarget?.classList.remove('block-armed')
+    scheduleHide()
+  })
 
   plusButton.addEventListener('click', () => {
     const block = plusTarget
@@ -984,14 +1001,15 @@ function setUpBlockPlus() {
   })
 
   document.addEventListener('mousemove', (event) => {
-    if (event.target === plusButton) return
+    if (event.target === plusButton) return cancelHide()
     const root = content()
-    if (!root.contains(event.target)) return hidePlus()
+    if (!root.contains(event.target)) return scheduleHide()
     // Not while a selection is live: the popover is already open on words the
     // reader chose, and a second way in would fight it.
     if (hadSelection) return hidePlus()
     const block = topLevelBlock(event.target)
-    if (!block || !lineRange(block)) return hidePlus()
+    if (!block || !lineRange(block)) return scheduleHide()
+    cancelHide()
     showPlus(block)
   })
 

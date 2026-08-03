@@ -461,7 +461,11 @@ export function buildNoteRail() {
   hideTip()
 
   const all = dots()
-  if (all.length < 2) {
+  // One mark is enough. The rail used to wait for two, on the grounds that a
+  // rail with a single mark is not a rail — but that made the first comment you
+  // ever wrote produce nothing at all, and the second one make two appear out of
+  // nowhere. Feedback for the thing you just did beats tidiness.
+  if (all.length === 0) {
     delete document.documentElement.dataset.noteRail
     return
   }

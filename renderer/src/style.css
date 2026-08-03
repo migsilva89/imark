@@ -922,9 +922,17 @@ img[data-blocked] {
    while the popover is open: a note about to be written into a file should say
    where it is going before it goes. */
 .block-target {
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
   border-radius: 4px;
-  box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 12%, transparent);
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+/* Stronger once the pointer is actually on the `+`, so the difference between
+   "you are near this block" and "this is the one about to be written to" is
+   visible without reading anything. */
+.block-armed {
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
 /* A note written by the `+` has no quote to underline, so the dot is all there
