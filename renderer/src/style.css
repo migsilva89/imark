@@ -468,6 +468,67 @@ pre code {
   line-height: 1.55;
 }
 
+/* A diff, read the way a diff is read: the whole row carries the colour, and
+   the old and new line numbers run down the side. Same green and red as the
+   note palette, so nothing new enters the window — and the same two the review
+   buttons use, where they also mean accepted and sent back. */
+.diff-block {
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  line-height: 1.55;
+  padding: calc(var(--step) * 2) 0;
+}
+
+.diff-row {
+  display: grid;
+  grid-template-columns: 3.5ch 3.5ch 1fr;
+  gap: calc(var(--step) * 2);
+  padding: 0 calc(var(--step) * 3);
+  min-width: max-content;
+}
+
+.diff-row code {
+  background: none;
+  padding: 0;
+  white-space: pre;
+}
+
+/* Not selectable, and never copied. Selecting three rows to comment on them
+   would otherwise put the line numbers in the quote, and the quote is what
+   has to match the file. */
+.diff-num {
+  user-select: none;
+  -webkit-user-select: none;
+  text-align: right;
+  color: var(--secondary);
+  opacity: 0.55;
+}
+
+/* Mixed into the page background rather than used flat: at full strength the
+   note red is a colour you write in, and a whole row of it is a wall. */
+.diff-add { background: color-mix(in srgb, var(--note-green) 13%, transparent); }
+.diff-del { background: color-mix(in srgb, var(--note-red) 13%, transparent); }
+
+/* The row carries the colour; the code does not. Tinting both put green text
+   on a green field, which is the one combination that makes a diff harder to
+   read than leaving it alone. Only the marker takes the colour, so a row still
+   says which it is when the tints are washed out by a light theme. */
+.diff-add code::first-letter { color: var(--note-green); font-weight: 600; }
+.diff-del code::first-letter { color: var(--note-red); font-weight: 600; }
+
+/* The @@ line says where you are in the file, which is navigation rather than
+   change — it takes the accent, not one of the two verdict colours. */
+.diff-hunk {
+  background: var(--accent-soft);
+  color: var(--secondary);
+}
+
+.diff-meta code { color: var(--secondary); }
+
 .copy-btn {
   position: absolute;
   top: calc(var(--step) * 2);

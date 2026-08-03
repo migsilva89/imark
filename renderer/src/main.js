@@ -122,6 +122,52 @@ md.renderer.renderToken = (tokens, idx, options) => {
   return defaultRenderToken(tokens, idx, options)
 }
 
+/**
+ * A ```diff block, rendered the way everybody already reads a diff: the whole
+ * row tinted rather than just the `+` or the `-`, with the old and new line
+ * numbers down the side.
+ *
+ * highlight.js colours the marker character and leaves the rest of the line on
+ * the block's own background, which is legible but has to be read a character
+ * at a time. Tinting the row is what makes a diff scannable.
+ *
+ * Unified only. A reading column is one column, and two columns of code inside
+ * it is a different app.
+ */
+function renderDiff(source) {
+  const HUNK = /^@@+ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/
+  let oldNo = 0
+  let newNo = 0
+
+  const rows = source.split('\n').map((line) => {
+    const cell = (kind, left, right) =>
+      `<div class="diff-row diff-${kind}">`
+      + `<span class="diff-num">${left}</span>`
+      + `<span class="diff-num">${right}</span>`
+      + `<code>${escapeHtml(line) || '&nbsp;'}</code>`
+      + '</div>'
+
+    const hunk = line.match(HUNK)
+    if (hunk) {
+      oldNo = Number(hunk[1])
+      newNo = Number(hunk[2])
+      return cell('hunk', '', '')
+    }
+    // The `diff --git`, `index`, `---` and `+++` preamble. Matched before the
+    // +/- tests, or the file headers would be read as an added and a removed
+    // line and tinted as changes nobody made.
+    if (/^(diff --git |index |--- |\+\+\+ |new file|deleted file|similarity|rename |Binary files )/.test(line)) {
+      return cell('meta', '', '')
+    }
+    if (line.startsWith('+')) return cell('add', '', newNo++)
+    if (line.startsWith('-')) return cell('del', oldNo++, '')
+    if (line.startsWith('\\')) return cell('meta', '', '')
+    return cell('ctx', oldNo++, newNo++)
+  })
+
+  return `<div class="diff-block">${rows.join('')}</div>`
+}
+
 // Fenced ```mermaid blocks are held aside and rendered after the HTML lands.
 const defaultFence = md.renderer.rules.fence.bind(md.renderer.rules)
 md.renderer.rules.fence = (tokens, idx, options, env, self) => {
@@ -134,6 +180,9 @@ md.renderer.rules.fence = (tokens, idx, options, env, self) => {
     : ''
   if (info === 'mermaid') {
     return `<div class="mermaid-block"${lines} data-graph="${encodeURIComponent(token.content)}"></div>`
+  }
+  if (info === 'diff') {
+    return `<div class="code-wrap diff-wrap"${lines} data-lang="diff">${renderDiff(token.content)}</div>`
   }
   const html = defaultFence(tokens, idx, options, env, self)
   const label = info || 'text'
@@ -659,7 +708,11 @@ function addCopyButtons(root) {
     button.type = 'button'
     button.textContent = 'Copiar'
     button.addEventListener('click', async () => {
-      const code = wrap.querySelector('code')?.textContent ?? ''
+      // A diff is one `code` per row, so the first one alone would copy a
+      // single line and look like it had worked.
+      const code = wrap.classList.contains('diff-wrap')
+        ? [...wrap.querySelectorAll('.diff-row code')].map((el) => el.textContent).join('\n')
+        : wrap.querySelector('code')?.textContent ?? ''
       try {
         await navigator.clipboard.writeText(code)
         button.textContent = 'Copiado'
