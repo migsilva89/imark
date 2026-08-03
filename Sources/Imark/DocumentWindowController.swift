@@ -266,7 +266,17 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
 
         case .selection(let found):
             selection = found
-            selectionPopover.show(text: found.text, at: found.rect, in: content.renderer)
+            // No text means the `+` in the margin, not a selection. Straight to
+            // writing: Translate and Search need words, and offering them over
+            // a whole paragraph would be three choices where there is one.
+            if found.text.isEmpty {
+                selectionPopover.compose(
+                    existing: "", colour: Settings.noteColour,
+                    at: found.rect, in: content.renderer
+                )
+            } else {
+                selectionPopover.show(text: found.text, at: found.rect, in: content.renderer)
+            }
 
         case .selectionCleared:
             selection = nil

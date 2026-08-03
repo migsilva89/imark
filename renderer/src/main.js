@@ -907,6 +907,104 @@ function countBefore(block, range, text) {
   return before.toString().split(text).length
 }
 
+/* ------------------------------------------------------ comment on a block */
+
+/// The `+` in the margin. One button that follows the block under the pointer,
+/// rather than one per paragraph: a document is thousands of blocks, and most
+/// of them are never hovered.
+///
+/// It exists because commenting on a whole paragraph through a selection is
+/// work pretending to be precision — you pick some words arbitrarily just to
+/// have somewhere to hang the note. A block note has no `quote=` at all: the
+/// note is written directly after the block, so its position already says which
+/// one it is, and it can never come loose the way a quote can.
+let plusButton = null
+let plusTarget = null
+
+const topLevelBlock = (node) => {
+  const root = content()
+  let block = node
+  while (block && block.parentElement !== root && block.parentElement) {
+    if (block.parentElement.classList.contains('note-holder')) break
+    block = block.parentElement
+  }
+  return block?.parentElement === root || block?.parentElement?.classList.contains('note-holder')
+    ? block
+    : null
+}
+
+function hidePlus() {
+  plusTarget?.classList.remove('block-target')
+  plusTarget = null
+  if (plusButton) plusButton.style.display = 'none'
+}
+
+function showPlus(block) {
+  if (!plusButton) return
+  if (plusTarget === block) return
+  plusTarget?.classList.remove('block-target')
+  plusTarget = block
+
+  const rect = block.getBoundingClientRect()
+  plusButton.style.display = 'flex'
+  plusButton.style.top = `${rect.top + 1}px`
+  plusButton.style.left = `${rect.left - 34}px`
+}
+
+function setUpBlockPlus() {
+  plusButton = document.createElement('button')
+  plusButton.type = 'button'
+  plusButton.className = 'block-plus'
+  plusButton.textContent = '+'
+  plusButton.setAttribute('aria-label', 'Comment on this block')
+  plusButton.style.display = 'none'
+  document.body.appendChild(plusButton)
+
+  // Held down rather than clicked-through: the block lights up while the
+  // pointer is on the button, which is what says where the note will land.
+  plusButton.addEventListener('mouseenter', () => plusTarget?.classList.add('block-target'))
+  plusButton.addEventListener('mouseleave', () => plusTarget?.classList.remove('block-target'))
+
+  plusButton.addEventListener('click', () => {
+    const block = plusTarget
+    const lines = lineRange(block)
+    if (!block || !lines) return
+    const rect = block.getBoundingClientRect()
+    block.classList.add('block-target')
+    // The same message a selection sends, with no text. Everything downstream
+    // already carries the quote through as a string; empty means "the block".
+    bridge({
+      type: 'selection',
+      text: '',
+      rect: { x: rect.left, y: rect.top, width: rect.width, height: Math.min(rect.height, 24) },
+      inline: lines,
+      block: lines,
+      occurrence: 1,
+    })
+  })
+
+  document.addEventListener('mousemove', (event) => {
+    if (event.target === plusButton) return
+    const root = content()
+    if (!root.contains(event.target)) return hidePlus()
+    // Not while a selection is live: the popover is already open on words the
+    // reader chose, and a second way in would fight it.
+    if (hadSelection) return hidePlus()
+    const block = topLevelBlock(event.target)
+    if (!block || !lineRange(block)) return hidePlus()
+    showPlus(block)
+  })
+
+  // Fixed positioning against a rect taken once — scrolling moves the block out
+  // from under it, so it goes away and comes back on the next move.
+  document.addEventListener('scroll', hidePlus, true)
+}
+
+function clearBlockTarget() {
+  document.querySelectorAll('.block-target').forEach((el) => el.classList.remove('block-target'))
+  hidePlus()
+}
+
 let selectionTimer = 0
 let hadSelection = false
 
@@ -1075,6 +1173,9 @@ window.imark = {
   },
   clearSelection() {
     window.getSelection()?.removeAllRanges()
+    // The block lit up by the `+` is not a selection and would otherwise stay
+    // lit after the popover closed.
+    clearBlockTarget()
   },
   markMissing(targets) {
     const dead = new Set(targets)
@@ -1105,6 +1206,7 @@ window.imark = {
 }
 
 installCommentHandlers()
+setUpBlockPlus()
 
 // KaTeX is imported for its side-effect-free API; keep a reference so the
 // bundler cannot tree-shake the font-bearing CSS away.

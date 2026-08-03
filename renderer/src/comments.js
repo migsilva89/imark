@@ -194,7 +194,13 @@ export function attachComments(root, comments) {
 
   for (const { note, block } of resolved) {
     if (!block) continue
-    const anchor = wrapQuote(block, note.quote, note.nth)
+    // A note with no quote at all was written about the whole block, by the `+`
+    // in the margin. It has nothing to underline and nothing it could have
+    // lost — treating it as an orphan would warn about a problem that cannot
+    // exist for it.
+    const aboutBlock = !note.quote
+    const anchor = aboutBlock ? null : wrapQuote(block, note.quote, note.nth)
+    const lost = !aboutBlock && !anchor
     // A quote split across markup becomes several spans; all of them have to
     // answer to the same note, or clicking half a phrase would do nothing.
     for (const piece of block.querySelectorAll('.note-anchor:not([data-note])')) {
@@ -207,16 +213,16 @@ export function attachComments(root, comments) {
 
     const dot = document.createElement('button')
     dot.type = 'button'
-    dot.className = anchor ? 'note-dot' : 'note-dot orphan'
+    dot.className = lost ? 'note-dot orphan' : (aboutBlock ? 'note-dot block' : 'note-dot')
     dot.dataset.note = note.id
     if (note.colour) dot.dataset.color = note.colour
-    dot.setAttribute('aria-label', anchor ? 'Comment' : 'Comment with a missing quote')
+    dot.setAttribute('aria-label', lost ? 'Comment with a missing quote' : 'Comment')
     // Two notes on one paragraph would otherwise sit exactly on top of each
     // other and only the last one would be clickable.
     const stacked = holder.querySelectorAll('.note-dot').length
     if (stacked) dot.style.top = `${2 + stacked * 17}px`
     holder.appendChild(dot)
-    holder.appendChild(buildCard(note, !anchor))
+    holder.appendChild(buildCard(note, lost))
     attached.push({
       quote: note.quote,
       colour: note.colour,
@@ -225,7 +231,7 @@ export function attachComments(root, comments) {
       // of timestamp, and this is already the one place that copes with that.
       when: formatDate(note.at),
       text: note.text,
-      orphan: !anchor,
+      orphan: lost,
     })
   }
 

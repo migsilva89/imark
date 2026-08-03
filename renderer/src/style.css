@@ -26,7 +26,7 @@
   --syn-comment: #9a9aa0;
   --syn-number: #b45309;
 
-  --measure: 72ch;
+  --measure: 80ch;
   --step: 4px;
   --radius: 10px;
 
@@ -269,8 +269,13 @@
   --syn-number: #ffb84d;
 }
 
+/* The four steps used to run 60 / 72 / 90, which is barely a ladder: Normal and
+   Wide sat close enough together that switching between them looked like
+   nothing had happened, and neither used a large window. Spread out, each one
+   is now for something — Narrow to focus, Normal for prose, Wide for documents
+   full of tables and code, Full for when you want the window. */
 :root[data-width='narrow'] { --measure: 60ch; }
-:root[data-width='wide'] { --measure: 90ch; }
+:root[data-width='wide'] { --measure: 104ch; }
 :root[data-width='full'] { --measure: none; }
 
 * { box-sizing: border-box; }
@@ -887,6 +892,45 @@ img[data-blocked] {
   border-radius: 2px;
   padding: 0 1px;
   cursor: pointer;
+}
+
+/* The `+` in the left margin, on the block under the pointer. One button that
+   moves, so it is fixed to the viewport rather than to the page. */
+.block-plus {
+  position: fixed;
+  z-index: 8;
+  width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1;
+  color: var(--bg);
+  background: var(--accent);
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: 0.5;
+  transition: opacity 100ms ease;
+}
+
+.block-plus:hover { opacity: 1; }
+
+/* What the note will attach to. Shown while the pointer is on the `+` and kept
+   while the popover is open: a note about to be written into a file should say
+   where it is going before it goes. */
+.block-target {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-radius: 4px;
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+/* A note written by the `+` has no quote to underline, so the dot is all there
+   is to see. Filled, not hollow like an orphan's: nothing is missing. */
+.note-dot.block {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--note) 30%, transparent);
 }
 
 .note-dot {

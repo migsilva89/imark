@@ -181,7 +181,12 @@ enum Comments {
         date: Date,
         occurrence: Int
     ) -> String {
-        var attributes = ["quote=\"\(escapeAttribute(quote))\""]
+        // No quote means the note is about the whole block, written by the `+`
+        // in the margin rather than by selecting words. Writing `quote=""` would
+        // be a lie in the file — nothing was quoted — and the position already
+        // says which block it is, which is why such a note can never come loose.
+        var attributes: [String] = []
+        if !quote.isEmpty { attributes.append("quote=\"\(escapeAttribute(quote))\"") }
         if !author.isEmpty { attributes.append("by=\"\(escapeAttribute(author))\"") }
         attributes.append("at=\"\(ISO8601DateFormatter().string(from: date))\"")
         // Only written when it is needed to tell two identical quotes apart;

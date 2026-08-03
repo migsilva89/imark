@@ -111,7 +111,7 @@ export function formatNotes(notes) {
   if (notes.length === 0) return '_Sem notas._'
   return notes.map((note, i) => {
     const who = [note.by || 'anónimo', when(note.at)].filter(Boolean).join(', ')
-    const head = note.quote ? `sobre “${note.quote}”` : 'sobre o documento'
+    const head = note.quote ? `sobre “${note.quote}”` : 'sobre o bloco acima'
     const lines = [`### Nota ${i + 1} — ${head}`, `${who} · linha ${note.line}`]
     if (note.heading) lines.push(`Secção: ${note.heading}`)
     if (note.orphan) lines.push('⚠️ Órfã — o texto citado já não existe no documento.')
