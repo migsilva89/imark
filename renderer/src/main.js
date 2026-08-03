@@ -122,6 +122,52 @@ md.renderer.renderToken = (tokens, idx, options) => {
   return defaultRenderToken(tokens, idx, options)
 }
 
+/**
+ * A ```diff block, rendered the way everybody already reads a diff: the whole
+ * row tinted rather than just the `+` or the `-`, with the old and new line
+ * numbers down the side.
+ *
+ * highlight.js colours the marker character and leaves the rest of the line on
+ * the block's own background, which is legible but has to be read a character
+ * at a time. Tinting the row is what makes a diff scannable.
+ *
+ * Unified only. A reading column is one column, and two columns of code inside
+ * it is a different app.
+ */
+function renderDiff(source) {
+  const HUNK = /^@@+ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/
+  let oldNo = 0
+  let newNo = 0
+
+  const rows = source.split('\n').map((line) => {
+    const cell = (kind, left, right) =>
+      `<div class="diff-row diff-${kind}">`
+      + `<span class="diff-num">${left}</span>`
+      + `<span class="diff-num">${right}</span>`
+      + `<code>${escapeHtml(line) || '&nbsp;'}</code>`
+      + '</div>'
+
+    const hunk = line.match(HUNK)
+    if (hunk) {
+      oldNo = Number(hunk[1])
+      newNo = Number(hunk[2])
+      return cell('hunk', '', '')
+    }
+    // The `diff --git`, `index`, `---` and `+++` preamble. Matched before the
+    // +/- tests, or the file headers would be read as an added and a removed
+    // line and tinted as changes nobody made.
+    if (/^(diff --git |index |--- |\+\+\+ |new file|deleted file|similarity|rename |Binary files )/.test(line)) {
+      return cell('meta', '', '')
+    }
+    if (line.startsWith('+')) return cell('add', '', newNo++)
+    if (line.startsWith('-')) return cell('del', oldNo++, '')
+    if (line.startsWith('\\')) return cell('meta', '', '')
+    return cell('ctx', oldNo++, newNo++)
+  })
+
+  return `<div class="diff-block">${rows.join('')}</div>`
+}
+
 // Fenced ```mermaid blocks are held aside and rendered after the HTML lands.
 const defaultFence = md.renderer.rules.fence.bind(md.renderer.rules)
 md.renderer.rules.fence = (tokens, idx, options, env, self) => {
@@ -134,6 +180,9 @@ md.renderer.rules.fence = (tokens, idx, options, env, self) => {
     : ''
   if (info === 'mermaid') {
     return `<div class="mermaid-block"${lines} data-graph="${encodeURIComponent(token.content)}"></div>`
+  }
+  if (info === 'diff') {
+    return `<div class="code-wrap diff-wrap"${lines} data-lang="diff">${renderDiff(token.content)}</div>`
   }
   const html = defaultFence(tokens, idx, options, env, self)
   const label = info || 'text'
@@ -188,7 +237,9 @@ function renderFrontMatter(data) {
   if (!data) return ''
   const title = data.title ?? data.name
   const rows = Object.entries(data)
-    .filter(([key]) => key !== 'title' && key !== 'name')
+    // `imark:` is how a document tells the app what it is — machinery, not
+    // something the person reading it put there or needs to see.
+    .filter(([key]) => key !== 'title' && key !== 'name' && key !== 'imark')
     .map(([key, value]) => {
       const shown = Array.isArray(value)
         ? value.map((v) => `<span class="fm-chip">${escapeHtml(v)}</span>`).join('')
@@ -591,6 +642,26 @@ function attachRail(rail) {
     return Math.min(Math.max(index, 0), railTicks.length - 1)
   }
 
+  /// Where the document should sit for a pointer anywhere along the rail —
+  /// between headings as well as on them.
+  ///
+  /// Snapping to the nearest heading is right for a click and wrong for a drag:
+  /// it made scrubbing jump from section to section, which reads as the rail
+  /// resisting rather than following. This interpolates between the heading
+  /// above and the one below, so the page moves with the hand the way a
+  /// scrollbar does, while the rail still means headings.
+  const scrollAt = (clientY) => {
+    const first = railTicks[0].getBoundingClientRect()
+    const row = (clientY - (first.top + first.height / 2)) / railPitch
+    // Rows are half-headings — one tick per heading, one gradation between.
+    const at = Math.min(Math.max(row / 2, 0), railBlocks.length - 1)
+    const lower = Math.floor(at)
+    const upper = Math.min(lower + 1, railBlocks.length - 1)
+    const topOf = (i) => railBlocks[i].getBoundingClientRect().top + window.scrollY - 24
+    const from = topOf(lower)
+    return from + (topOf(upper) - from) * (at - lower)
+  }
+
   // A gradation takes you to the heading it sits under. It is not a place of
   // its own, and a row that swallows a click is worse than one that is not
   // there.
@@ -613,12 +684,19 @@ function attachRail(rail) {
   // is skipped outright while the pointer stays within the same tick, which is
   // most pointer moves.
   const track = (clientY) => {
+    // The page follows the pointer continuously, on every move — outside the
+    // tick check below, which exists to skip repainting the funnel and would
+    // otherwise make the scroll steppy again for a different reason.
+    if (scrubbing) {
+      cancelAnimationFrame(scrollAnimation)
+      window.scrollTo(0, scrollAt(clientY))
+    }
     const index = nearest(clientY)
     if (index === railHoverIndex) return
     railHoverIndex = index
     paintRail()
     showTip(index, railTicks[index])
-    if (scrubbing) goTo(index, false)
+    if (scrubbing) railScrollIndex = index
   }
 
   rail.addEventListener('pointermove', (event) => track(event.clientY))
@@ -657,7 +735,11 @@ function addCopyButtons(root) {
     button.type = 'button'
     button.textContent = 'Copiar'
     button.addEventListener('click', async () => {
-      const code = wrap.querySelector('code')?.textContent ?? ''
+      // A diff is one `code` per row, so the first one alone would copy a
+      // single line and look like it had worked.
+      const code = wrap.classList.contains('diff-wrap')
+        ? [...wrap.querySelectorAll('.diff-row code')].map((el) => el.textContent).join('\n')
+        : wrap.querySelector('code')?.textContent ?? ''
       try {
         await navigator.clipboard.writeText(code)
         button.textContent = 'Copiado'
@@ -852,6 +934,157 @@ function countBefore(block, range, text) {
   return before.toString().split(text).length
 }
 
+/* ------------------------------------------------------ comment on a block */
+
+/// The `+` in the margin. One button that follows the block under the pointer,
+/// rather than one per paragraph: a document is thousands of blocks, and most
+/// of them are never hovered.
+///
+/// It exists because commenting on a whole paragraph through a selection is
+/// work pretending to be precision — you pick some words arbitrarily just to
+/// have somewhere to hang the note. A block note has no `quote=` at all: the
+/// note is written directly after the block, so its position already says which
+/// one it is, and it can never come loose the way a quote can.
+let plusButton = null
+let plusTarget = null
+/// Hiding is delayed, because the way to the button leads out of the text: the
+/// pointer crosses the margin, which belongs to no block, and hiding on the
+/// first frame outside meant the button vanished exactly as you reached for it.
+let plusHideTimer = 0
+
+const cancelHide = () => clearTimeout(plusHideTimer)
+const scheduleHide = () => {
+  clearTimeout(plusHideTimer)
+  plusHideTimer = setTimeout(hidePlus, 220)
+}
+
+/// The block on the same line as the pointer, whatever the pointer is actually
+/// over. A reading column is centred and narrow, so most of the window beside a
+/// paragraph belongs to nothing — and aiming at the words to reach a button
+/// that lives in the margin is backwards.
+///
+/// Bounded rather than the whole width: the rails sit at the window edges and
+/// have their own hover behaviour to answer for.
+function blockAtHeight(clientX, clientY) {
+  const root = content()
+  const box = root.getBoundingClientRect()
+  // Never into the outer strip, whatever the reach works out to: the rails live
+  // there and answer to the pointer themselves. On a narrow window this is what
+  // decides, and the reach never comes into it.
+  const from = Math.max(box.left - PLUS_REACH, RAIL_GUTTER)
+  const to = Math.min(box.right + PLUS_REACH, window.innerWidth - RAIL_GUTTER)
+  if (clientX < from || clientX > to) return null
+  for (const child of root.children) {
+    if (!lineRange(child)) continue
+    const rect = child.getBoundingClientRect()
+    if (clientY >= rect.top && clientY <= rect.bottom) return child
+  }
+  return null
+}
+
+/// How far past the text column the `+` still answers, in points.
+const PLUS_REACH = 120
+/// And how much of each edge it never touches, because the rails are there.
+const RAIL_GUTTER = 56
+
+const topLevelBlock = (node) => {
+  const root = content()
+  let block = node
+  while (block && block.parentElement !== root && block.parentElement) {
+    if (block.parentElement.classList.contains('note-holder')) break
+    block = block.parentElement
+  }
+  return block?.parentElement === root || block?.parentElement?.classList.contains('note-holder')
+    ? block
+    : null
+}
+
+function hidePlus() {
+  plusTarget?.classList.remove('block-target', 'block-armed')
+  plusTarget = null
+  if (plusButton) plusButton.style.display = 'none'
+}
+
+function showPlus(block) {
+  if (!plusButton) return
+  if (plusTarget === block) return
+  plusTarget?.classList.remove('block-target', 'block-armed')
+  plusTarget = block
+  // Lit as soon as the button appears, not only once the pointer reaches it.
+  // Waiting meant the highlight never showed at all if you never got there.
+  block.classList.add('block-target')
+
+  const rect = block.getBoundingClientRect()
+  plusButton.style.display = 'flex'
+  plusButton.style.top = `${rect.top + 1}px`
+  plusButton.style.left = `${Math.max(4, rect.left - 34)}px`
+}
+
+function setUpBlockPlus() {
+  plusButton = document.createElement('button')
+  plusButton.type = 'button'
+  plusButton.className = 'block-plus'
+  plusButton.textContent = '+'
+  plusButton.setAttribute('aria-label', 'Comment on this block')
+  plusButton.style.display = 'none'
+  document.body.appendChild(plusButton)
+
+  plusButton.addEventListener('mouseenter', () => {
+    cancelHide()
+    plusTarget?.classList.add('block-armed')
+  })
+  plusButton.addEventListener('mouseleave', () => {
+    plusTarget?.classList.remove('block-armed')
+    scheduleHide()
+  })
+
+  plusButton.addEventListener('click', () => {
+    const block = plusTarget
+    const lines = lineRange(block)
+    if (!block || !lines) return
+    const rect = block.getBoundingClientRect()
+    block.classList.add('block-target')
+    // The same message a selection sends, with no text. Everything downstream
+    // already carries the quote through as a string; empty means "the block".
+    bridge({
+      type: 'selection',
+      text: '',
+      rect: { x: rect.left, y: rect.top, width: rect.width, height: Math.min(rect.height, 24) },
+      inline: lines,
+      block: lines,
+      occurrence: 1,
+    })
+  })
+
+  document.addEventListener('mousemove', (event) => {
+    // The Quick Look panel renders with the same bundle and cannot write to
+    // anything. Existing notes still show — that is reading — but offering a
+    // way to add one there is offering something that cannot happen.
+    if (document.documentElement.dataset.preview === 'true') return hidePlus()
+    if (event.target === plusButton) return cancelHide()
+    // Not while a selection is live: the popover is already open on words the
+    // reader chose, and a second way in would fight it.
+    if (hadSelection) return hidePlus()
+    // By line first, so the whole width of the reading area answers; the
+    // element under the pointer only decides it when the two disagree, which
+    // is inside a note card or a holder.
+    const onText = content().contains(event.target) ? topLevelBlock(event.target) : null
+    const block = onText ?? blockAtHeight(event.clientX, event.clientY)
+    if (!block || !lineRange(block)) return scheduleHide()
+    cancelHide()
+    showPlus(block)
+  })
+
+  // Fixed positioning against a rect taken once — scrolling moves the block out
+  // from under it, so it goes away and comes back on the next move.
+  document.addEventListener('scroll', hidePlus, true)
+}
+
+function clearBlockTarget() {
+  document.querySelectorAll('.block-target').forEach((el) => el.classList.remove('block-target'))
+  hidePlus()
+}
+
 let selectionTimer = 0
 let hadSelection = false
 
@@ -1020,6 +1253,9 @@ window.imark = {
   },
   clearSelection() {
     window.getSelection()?.removeAllRanges()
+    // The block lit up by the `+` is not a selection and would otherwise stay
+    // lit after the popover closed.
+    clearBlockTarget()
   },
   markMissing(targets) {
     const dead = new Set(targets)
@@ -1050,6 +1286,7 @@ window.imark = {
 }
 
 installCommentHandlers()
+setUpBlockPlus()
 
 // KaTeX is imported for its side-effect-free API; keep a reference so the
 // bundler cannot tree-shake the font-bearing CSS away.

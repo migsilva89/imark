@@ -26,6 +26,10 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     private let commentsList = CommentsList()
     private var notes: [NoteSummary] = []
     private(set) var noteCount = 0
+    /// Set while the composer is open for a note about the document rather than
+    /// about anything in it. There is no selection behind such a note, so the
+    /// save path has nothing else to tell them apart by.
+    private var composingFileNote = false
     private(set) var reviewingComments = false
 
     private var watcher: FileWatcher?
@@ -177,6 +181,12 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func load() {
+        // Asked again from disk: a different document, or the same one after an
+        // edit, may have stopped being a review — and the toolbar is built from
+        // the answer.
+        Review.forget()
+        buildToolbar()
+
         guard var text = try? String(contentsOf: url, encoding: .utf8) else {
             content.renderer.render(
                 markdown: "# Can't read this file\n\n`\(url.path)`\n\nIt exists, but it isn't UTF-8 text.",
@@ -260,7 +270,17 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
 
         case .selection(let found):
             selection = found
-            selectionPopover.show(text: found.text, at: found.rect, in: content.renderer)
+            // No text means the `+` in the margin, not a selection. Straight to
+            // writing: Translate and Search need words, and offering them over
+            // a whole paragraph would be three choices where there is one.
+            if found.text.isEmpty {
+                selectionPopover.compose(
+                    existing: "", colour: Settings.noteColour,
+                    at: found.rect, in: content.renderer
+                )
+            } else {
+                selectionPopover.show(text: found.text, at: found.rect, in: content.renderer)
+            }
 
         case .selectionCleared:
             selection = nil
@@ -285,6 +305,20 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
+    /// Starts a note about the document rather than about anything in it.
+    func beginFileNote() {
+        selection = nil
+        editingNote = nil
+        composingFileNote = true
+        content.renderer.clearSelection()
+        let view = content.renderer
+        // A thin strip across the top of the page: there is nothing to point at,
+        // and a popover in the middle of the text would look like it belonged to
+        // whatever it happened to cover.
+        let rect = NSRect(x: view.bounds.midX - 40, y: view.bounds.maxY - 12, width: 80, height: 1)
+        selectionPopover.compose(existing: "", colour: Settings.noteColour, at: rect, in: view)
+    }
+
     /// Writes the note into the file, immediately after the block the selection
     /// came from. This is the first thing Imark does that changes a document, so
     /// it goes through an atomic replace and refuses to write over a file that
@@ -293,20 +327,23 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         if let range = editingNote {
             return updateComment(body, colour: colour, at: range)
         }
-        guard let selection, let block = selection.block else {
+        let fileNote = composingFileNote
+        composingFileNote = false
+        guard fileNote || selection?.block != nil else {
             selectionPopover.reportCommentFailure("Couldn't tell where that selection came from")
             return
         }
         do {
             snapshot("Comment")
             let index = try Comments.insert(
-                quote: selection.text,
+                quote: fileNote ? "" : (selection?.text ?? ""),
                 body: body,
                 colour: colour,
-                after: block.end,
-                occurrence: selection.occurrence,
+                after: selection?.block?.end ?? 0,
+                occurrence: selection?.occurrence ?? 1,
                 by: Settings.authorName,
                 on: Date(),
+                scope: fileNote ? .file : .block,
                 into: url,
                 expecting: stamp
             )

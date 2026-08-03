@@ -1,0 +1,17 @@
+{
+  "description": "Optional plan review in Imark. Does nothing unless IMARK_PLAN_REVIEW is set.",
+  "hooks": {
+    "PermissionRequest": [
+      {
+        "matcher": "ExitPlanMode",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/imark.mjs\" plan-hook",
+            "timeout": 345600
+          }
+        ]
+      }
+    ]
+  }
+}

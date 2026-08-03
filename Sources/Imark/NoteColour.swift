@@ -45,6 +45,11 @@ extension NSColor {
     /// document is a web view and the chrome around it is not.
     static let imarkAccent = NSColor.imark(light: 0x7A_6BD8, dark: 0x8B_7BE8)
 
+    /// Approve's fill. It is the palette's green, taken down in the dark theme:
+    /// `NoteColour.green` is tuned to be legible *as* an underline on the page,
+    /// and the same value carrying white text on a button is too pale to read.
+    static let imarkApprove = NSColor.imark(light: 0x2F_8F4E, dark: 0x3F_9E64)
+
     /// Two hex values, picked by the appearance in effect when the colour is
     /// drawn rather than when it is created — otherwise every one of these
     /// would be stuck on whatever theme was active at launch.

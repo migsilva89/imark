@@ -26,7 +26,7 @@
   --syn-comment: #9a9aa0;
   --syn-number: #b45309;
 
-  --measure: 72ch;
+  --measure: 80ch;
   --step: 4px;
   --radius: 10px;
 
@@ -269,8 +269,13 @@
   --syn-number: #ffb84d;
 }
 
+/* The four steps used to run 60 / 72 / 90, which is barely a ladder: Normal and
+   Wide sat close enough together that switching between them looked like
+   nothing had happened, and neither used a large window. Spread out, each one
+   is now for something — Narrow to focus, Normal for prose, Wide for documents
+   full of tables and code, Full for when you want the window. */
 :root[data-width='narrow'] { --measure: 60ch; }
-:root[data-width='wide'] { --measure: 90ch; }
+:root[data-width='wide'] { --measure: 104ch; }
 :root[data-width='full'] { --measure: none; }
 
 * { box-sizing: border-box; }
@@ -467,6 +472,67 @@ pre code {
   font-size: 13.5px;
   line-height: 1.55;
 }
+
+/* A diff, read the way a diff is read: the whole row carries the colour, and
+   the old and new line numbers run down the side. Same green and red as the
+   note palette, so nothing new enters the window — and the same two the review
+   buttons use, where they also mean accepted and sent back. */
+.diff-block {
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  line-height: 1.55;
+  padding: calc(var(--step) * 2) 0;
+}
+
+.diff-row {
+  display: grid;
+  grid-template-columns: 3.5ch 3.5ch 1fr;
+  gap: calc(var(--step) * 2);
+  padding: 0 calc(var(--step) * 3);
+  min-width: max-content;
+}
+
+.diff-row code {
+  background: none;
+  padding: 0;
+  white-space: pre;
+}
+
+/* Not selectable, and never copied. Selecting three rows to comment on them
+   would otherwise put the line numbers in the quote, and the quote is what
+   has to match the file. */
+.diff-num {
+  user-select: none;
+  -webkit-user-select: none;
+  text-align: right;
+  color: var(--secondary);
+  opacity: 0.55;
+}
+
+/* Mixed into the page background rather than used flat: at full strength the
+   note red is a colour you write in, and a whole row of it is a wall. */
+.diff-add { background: color-mix(in srgb, var(--note-green) 13%, transparent); }
+.diff-del { background: color-mix(in srgb, var(--note-red) 13%, transparent); }
+
+/* The row carries the colour; the code does not. Tinting both put green text
+   on a green field, which is the one combination that makes a diff harder to
+   read than leaving it alone. Only the marker takes the colour, so a row still
+   says which it is when the tints are washed out by a light theme. */
+.diff-add code::first-letter { color: var(--note-green); font-weight: 600; }
+.diff-del code::first-letter { color: var(--note-red); font-weight: 600; }
+
+/* The @@ line says where you are in the file, which is navigation rather than
+   change — it takes the accent, not one of the two verdict colours. */
+.diff-hunk {
+  background: var(--accent-soft);
+  color: var(--secondary);
+}
+
+.diff-meta code { color: var(--secondary); }
 
 .copy-btn {
   position: absolute;
@@ -816,6 +882,38 @@ img[data-blocked] {
 
 /* Wrapping every commented block is what lets the dot and the card be placed
    against it — a table or a list will not take stray children of its own. */
+/* A block carrying a note of its own. Weak on purpose: it has to survive being
+   a whole table or a long paragraph, where the same strength that reads as a
+   highlight on one line reads as a different theme on twenty. The bar down the
+   left is what actually says "this one" — the wash alone is too quiet to find
+   when you are scrolling. */
+.note-block {
+  background: color-mix(in srgb, var(--note) 8%, transparent);
+  box-shadow: inset 3px 0 0 0 var(--note);
+  border-radius: 4px;
+  padding: calc(var(--step) * 2) calc(var(--step) * 3);
+  margin-left: calc(var(--step) * -3);
+}
+
+/* Notes about the document itself, above everything. They have nothing in the
+   page to point at, so unlike every other card these are open from the start —
+   one that had to be found by clicking would never be read. */
+.file-notes {
+  position: relative;
+  margin: 0 0 calc(var(--step) * 6) 0;
+  padding-left: calc(var(--step) * 3);
+  border-left: 3px solid var(--note);
+}
+
+.file-notes .note-card.is-file {
+  position: static;
+  width: auto;
+  margin: 0 0 calc(var(--step) * 2) 0;
+  box-shadow: none;
+}
+
+.note-dot.file { display: none; }
+
 .note-holder {
   position: relative;
 }
@@ -826,6 +924,57 @@ img[data-blocked] {
   border-radius: 2px;
   padding: 0 1px;
   cursor: pointer;
+}
+
+/* The `+` in the left margin, on the block under the pointer. One button that
+   moves, so it is fixed to the viewport rather than to the page. */
+.block-plus {
+  position: fixed;
+  z-index: 8;
+  width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1;
+  color: var(--bg);
+  background: var(--accent);
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: 0.5;
+  transition: opacity 100ms ease;
+}
+
+.block-plus:hover { opacity: 1; }
+
+/* Belt and braces with the guard in the mousemove handler: the preview panel
+   has nothing to write to, and a `+` there is a promise the panel cannot keep. */
+:root[data-preview='true'] .block-plus { display: none !important; }
+
+/* What the note will attach to. Shown while the pointer is on the `+` and kept
+   while the popover is open: a note about to be written into a file should say
+   where it is going before it goes. */
+.block-target {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border-radius: 4px;
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+/* Stronger once the pointer is actually on the `+`, so the difference between
+   "you are near this block" and "this is the one about to be written to" is
+   visible without reading anything. */
+.block-armed {
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+/* A note written by the `+` has no quote to underline, so the dot is all there
+   is to see. Filled, not hollow like an orphan's: nothing is missing. */
+.note-dot.block {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--note) 30%, transparent);
 }
 
 .note-dot {

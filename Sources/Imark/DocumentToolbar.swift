@@ -8,6 +8,9 @@ private extension NSToolbarItem.Identifier {
     static let theme = NSToolbarItem.Identifier("theme")
     static let comments = NSToolbarItem.Identifier("comments")
     static let shortcuts = NSToolbarItem.Identifier("shortcuts")
+    static let commentFile = NSToolbarItem.Identifier("commentFile")
+    static let reviewSendBack = NSToolbarItem.Identifier("reviewSendBack")
+    static let reviewApprove = NSToolbarItem.Identifier("reviewApprove")
 }
 
 extension DocumentWindowController: NSToolbarDelegate {
@@ -29,8 +32,31 @@ extension DocumentWindowController: NSToolbarDelegate {
         // somewhere else. Find sits with the appearance rather than leading the
         // row: it is a thing you do to the page in front of you, not a way out
         // of it.
-        [.toggleSidebar, .sidebarTrackingSeparator, .flexibleSpace,
-         .comments, .theme, .find, .export, .openIn]
+        //
+        // A document under review ends the row with the two buttons that finish
+        // it. They go last, past the appearance and the way out, because they
+        // are the only items here that end something rather than change how you
+        // are looking at it — and because a button that closes a loop somebody
+        // else is waiting on should not sit next to Find.
+        let reading: [NSToolbarItem.Identifier] =
+            [.toggleSidebar, .sidebarTrackingSeparator, .flexibleSpace,
+             .commentFile, .comments, .theme, .find, .export, .openIn]
+        guard Review.isReview(url) else { return reading }
+
+        // A review keeps only what a reviewer does. Open in and Export are ways
+        // of taking a document somewhere else, and this one is a copy that
+        // exists to be answered — editing it in Cursor changes nothing anybody
+        // will read, and printing it is printing a working file.
+        let reviewing = reading.filter { $0 != .export && $0 != .openIn }
+        // Once it is decided, only the button that was pressed stays. Hiding the
+        // other one leaves its slot behind, and an empty pill in the toolbar
+        // looks like something that failed to load.
+        if let decision = Review.decision(for: url) {
+            return reviewing + [decision == .approve ? .reviewApprove : .reviewSendBack]
+        }
+        // A gap between them, because the cost of pressing the wrong one is
+        // asymmetric: approving by mistake sets work going that nobody checked.
+        return reviewing + [.reviewSendBack, .space, .reviewApprove]
     }
 
     public func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
@@ -72,6 +98,13 @@ extension DocumentWindowController: NSToolbarDelegate {
             return button(identifier, symbol: "magnifyingglass", label: "Find",
                           tip: "Find in Document (⌘F)",
                           action: #selector(performFind(_:)))
+
+        case .commentFile:
+            // Next to Comments, which shows the ones that exist: one names the
+            // subject, the other adds to it.
+            return button(identifier, symbol: "text.bubble", label: "Comment on Document",
+                          tip: "Comment on the whole document",
+                          action: #selector(commentOnDocument(_:)))
 
         case .comments:
             // "Comments" alone names the subject, not the action, and left
@@ -123,9 +156,58 @@ extension DocumentWindowController: NSToolbarDelegate {
             }
             return item
 
+        case .reviewSendBack:
+            // The palette's own red, the same one you can paint a note with.
+            // Borrowing GitHub's would have put a colour in the window that
+            // appears nowhere else in the app.
+            return reviewButton(identifier, title: "Request Changes",
+                                symbol: "arrow.uturn.backward",
+                                tip: "Send your notes back and hold the work",
+                                tint: NoteColour.red.colour,
+                                action: #selector(sendReviewBack(_:)))
+
+        case .reviewApprove:
+            // The only filled button in the app. It is the one place where a
+            // button does something outside this window, and the row would
+            // otherwise read as five equal ways of looking at a document.
+            return reviewButton(identifier, title: "Approve", symbol: "checkmark",
+                                tip: "Approve and let the agent continue",
+                                tint: .imarkApprove,
+                                action: #selector(approveReview(_:)), filled: true)
+
         default:
             return nil
         }
+    }
+
+    /// Wide enough to carry a word, because these two have to be read rather
+    /// than recognised: nobody has seen them before, and getting them the wrong
+    /// way round sends work back that was meant to go ahead.
+    private func reviewButton(
+        _ identifier: NSToolbarItem.Identifier,
+        title: String,
+        symbol: String,
+        tip: String,
+        tint: NSColor,
+        action: Selector,
+        filled: Bool = false
+    ) -> NSToolbarItem {
+        let button = ReviewButton(title: title, symbol: symbol, filled: filled,
+                                  tint: tint, target: self, action: action)
+
+        // Decided already: the pair stops offering a choice that has been made
+        // and becomes a record of it, so reopening the file tells you what you
+        // said instead of inviting you to say it twice.
+        if Review.decision(for: url) != nil {
+            button.isEnabled = false
+            button.title = filled ? "Approved" : "Changes Requested"
+        }
+
+        let item = NSToolbarItem(itemIdentifier: identifier)
+        item.view = button
+        item.label = title
+        item.toolTip = tip
+        return item
     }
 
     private func button(
@@ -173,6 +255,52 @@ extension DocumentWindowController: NSToolbarDelegate {
         reveal.image = icon(for: URL(fileURLWithPath: "/System/Library/CoreServices/Finder.app"))
         reveal.target = self
         return menu
+    }
+
+    /// Opens the composer for a note about the document itself. There is no
+    /// selection and nothing highlighted, so the popover is anchored to the top
+    /// of the page — the note is about all of it.
+    @objc func commentOnDocument(_ sender: Any?) {
+        beginFileNote()
+    }
+
+    // MARK: - Finishing a review
+
+    @objc func approveReview(_ sender: Any?) {
+        finishReview(.approve)
+    }
+
+    @objc func sendReviewBack(_ sender: Any?) {
+        // Sending back an unannotated document tells the agent to try again and
+        // nothing about what to change, which is the one outcome nobody wants.
+        guard noteCount > 0 else {
+            let alert = NSAlert()
+            alert.messageText = "Request changes with no notes?"
+            alert.informativeText = "You haven't commented on anything. "
+                + "The agent will be told to revise without being told what to change."
+            alert.addButton(withTitle: "Request Changes Anyway")
+            alert.addButton(withTitle: "Cancel")
+            guard alert.runModal() == .alertFirstButtonReturn else { return }
+            return finishReview(.requestChanges)
+        }
+        finishReview(.requestChanges)
+    }
+
+    private func finishReview(_ decision: Review.Decision) {
+        do {
+            try Review.decide(decision, notes: noteCount, for: url)
+            // The button says what happened before the window goes, so the press
+            // is acknowledged rather than just answered by everything vanishing.
+            // The state is kept on disk too: reopening the file later shows it.
+            buildToolbar()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                self?.window?.performClose(nil)
+            }
+        } catch {
+            let alert = NSAlert(error: error)
+            alert.messageText = "Imark couldn't record that decision."
+            alert.runModal()
+        }
     }
 
     private func icon(for app: URL) -> NSImage {

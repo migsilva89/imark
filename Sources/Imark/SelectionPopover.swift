@@ -268,7 +268,12 @@ final class SelectionPopover {
         popover.behavior = .applicationDefined
 
         let subject = prefill.isEmpty ? text : quotedText
-        let quoted = NSTextField(labelWithString: "“\(subject.prefix(80))\(subject.count > 80 ? "…" : "")”")
+        // Nothing was quoted: this came from the `+` in the margin and is about
+        // the block as a whole. Empty quotation marks would read as a bug.
+        let heading = subject.isEmpty
+            ? "On this block"
+            : "“\(subject.prefix(80))\(subject.count > 80 ? "…" : "")”"
+        let quoted = NSTextField(labelWithString: heading)
         quoted.font = .systemFont(ofSize: 11)
         quoted.textColor = .secondaryLabelColor
         quoted.lineBreakMode = .byTruncatingTail

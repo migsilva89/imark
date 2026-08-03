@@ -46,6 +46,9 @@ export function extractComments(body, lineOffset = 0) {
     comments.push({
       id: `note-${comments.length}`,
       quote: attributes.quote ?? '',
+      // `scope="file"` is a note about the document, not about anything in it.
+      // Anything else, including nothing, is a note about a block.
+      scope: attributes.scope === 'file' ? 'file' : 'block',
       by: attributes.by ?? '',
       at: attributes.at ?? '',
       nth: Number(attributes.nth) || 1,
@@ -187,14 +190,60 @@ export function attachComments(root, comments) {
   attachedNotes = []
   if (!comments.length) return []
 
+  const attached = []
+
+  // Notes about the document come first, in the DOM and in the list. The rail
+  // pairs its marks with dots by index, so the two orders have to agree — and
+  // the top of the page is where a note about the whole thing belongs anyway.
+  const fileNotes = comments.filter((note) => note.scope === 'file')
+  if (fileNotes.length) {
+    const panel = document.createElement('section')
+    panel.className = 'file-notes note-holder has-note'
+    for (const note of fileNotes) {
+      const dot = document.createElement('button')
+      dot.type = 'button'
+      dot.className = 'note-dot file'
+      dot.dataset.note = note.id
+      if (note.colour) dot.dataset.color = note.colour
+      dot.setAttribute('aria-label', 'Comment on the document')
+      const stacked = panel.querySelectorAll('.note-dot').length
+      if (stacked) dot.style.top = `${2 + stacked * 17}px`
+      panel.appendChild(dot)
+      const card = buildCard(note, false)
+      // Always open. There is nothing in the page to point at, so a card that
+      // has to be found by clicking a dot would never be read.
+      card.hidden = false
+      card.classList.add('is-file')
+      if (note.colour) panel.dataset.color = note.colour
+      panel.appendChild(card)
+      attached.push({
+        quote: '',
+        colour: note.colour,
+        by: note.by,
+        when: formatDate(note.at),
+        text: note.text,
+        orphan: false,
+        scope: 'file',
+      })
+    }
+    root.prepend(panel)
+  }
+
   // Resolved before anything is wrapped: wrapping changes root.children, and
   // two notes on the same paragraph would then fail to find it.
-  const resolved = comments.map((note) => ({ note, block: blockAbove(root, note.line) }))
-  const attached = []
+  const resolved = comments
+    .filter((note) => note.scope !== 'file')
+    .map((note) => ({ note, block: blockAbove(root, note.line) }))
 
   for (const { note, block } of resolved) {
     if (!block) continue
-    const anchor = wrapQuote(block, note.quote, note.nth)
+    // A note with no quote at all was written about the whole block, by the `+`
+    // in the margin. It has nothing to underline and nothing it could have
+    // lost — treating it as an orphan would warn about a problem that cannot
+    // exist for it.
+    const aboutBlock = !note.quote
+    const anchor = aboutBlock ? null : wrapQuote(block, note.quote, note.nth)
+    const lost = !aboutBlock && !anchor
     // A quote split across markup becomes several spans; all of them have to
     // answer to the same note, or clicking half a phrase would do nothing.
     for (const piece of block.querySelectorAll('.note-anchor:not([data-note])')) {
@@ -205,18 +254,27 @@ export function attachComments(root, comments) {
     const holder = holderFor(block)
     holder.classList.add('has-note')
 
+    // A quoted note underlines its words. A block note has no words of its own
+    // to underline, so the block itself takes the note's colour as a wash —
+    // otherwise the only sign it exists is a dot in the margin, and you have to
+    // click it to find out what it is attached to.
+    if (aboutBlock) {
+      block.classList.add('note-block')
+      if (note.colour) block.dataset.color = note.colour
+    }
+
     const dot = document.createElement('button')
     dot.type = 'button'
-    dot.className = anchor ? 'note-dot' : 'note-dot orphan'
+    dot.className = lost ? 'note-dot orphan' : (aboutBlock ? 'note-dot block' : 'note-dot')
     dot.dataset.note = note.id
     if (note.colour) dot.dataset.color = note.colour
-    dot.setAttribute('aria-label', anchor ? 'Comment' : 'Comment with a missing quote')
+    dot.setAttribute('aria-label', lost ? 'Comment with a missing quote' : 'Comment')
     // Two notes on one paragraph would otherwise sit exactly on top of each
     // other and only the last one would be clickable.
     const stacked = holder.querySelectorAll('.note-dot').length
     if (stacked) dot.style.top = `${2 + stacked * 17}px`
     holder.appendChild(dot)
-    holder.appendChild(buildCard(note, !anchor))
+    holder.appendChild(buildCard(note, lost))
     attached.push({
       quote: note.quote,
       colour: note.colour,
@@ -225,7 +283,7 @@ export function attachComments(root, comments) {
       // of timestamp, and this is already the one place that copes with that.
       when: formatDate(note.at),
       text: note.text,
-      orphan: !anchor,
+      orphan: lost,
     })
   }
 
@@ -455,7 +513,11 @@ export function buildNoteRail() {
   hideTip()
 
   const all = dots()
-  if (all.length < 2) {
+  // One mark is enough. The rail used to wait for two, on the grounds that a
+  // rail with a single mark is not a rail — but that made the first comment you
+  // ever wrote produce nothing at all, and the second one make two appear out of
+  // nowhere. Feedback for the thing you just did beats tidiness.
+  if (all.length === 0) {
     delete document.documentElement.dataset.noteRail
     return
   }
