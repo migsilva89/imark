@@ -175,8 +175,8 @@ const DECISION = `
 
 ## Decisão
 
-Os botões **Approve** e **Send Back**, no topo da janela, fecham esta revisão.
-*Send Back* devolve ao agente tudo o que comentaste; *Approve* deixa-o seguir.
+Os botões **Approve** e **Request Changes**, no topo da janela, fecham esta revisão.
+*Request Changes* devolve ao agente tudo o que comentaste; *Approve* deixa-o seguir.
 
 Comenta onde quiseres até lá — nada do que escreveres decide seja o que for.
 
@@ -265,7 +265,7 @@ const slug = (value) =>
 function writeReview(root, { title, body, kind }) {
   const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
   const file = path.join(reviewsDir(root), `${slug(kind)}-${stamp}.md`)
-  // `imark: review` is what puts Approve and Send Back in the app's toolbar.
+  // `imark: review` is what puts Approve and Request Changes in the app's toolbar.
   // Without it the document is just a document, which is what every other
   // markdown file Imark opens has to stay.
   const front = [
@@ -394,7 +394,7 @@ async function cmdReview(argv) {
   }
   openInImark(file)
   if (!wait) { say(`Aberto no Imark: ${file}`); return }
-  say(`Aberto no Imark: ${file}\nÀ espera do Approve ou do Send Back na janela…`)
+  say(`Aberto no Imark: ${file}\nÀ espera do Approve ou do Request Changes na janela…`)
   report(file, await waitForDecision(file))
 }
 

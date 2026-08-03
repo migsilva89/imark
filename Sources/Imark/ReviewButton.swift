@@ -22,7 +22,11 @@ final class ReviewButton: NSButton {
         imagePosition = .imageLeading
         imageHugsTitle = true
         bezelStyle = .texturedRounded
-        isBordered = !filled
+        // Neither one is bordered. The filled button draws its own pill, and the
+        // other is plain text: two pills side by side were the same size and the
+        // same shape, and the one you must not press by accident looked exactly
+        // like the one you meant.
+        isBordered = false
         self.target = target
         self.action = action
 
@@ -31,6 +35,8 @@ final class ReviewButton: NSButton {
             layer?.cornerCurve = .continuous
             layer?.cornerRadius = 12
             contentTintColor = .white
+        } else {
+            contentTintColor = .secondaryLabelColor
         }
         self.title = title
 
@@ -44,10 +50,12 @@ final class ReviewButton: NSButton {
     /// works — the button changes its own wording once a decision is taken.
     override var title: String {
         didSet {
-            guard filled else { return }
             attributedTitle = NSAttributedString(string: title, attributes: [
-                .foregroundColor: NSColor.white,
-                .font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize, weight: .semibold),
+                .foregroundColor: filled ? NSColor.white : .secondaryLabelColor,
+                .font: NSFont.systemFont(
+                    ofSize: NSFont.smallSystemFontSize,
+                    weight: filled ? .semibold : .regular
+                ),
             ])
         }
     }

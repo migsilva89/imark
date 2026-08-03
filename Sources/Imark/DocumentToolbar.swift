@@ -47,7 +47,9 @@ extension DocumentWindowController: NSToolbarDelegate {
         if let decision = Review.decision(for: url) {
             return reading + [decision == .approve ? .reviewApprove : .reviewSendBack]
         }
-        return reading + [.reviewSendBack, .reviewApprove]
+        // A gap between them, because the cost of pressing the wrong one is
+        // asymmetric: approving by mistake sets work going that nobody checked.
+        return reading + [.reviewSendBack, .space, .reviewApprove]
     }
 
     public func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
@@ -141,8 +143,9 @@ extension DocumentWindowController: NSToolbarDelegate {
             return item
 
         case .reviewSendBack:
-            return reviewButton(identifier, title: "Send Back", symbol: "arrowshape.turn.up.left",
-                                tip: "Return the review with your notes",
+            return reviewButton(identifier, title: "Request Changes",
+                                symbol: "arrow.uturn.backward",
+                                tip: "Send your notes back and hold the work",
                                 action: #selector(sendReviewBack(_:)))
 
         case .reviewApprove:
@@ -177,7 +180,7 @@ extension DocumentWindowController: NSToolbarDelegate {
         // said instead of inviting you to say it twice.
         if Review.decision(for: url) != nil {
             button.isEnabled = false
-            button.title = filled ? "Approved" : "Sent Back"
+            button.title = filled ? "Approved" : "Changes Requested"
         }
 
         let item = NSToolbarItem(itemIdentifier: identifier)
@@ -245,15 +248,15 @@ extension DocumentWindowController: NSToolbarDelegate {
         // nothing about what to change, which is the one outcome nobody wants.
         guard noteCount > 0 else {
             let alert = NSAlert()
-            alert.messageText = "Send this back with no notes?"
+            alert.messageText = "Request changes with no notes?"
             alert.informativeText = "You haven't commented on anything. "
                 + "The agent will be told to revise without being told what to change."
-            alert.addButton(withTitle: "Send Back Anyway")
+            alert.addButton(withTitle: "Request Changes Anyway")
             alert.addButton(withTitle: "Cancel")
             guard alert.runModal() == .alertFirstButtonReturn else { return }
-            return finishReview(.sendBack)
+            return finishReview(.requestChanges)
         }
-        finishReview(.sendBack)
+        finishReview(.requestChanges)
     }
 
     private func finishReview(_ decision: Review.Decision) {

@@ -10,7 +10,7 @@ import AppKit
 enum Review {
     enum Decision: String {
         case approve
-        case sendBack = "send-back"
+        case requestChanges = "request-changes"
     }
 
     /// Marked in the front matter rather than by which folder the file sits in:

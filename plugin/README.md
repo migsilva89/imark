@@ -32,7 +32,7 @@ buttons at the top of the window:
 | | |
 |---|---|
 | **Approve** | the agent carries on, with any notes you left |
-| **Send Back** | the agent gets every note and revises instead |
+| **Request Changes** | the agent gets every note and revises instead |
 
 They appear only on a review — a document carrying `imark: review` in its front
 matter. Every other markdown file opens exactly as it always did.
