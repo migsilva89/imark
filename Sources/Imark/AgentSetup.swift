@@ -1,49 +1,87 @@
 import Foundation
 
-/// Installing the Claude Code integration from inside the app, for somebody who
+/// Installing the coding-agent integration from inside the app, for somebody who
 /// downloaded a disk image and has no repository to add.
 ///
-/// Skills and commands only — never the plugin. A plugin is not a folder of
-/// files: Claude Code keeps its own registry of what is installed and where it
-/// came from, and writing into another program's bookkeeping is how you break
-/// the plugins somebody already had and get blamed for it. A skill is a file in
-/// a folder, read on sight, and uninstalling is deleting it.
+/// Skills only — never a plugin. A plugin is not a folder of files: Claude Code
+/// keeps its own registry of what is installed and where it came from, and
+/// writing into another program's bookkeeping is how you break the plugins
+/// somebody already had and get blamed for it. A skill is a file in a folder,
+/// read on sight, and uninstalling is deleting it.
+///
+/// It is also the same file everywhere. Claude Code and Codex both read a
+/// `SKILL.md` out of a `skills` folder, so one document serves both — Codex's
+/// own custom prompts are deprecated in favour of exactly this. Commands are
+/// where they differ: only Claude Code has a global folder for them.
 ///
 /// Which leaves one thing this cannot do: register the `ExitPlanMode` hook. A
 /// hook belongs to a plugin, and the alternative — editing somebody's
-/// `settings.json` from a button — is exactly the kind of reach this is
-/// avoiding. That one stays a line to copy.
+/// `settings.json` from a button — is the same reach this is avoiding. That one
+/// stays a line to copy.
 enum AgentSetup {
-    private static var home: URL {
+    struct Agent {
+        let name: String
+        /// What says the agent is on this machine at all.
+        let home: String
+        let skills: String
+        /// Only Claude Code takes loose commands. Codex removed its equivalent.
+        let commands: String?
+    }
+
+    static let known = [
+        Agent(name: "Claude Code", home: ".claude", skills: ".claude/skills", commands: ".claude/commands"),
+        Agent(name: "Codex", home: ".codex", skills: ".codex/skills", commands: nil),
+    ]
+
+    private static var homeDirectory: URL {
         // Redirected for the test, which installs and uninstalls for real and
-        // must not do it in whoever is running it's actual home folder.
+        // must not do it in the actual home folder of whoever runs it.
         if let test = ProcessInfo.processInfo.environment["IMARK_TEST_HOME"] {
             return URL(fileURLWithPath: test)
         }
         return FileManager.default.homeDirectoryForCurrentUser
     }
 
-    static var skillFile: URL {
-        home.appendingPathComponent(".claude/skills/imark-comments/SKILL.md")
+    private static let skillName = "imark-comments"
+    private static let commandNames = ["imark-review.md", "imark-notes.md"]
+
+    static func skillFile(for agent: Agent) -> URL {
+        homeDirectory.appendingPathComponent("\(agent.skills)/\(skillName)/SKILL.md")
     }
 
-    static var commandsDirectory: URL {
-        home.appendingPathComponent(".claude/commands")
+    private static func commandFiles(for agent: Agent) -> [URL] {
+        guard let commands = agent.commands else { return [] }
+        return commandNames.map { homeDirectory.appendingPathComponent("\(commands)/\($0)") }
     }
 
-    /// The commands this writes, named after the app rather than after the
-    /// plugin: installed loose they have no `imark:` namespace in front of them,
-    /// and `/imark-review` beside somebody's own `/review` should still say
-    /// whose it is.
-    private static let commands = ["imark-review.md", "imark-notes.md"]
-
-    private static var commandFiles: [URL] {
-        commands.map { commandsDirectory.appendingPathComponent($0) }
+    /// The agents on this machine. An offer to set up something you do not have
+    /// is a puzzle rather than a feature.
+    static var found: [Agent] {
+        known.filter {
+            FileManager.default.fileExists(atPath: homeDirectory.appendingPathComponent($0.home).path)
+        }
     }
 
-    /// Where the app keeps its own files. `Bundle.main` is the app when the app
-    /// is running and the test binary when the test is, so the test says which
-    /// bundle it means.
+    static var installed: [Agent] {
+        found.filter { FileManager.default.fileExists(atPath: skillFile(for: $0).path) }
+    }
+
+    static var isInstalled: Bool {
+        !found.isEmpty && installed.count == found.count
+    }
+
+    /// Every path this will write, in the order it will write them. Shown before
+    /// anything is written: this is the one thing Imark does outside its own
+    /// files and somebody's documents, and it lands in folders other programs
+    /// own.
+    static var plannedFiles: [URL] {
+        found.flatMap { [skillFile(for: $0)] + commandFiles(for: $0) }
+    }
+
+    // MARK: - Where the app keeps its copy
+
+    /// `Bundle.main` is the app when the app is running and the test binary when
+    /// the test is, so the test says which bundle it means.
     private static var resources: URL? {
         if let test = ProcessInfo.processInfo.environment["IMARK_TEST_RESOURCES"] {
             return URL(fileURLWithPath: test)
@@ -57,58 +95,49 @@ enum AgentSetup {
         resources?.appendingPathComponent("agent/imark.mjs")
     }
 
-    static var isInstalled: Bool {
-        FileManager.default.fileExists(atPath: skillFile.path)
-    }
-
-    /// Claude Code has to be there for any of this to mean anything. Its folder
-    /// is the only signal available without running it.
-    static var claudeCodeFound: Bool {
-        FileManager.default.fileExists(atPath: home.appendingPathComponent(".claude").path)
-    }
-
     enum Failure: LocalizedError {
         case missingResources
         case cannotWrite(String)
 
         var errorDescription: String? {
             switch self {
-            case .missingResources:
-                "This copy of Imark is missing the agent files."
-            case .cannotWrite(let path):
-                "Imark couldn't write to \(path)."
+            case .missingResources: "This copy of Imark is missing the agent files."
+            case .cannotWrite(let path): "Imark couldn't write to \(path)."
             }
         }
     }
 
     static func install() throws {
-        guard let resources,
-              let script,
+        guard let resources, let script,
               FileManager.default.fileExists(atPath: script.path)
         else { throw Failure.missingResources }
 
         let source = resources.appendingPathComponent("agent")
-        let manager = FileManager.default
-
-        try write(
-            rewritten(at: source.appendingPathComponent("SKILL.md"), script: script),
-            to: skillFile,
-            using: manager
-        )
-        for name in commands {
+        for agent in found {
             try write(
-                rewritten(at: source.appendingPathComponent("commands/\(name)"), script: script),
-                to: commandsDirectory.appendingPathComponent(name),
-                using: manager
+                rewritten(at: source.appendingPathComponent("SKILL.md"), script: script),
+                to: skillFile(for: agent)
             )
+            guard let commands = agent.commands else { continue }
+            for name in commandNames {
+                try write(
+                    rewritten(at: source.appendingPathComponent("commands/\(name)"), script: script),
+                    to: homeDirectory.appendingPathComponent("\(commands)/\(name)")
+                )
+            }
         }
     }
 
+    /// Removes from every agent it knows, not only the ones currently found: an
+    /// agent uninstalled since is exactly the case where our leftovers would sit
+    /// there forever.
     static func uninstall() throws {
         let manager = FileManager.default
-        try? manager.removeItem(at: skillFile.deletingLastPathComponent())
-        for file in commandFiles where manager.fileExists(atPath: file.path) {
-            try manager.removeItem(at: file)
+        for agent in known {
+            try? manager.removeItem(at: skillFile(for: agent).deletingLastPathComponent())
+            for file in commandFiles(for: agent) where manager.fileExists(atPath: file.path) {
+                try? manager.removeItem(at: file)
+            }
         }
     }
 
@@ -119,21 +148,16 @@ enum AgentSetup {
         guard let text = try? String(contentsOf: url, encoding: .utf8) else {
             throw Failure.missingResources
         }
-        return text
-            .replacingOccurrences(
-                of: "\"${CLAUDE_PLUGIN_ROOT}/scripts/imark.mjs\"",
-                with: "\"\(script.path)\""
-            )
-            .replacingOccurrences(
-                of: "${CLAUDE_PLUGIN_ROOT}/scripts/imark.mjs",
-                with: script.path
-            )
+        return text.replacingOccurrences(
+            of: "${CLAUDE_PLUGIN_ROOT}/scripts/imark.mjs",
+            with: script.path
+        )
     }
 
-    private static func write(_ text: String, to url: URL, using manager: FileManager) throws {
+    private static func write(_ text: String, to url: URL) throws {
         let folder = url.deletingLastPathComponent()
         do {
-            try manager.createDirectory(at: folder, withIntermediateDirectories: true)
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             try text.write(to: url, atomically: true, encoding: .utf8)
         } catch {
             throw Failure.cannotWrite(folder.path)

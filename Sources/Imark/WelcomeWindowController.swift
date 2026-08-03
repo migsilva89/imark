@@ -9,9 +9,9 @@ final class WelcomeWindowController: NSWindowController {
     /// Holds either the "make me the default" button or the confirmation that
     /// Imark already is, and is rebuilt when that changes.
     private let defaultRow = NSStackView()
-    /// The same, for the Claude Code integration. Only built at all when there
-    /// is a `~/.claude` to install into: an offer to set up something you do not
-    /// have is a puzzle, not a feature.
+    /// The same, for the coding-agent integration. Only built at all when an
+    /// agent is on the machine: an offer to set up something you do not have is
+    /// a puzzle, not a feature.
     private let agentRow = NSStackView()
 
     init() {
@@ -123,13 +123,15 @@ final class WelcomeWindowController: NSWindowController {
 
     private func refreshAgentRow() {
         agentRow.arrangedSubviews.forEach { $0.removeFromSuperview() }
-        // Nothing to install into, so nothing to say. Somebody who does not use
-        // Claude Code should not have to work out what this row is for.
-        guard AgentSetup.claudeCodeFound else {
+        let found = AgentSetup.found
+        // Nothing to install into, so nothing to say. Somebody who uses no
+        // coding agent should not have to work out what this row is for.
+        guard !found.isEmpty else {
             agentRow.isHidden = true
             return
         }
         agentRow.isHidden = false
+        let names = found.map(\.name).joined(separator: " and ")
 
         guard !AgentSetup.isInstalled else {
             let check = NSImageView(
@@ -139,13 +141,13 @@ final class WelcomeWindowController: NSWindowController {
             check.contentTintColor = .secondaryLabelColor
             check.symbolConfiguration = .init(pointSize: 11, weight: .regular)
 
-            let label = NSTextField(labelWithString: "Set up for Claude Code")
+            let label = NSTextField(labelWithString: "Set up for \(names)")
             label.font = .systemFont(ofSize: 11)
             label.textColor = .secondaryLabelColor
 
-            // Deleting three files, offered where they were created. An install
-            // with no way back is a trap, and hiding the way back in a menu is
-            // the same trap with a longer fuse.
+            // Deleting a handful of files, offered where they were created. An
+            // install with no way back is a trap, and hiding the way back in a
+            // menu is the same trap with a longer fuse.
             let remove = NSButton(title: "Remove", target: self, action: #selector(removeAgentSetup))
             remove.bezelStyle = .inline
             remove.controlSize = .small
@@ -158,31 +160,34 @@ final class WelcomeWindowController: NSWindowController {
         }
 
         let button = NSButton(
-            title: "Set up for Claude Code",
+            title: "Set up for \(names)",
             target: self,
             action: #selector(installAgentSetup)
         )
         button.bezelStyle = .rounded
-        button.toolTip = "Adds a skill and two commands to ~/.claude"
+        button.toolTip = "Adds a skill so your agent can open documents here for review"
         agentRow.addArrangedSubview(button)
     }
 
-    /// Says what it will write before it writes it. This is the one thing Imark
-    /// does outside its own files and somebody's documents, and it lands in a
-    /// folder another program owns.
+    /// Says what it will write before it writes it, path by path. This is the
+    /// one thing Imark does outside its own files and somebody's documents, and
+    /// it lands in folders other programs own.
     @objc private func installAgentSetup() {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let paths = AgentSetup.plannedFiles
+            .map { $0.path.replacingOccurrences(of: home, with: "~") }
+            .joined(separator: "\n")
+
         let alert = NSAlert()
-        alert.messageText = "Set Imark up for Claude Code?"
+        alert.messageText = "Set Imark up for your coding agents?"
         alert.informativeText = [
-            "This writes three files to your home folder:",
+            "This writes:",
             "",
-            "~/.claude/skills/imark-comments/SKILL.md",
-            "~/.claude/commands/imark-review.md",
-            "~/.claude/commands/imark-notes.md",
+            paths,
             "",
-            "You get /imark-review and /imark-notes, which open a document here "
-                + "for you to comment on and read your notes back. Nothing else "
-                + "is touched, and Remove deletes exactly these three.",
+            "Your agent can then open a document here for you to comment on, and "
+                + "read your notes back out of the file. Nothing else is touched, "
+                + "and Remove deletes exactly these.",
         ].joined(separator: "\n")
         alert.addButton(withTitle: "Set Up")
         alert.addButton(withTitle: "Cancel")

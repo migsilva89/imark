@@ -274,11 +274,15 @@ is the whole bridge.
 /imark:imark-notes ficheiro.md    # notes you already left
 ```
 
-Launched with no document, Imark offers to **set itself up for Claude Code** —
-it writes a skill and two commands to `~/.claude`, and Remove deletes exactly
-those. Skills and commands only, never the plugin: a plugin is not a folder of
-files but a registry another program owns, and writing into that is how you
-break what somebody already had.
+Launched with no document, Imark offers to **set itself up for the coding
+agents on your machine** — one skill, written into each one's `skills` folder,
+and Remove deletes exactly what it wrote. Claude Code and Codex read the same
+`SKILL.md`, so it is the same file in both; only Claude Code also takes the two
+loose commands.
+
+Skills only, never a plugin: a plugin is not a folder of files but a registry
+another program owns, and writing into that is how you break what somebody
+already had. The `ExitPlanMode` hook is the one thing that needs the plugin.
 
 A document under review gets two buttons in the toolbar — **Approve** and **Send
 Back** — and pressing one ends the wait on the other side. They appear only on a
