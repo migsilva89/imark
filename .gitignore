@@ -13,5 +13,6 @@ renderer/node_modules/
 .DS_Store
 renderer/.esbuild-meta.json
 
-# Working notes: launch plans, handoffs, anything not for the world
-docs/private/
+# Design notes, plans, working documents. They stay on disk and out of the
+# repository — the decisions in them are ours, and half of them name people.
+docs/

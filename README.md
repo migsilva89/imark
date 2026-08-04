@@ -219,7 +219,7 @@ Launch it with no document open and click **Make Imark the default for .md**, or
 
 ### Why does the Quick Look extension need the network entitlement?
 
-It does not use the network. WebKit refuses to start its WebContent process inside a sandboxed app extension without `com.apple.security.network.client`, even when every byte is served from a local scheme. The panel stays blank without it, with no error and no log entry. See `docs/PLAN.md` for the rest of that afternoon.
+It does not use the network. WebKit refuses to start its WebContent process inside a sandboxed app extension without `com.apple.security.network.client`, even when every byte is served from a local scheme. The panel stays blank without it, with no error and no log entry.
 
 ### What does `⌘Z` undo?
 
@@ -256,13 +256,10 @@ renderer/                JavaScript source
 Resources/               build output — not edited by hand
 Support/                 Info.plist, entitlements, generators, and tests
 testdata/                documents that exercise the renderer
-docs/                    design, flows and acceptance criteria
 plugin/                  the Claude Code plugin — uses the app, is not part of it
 ```
 
 The renderer is the only part that knows how to turn Markdown into anything. The Swift side handles windows, files and navigation, and talks to it in messages.
-
-Design and acceptance criteria live in [docs/DESIGN.md](docs/DESIGN.md); the build order and what each milestone had to satisfy is in [docs/PLAN.md](docs/PLAN.md). Comments have their own pair — [docs/EDITOR.md](docs/EDITOR.md) for why they are stored the way they are, [docs/PLAN-COMMENTS.md](docs/PLAN-COMMENTS.md) for the order it was built in and what went wrong on the way.
 
 ## Reviewing an agent's work
 
@@ -275,8 +272,8 @@ is the whole bridge.
 [`plugin/`](plugin/README.md) is a Claude Code plugin that does exactly that:
 
 ```
-/imark:imark-review docs/PLAN.md  # review a markdown document
-/imark:imark-notes ficheiro.md    # notes you already left
+/imark:imark-review PLAN.md       # review a markdown document
+/imark:imark-notes PLAN.md        # notes you already left
 ```
 
 Launched with no document, Imark offers to **set itself up for the coding

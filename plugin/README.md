@@ -19,13 +19,13 @@ Needs Imark in `/Applications` and Node 20.
 ## Use
 
 ```
-/imark:imark-review docs/PLAN.md  # review a markdown document
-/imark:imark-notes ficheiro.md    # notes you already left
+/imark:imark-review PLAN.md       # review a markdown document
+/imark:imark-notes PLAN.md        # notes you already left
 ```
 
 Markdown only — plans, specs, RFCs, docs. Imark is a markdown reader, and
-reviewing code is a real job this is not the tool for; that is what GitHub,
-Plannotator or your editor is for.
+reviewing code is a real job this is not the tool for; that is what GitHub or
+your editor is for.
 
 `imark-review` writes a document to `.imark/reviews/`, opens it in Imark, and
 **blocks**. You read it, comment where you want to, and finish with the two
@@ -88,5 +88,5 @@ that way.
 node scripts/imark.mjs notes ../testdata/comments.md
 ```
 
-Why it is built this way, and what it deliberately leaves out, is in
-[`docs/PLAN-AGENT.md`](../docs/PLAN-AGENT.md).
+Its escaping is the mirror image of `Sources/Imark/Comments.swift`; if one side
+grows a rule, the other has to grow it too.
