@@ -127,6 +127,51 @@ hook() {   # hook <on|off> <decision> → prints the JSON Claude Code reads
   cd "$OLDPWD"; rm -rf "$dir"
 }
 
+# A note is a note. The fallback words end a review, and everything else has to
+# leave it running — an ordinary English word quoted in a question used to
+# approve the document and take the question away with it.
+echo "▸ ordinary words do not decide"
+ordinary() {   # ordinary <quoted-word> → "still waiting" or what came back
+  local word="$1"
+  local dir; dir="$(mktemp -d)"
+  cd "$dir"
+  printf '# Plan\n\nWe go through the tables one at a time, and it is ok.\n' > SPEC.md
+
+  IMARK_TEST_NO_OPEN=1 node "$OLDPWD/plugin/scripts/imark.mjs" review SPEC.md > out.txt 2>&1 &
+  local pid=$!
+
+  local review=""
+  for _ in $(seq 1 40); do
+    review="$(ls .imark/reviews/*.md 2>/dev/null | head -1)"
+    [[ -n "$review" ]] && break
+    sleep 0.25
+  done
+
+  {
+    echo
+    echo "<!-- imark quote=\"$word\" by=\"reviewer\" at=\"2026-08-04T10:00Z\""
+    echo "A question about the word $word, not a decision."
+    echo '-->'
+  } >> "$review"
+
+  # Twice the poll interval, so a verdict would have been reached by now.
+  sleep 1.5
+  if kill -0 "$pid" 2>/dev/null; then
+    kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null
+    echo "still waiting"
+  else
+    wait "$pid" 2>/dev/null
+    cat out.txt
+  fi
+  cd "$OLDPWD"; rm -rf "$dir"
+}
+
+for word in go ok ship no changes rework; do
+  check "commenting on \"$word\" leaves the review open" "$(ordinary "$word")" "still waiting"
+done
+check "and \"approve\" still ends it"  "$(ordinary approve)" "APPROVED"
+check "as does \"revise\""             "$(ordinary revise)"  "DID NOT APPROVE"
+
 out="$(hook off approve)"
 check "does nothing without IMARK_PLAN_REVIEW"    "$out" "{}"
 refute "and decides no permission request"                "$out" "behavior"
