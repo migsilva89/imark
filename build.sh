@@ -21,7 +21,7 @@ for arg in "$@"; do
 		--debug) CONFIG="debug" ;;
 		--no-install) INSTALL=0 ;;
 		--dev) DEV=1; CONFIG="debug" ;;
-		*) echo "opção desconhecida: $arg" >&2; exit 2 ;;
+		*) echo "unknown option: $arg" >&2; exit 2 ;;
 	esac
 done
 
@@ -46,15 +46,21 @@ step() { printf '\n\033[1;35m▸ %s\033[0m\n' "$1"; }
 
 # ---------------------------------------------------------------- renderer
 
-if [ -d "$ROOT/renderer/node_modules" ]; then
-	step "renderer (esbuild)"
-	(cd "$ROOT/renderer" && node build.mjs)
-	# Generated from what esbuild actually bundled, so the notices cannot drift
-	# from the binary they have to travel with.
-	node "$ROOT/Support/licences.mjs"
-else
-	echo "warning: renderer/node_modules em falta — a saltar o bundle JS" >&2
+# Resources/ is generated, so a fresh clone has no bundle at all. Skipping the
+# renderer here used to be a warning, which meant a clean checkout could build,
+# sign and ship an app that renders nothing, with no sign anything went wrong.
+if [ ! -d "$ROOT/renderer/node_modules" ]; then
+	echo "error: renderer/node_modules is missing — the app would ship without" >&2
+	echo "       its renderer and show a blank window. Run:" >&2
+	echo "           cd renderer && npm ci" >&2
+	exit 1
 fi
+
+step "renderer (esbuild)"
+(cd "$ROOT/renderer" && node build.mjs)
+# Generated from what esbuild actually bundled, so the notices cannot drift
+# from the binary they have to travel with.
+node "$ROOT/Support/licences.mjs"
 
 # ------------------------------------------------------------------ swift
 
@@ -64,7 +70,7 @@ BIN="$(swift build -c "$CONFIG" --arch arm64 --show-bin-path)"
 
 # --------------------------------------------------------------- assemble
 
-step "montar $APP_NAME.app"
+step "assemble $APP_NAME.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" \
          "$APP/Contents/Resources" \
@@ -87,6 +93,10 @@ printf 'APPL????' > "$APP/Contents/PkgInfo"
 if [ -d "$ROOT/Resources" ]; then
 	cp -R "$ROOT/Resources/." "$APP/Contents/Resources/"
 fi
+# The one file the window is useless without, checked in the assembled bundle
+# rather than in the tree it was copied from.
+[ -f "$APP/Contents/Resources/bundle.js" ] \
+	|| { echo "error: the bundle is not in the app — the renderer did not build" >&2; exit 1; }
 if [ -f "$ROOT/Support/AppIcon.icns" ]; then
 	cp "$ROOT/Support/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
 else
