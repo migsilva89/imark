@@ -15,8 +15,15 @@ const CLOSE_LINE = /^\s*-->\s*$/
 
 // The words the reviewer comments on to end the wait. Written into every review
 // document, in the document, so nobody has to remember them.
-const APPROVE = new Set(['approve', 'approved', 'go', 'ok', 'ship'])
-const REVISE = new Set(['revise', 'reject', 'changes', 'rework', 'no'])
+//
+// Only these two, and they are the two the document names. This list once held
+// go, ok, ship, no, changes and rework as well — ordinary English, any of which
+// a reviewer might quote to ask a question about. Commenting on the word "go"
+// in "we go through the tables one at a time" approved the review, and because
+// the deciding note is taken out of the feedback, the question disappeared with
+// it. A word that ends a review has to be a word nobody types by accident.
+const APPROVE = new Set(['approve', 'approved'])
+const REVISE = new Set(['revise', 'revised'])
 
 // ---------------------------------------------------------------- parsing
 
