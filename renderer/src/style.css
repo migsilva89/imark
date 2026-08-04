@@ -935,7 +935,11 @@ img[data-blocked] {
   height: 22px;
   align-items: center;
   justify-content: center;
-  padding: 0;
+  /* Centring the line box is not centring the glyph: `+` is drawn on the maths
+     axis, which leaves it 2.8px lower than it looks like it should be. The
+     padding takes that back off the bottom, measured rather than guessed. */
+  box-sizing: border-box;
+  padding: 0 0 2.8px;
   font-family: var(--font-body);
   font-size: 15px;
   line-height: 1;
