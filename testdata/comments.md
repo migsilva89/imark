@@ -1,63 +1,62 @@
 ---
-title: Comentários — ficheiro de teste
+title: Comments — test file
 status: fixture
 ---
 
-# Comentários
+# Comments
 
-Este ficheiro existe para verificar o C3: ler comentários escritos à mão, sem
-que a app tenha escrito nenhum. Quatro devem ficar ancorados e um órfão.
+This file exists to verify C3: reading comments written by hand, with the app
+having written none of them. Six should anchor and one should be an orphan.
 
-O prazo é apertado mas exequível se começarmos em Setembro.
+The deadline is tight but achievable if we start in September.
 
-<!-- imark quote="razo é" by="John Doe" at="2026-08-02T11:02:33Z"
-boas coisa aqui gaurdada
+<!-- imark quote="dline is" by="John Doe" at="2026-08-02T11:02:33Z"
+A quote landing in the middle of two words, on purpose.
 -->
 
-<!-- imark quote="exequível" by="john" at="2026-08-02T14:31Z"
-Exequível com que equipa? Isto precisa de um número, não de um adjectivo.
+<!-- imark quote="achievable" by="john" at="2026-08-02T14:31Z"
+Achievable with which team? This needs a number, not an adjective.
 -->
 
-## Uma tabela
+## A table
 
-| Peça | Estado |
+| Piece | State |
 |---|---|
-| Mapa de linhas | feito |
-| Popover | feito |
+| Line map | done |
+| Popover | done |
 
-<!-- imark quote="Mapa de linhas" by="jane" at="2026-08-01T09:00Z" color="green"
-Uma nota dentro de uma tabela, para provar que a âncora não precisa de um
-parágrafo.
+<!-- imark quote="Line map" by="jane" at="2026-08-01T09:00Z" color="green"
+A note inside a table, to prove the anchor does not need a paragraph.
 -->
 
-> Uma citação também é um bloco de topo.
+> A blockquote is a top-level block too.
 
-<!-- imark quote="citação" by="john" at="2026-07-30T18:20Z" color="amber"
-E leva nota como qualquer outro.
+<!-- imark quote="blockquote" by="john" at="2026-07-30T18:20Z" color="amber"
+And it takes a note like any other.
 -->
 
-## A mesma palavra duas vezes
+## The same word twice
 
-A palavra aparece aqui, e aparece outra vez na mesma linha.
+The word appears here, and it appears again on the same line.
 
-<!-- imark quote="aparece" by="john" at="2026-08-02T15:00Z" nth="2" color="red"
-Esta tem de cair na segunda ocorrência, não na primeira.
+<!-- imark quote="appears" by="john" at="2026-08-02T15:00Z" nth="2" color="red"
+This one has to land on the second occurrence, not the first.
 -->
 
-## Uma cor que não existe
+## A colour that does not exist
 
-Um ficheiro pode trazer qualquer coisa no `color=`, e o que não for conhecido
-tem de voltar ao normal em vez de chegar à folha de estilos.
+A file can carry anything in `color=`, and whatever is not recognised has to
+fall back to normal instead of reaching the stylesheet.
 
-<!-- imark quote="qualquer coisa" by="sam" at="2026-08-02T16:00Z" color="chartreuse; }"
-Esta cor é inventada — a nota tem de ficar com a cor por omissão.
+<!-- imark quote="anything" by="sam" at="2026-08-02T16:00Z" color="chartreuse; }"
+This colour is invented — the note has to end up in the default one.
 -->
 
-## O órfão
+## The orphan
 
-Este parágrafo já não contém aquilo a que a nota se referia.
+This paragraph no longer contains what the note referred to.
 
-<!-- imark quote="uma frase que foi apagada" by="john" at="2026-07-28T11:05Z" color="blue"
-A citação desapareceu numa edição. A nota continua legível e presa ao bloco,
-mas sem sublinhado e marcada como órfã.
+<!-- imark quote="a sentence that was deleted" by="john" at="2026-07-28T11:05Z" color="blue"
+The quote disappeared in an edit. The note is still legible and still attached
+to its block, but without the underline and marked as an orphan.
 -->
