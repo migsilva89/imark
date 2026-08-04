@@ -151,7 +151,7 @@ cd renderer && npm install && cd ..
 ./build.sh
 ```
 
-That builds the JavaScript bundle, compiles the Swift, assembles `Imark.app`, signs it ad-hoc and installs it to `/Applications`.
+That builds the JavaScript bundle, compiles the Swift, assembles `Imark.app` and installs it to `/Applications`.
 
 | | |
 |---|---|
@@ -159,39 +159,6 @@ That builds the JavaScript bundle, compiles the Swift, assembles `Imark.app`, si
 | `./build.sh --debug` | fast compile, for iterating |
 | `./build.sh --no-install` | leave it in `dist/` |
 | `IMARK_INSTALL_DIR=~/Applications ./build.sh` | install elsewhere |
-
-## Giving it to somebody else
-
-```bash
-./release.sh
-```
-
-Refuses to run on a dirty tree, off `main`, out of sync with the remote, or with
-failing tests — a release is the one build somebody else runs, and a signed,
-notarised broken one is worse than an unsigned one because it carries a name and
-opens without a warning. `./release.sh --force` skips the checks.
-
-Produces `dist/Imark-<version>.dmg` — the app and a shortcut to Applications,
-so installing is a drag. It works as it stands, with one caveat: without a
-Developer ID the image is unsigned, and on macOS 15 or later the person opening
-it has to go to **System Settings › Privacy & Security › Open Anyway** the first
-time. Control-clicking no longer skips that step.
-
-With a certificate it signs the image too, and with notary credentials it waits
-for Apple's verdict and staples the result, so the app opens on a machine that
-has never seen it and is offline:
-
-```bash
-xcrun notarytool store-credentials imark \
-  --apple-id you@example.com --team-id TEAMID --password <app-specific-password>
-
-IMARK_SIGN_IDENTITY="Developer ID Application: Name (TEAMID)" \
-IMARK_NOTARY_PROFILE=imark ./release.sh
-```
-
-A Developer ID needs a paid Apple Developer Program membership. There is no free
-certificate that helps here: a free Apple ID only issues development
-certificates, which last seven days and only work on the machine that made them.
 
 ## Keyboard Shortcuts
 
@@ -233,14 +200,6 @@ from your own editor are your editor's to undo.
 The second note gets an `nth="2"` so it anchors to the right occurrence. Notes on
 the same paragraph stack down the margin rather than landing on top of each
 other.
-
-### Can I sign it with my own Developer ID?
-
-```bash
-IMARK_SIGN_IDENTITY="Developer ID Application: Name (TEAMID)" ./build.sh
-```
-
-With an identity it signs with `--options=runtime` and a timestamp, which is what notarisation expects. Without one it stays ad-hoc, which is enough for the machine that built it. For handing the app to somebody else, see [Giving it to somebody else](#giving-it-to-somebody-else).
 
 ## Repository
 
