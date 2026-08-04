@@ -53,8 +53,8 @@ to change.
 ## Reviewing the plan automatically
 
 The `ExitPlanMode` hook is off by default. `ExitPlanMode` is crowded territory —
-[Plannotator](https://plannotator.ai) hooks the same event, and two blocking
-hooks on one event is a hung session. Turn it on deliberately:
+other review tools hook the same event, and two blocking hooks on one event is a
+hung session. Turn it on deliberately:
 
 ```bash
 export IMARK_PLAN_REVIEW=1

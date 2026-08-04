@@ -23,7 +23,7 @@ Exequível com que equipa? Isto precisa de um número, não de um adjectivo.
 Do not hand-roll a parser:
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/scripts/imark.mjs" notes <ficheiro.md>
+node "${CLAUDE_PLUGIN_ROOT}/scripts/imark.mjs" notes <file.md>
 ```
 
 Add `--json` for structured output. Each note comes back with what it says, the
