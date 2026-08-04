@@ -29,6 +29,38 @@ STAGE="$ROOT/dist/dmg"
 DMG="$ROOT/dist/Imark-$VERSION.dmg"
 
 step() { printf '\n\033[1;35m▸ %s\033[0m\n' "$1"; }
+die() { printf '\n\033[1;31m✗ %s\033[0m\n' "$1" >&2; exit 1; }
+
+# ------------------------------------------------------------------- gate
+#
+# A release is the one build somebody else runs, so it is the one that must not
+# come from a working tree only this machine has seen. Skipped with --force for
+# the case where you know exactly what you are doing and why.
+
+if [ "${1:-}" != "--force" ]; then
+	step "checks"
+
+	[ -z "$(git status --porcelain)" ] \
+		|| die "uncommitted changes — a release has to be a commit somebody can go back to"
+
+	BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+	[ "$BRANCH" = "main" ] || die "on $BRANCH, not main"
+
+	git fetch --quiet origin main 2>/dev/null || true
+	if git rev-parse --quiet --verify origin/main >/dev/null; then
+		[ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ] \
+			|| die "main and origin/main have diverged — push or pull first"
+	fi
+
+	# The suites, because a signed and notarised broken build is worse than an
+	# unsigned one: it carries somebody's name and opens without a warning.
+	swiftc -parse-as-library Sources/Imark/Comments.swift Sources/Imark/NoteColour.swift \
+		Support/test-comments.swift -o /tmp/imark-release-test >/dev/null 2>&1 \
+		&& /tmp/imark-release-test >/dev/null || die "the comment tests failed"
+	node Support/test-export.mjs >/dev/null 2>&1 || die "the export test failed"
+
+	echo "clean tree, on main, in sync, tests pass"
+fi
 
 # ------------------------------------------------------------------- build
 

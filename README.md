@@ -166,6 +166,11 @@ That builds the JavaScript bundle, compiles the Swift, assembles `Imark.app`, si
 ./release.sh
 ```
 
+Refuses to run on a dirty tree, off `main`, out of sync with the remote, or with
+failing tests — a release is the one build somebody else runs, and a signed,
+notarised broken one is worse than an unsigned one because it carries a name and
+opens without a warning. `./release.sh --force` skips the checks.
+
 Produces `dist/Imark-<version>.dmg` — the app and a shortcut to Applications,
 so installing is a drag. It works as it stands, with one caveat: without a
 Developer ID the image is unsigned, and on macOS 15 or later the person opening
