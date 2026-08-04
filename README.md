@@ -242,9 +242,47 @@ IMARK_SIGN_IDENTITY="Developer ID Application: Name (TEAMID)" ./build.sh
 
 With an identity it signs with `--options=runtime` and a timestamp, which is what notarisation expects. Without one it stays ad-hoc, which is enough for the machine that built it. For handing the app to somebody else, see [Giving it to somebody else](#giving-it-to-somebody-else).
 
-### Can I use somebody else's certificate?
+### Can somebody else's membership sign it?
 
-Technically yes, and it is a bad idea. It means asking them to export their signing key, which can sign anything at all as them. Either they run `release.sh` themselves, or you get your own membership.
+Yes, and there is a right way and a wrong way.
+
+The wrong way is asking them to export their signing key. That key signs
+**anything at all** as them, and once it has been sent it cannot be unsent.
+
+The right way costs them two minutes and hands over nothing. You make the
+signing request on your own Mac, so the private key is born in your keychain and
+never leaves it:
+
+```bash
+# Keychain Access › Certificate Assistant › Request a Certificate from a
+# Certificate Authority › Saved to disk. Or, equivalently:
+openssl req -new -newkey rsa:2048 -nodes \
+  -keyout imark.key -out imark.certSigningRequest \
+  -subj "/emailAddress=you@example.com/CN=Your Name/C=PT"
+```
+
+Send them the `.certSigningRequest` — there is nothing secret in it. They go to
+**developer.apple.com › Certificates, IDs & Profiles › Certificates › + ›
+Developer ID Application**, upload it, download the `.cer`, and send that back.
+Double-click it and `security find-identity -v -p codesigning` shows the
+identity, because it has found the key that was here all along.
+
+Four things worth knowing before asking:
+
+- Only the **Account Holder** can create Developer ID certificates. A team member
+  cannot, however they are invited.
+- There is a limit of **five** per team. If they are at five, one has to be
+  revoked first.
+- The certificate is named after **their team**, not after the `CN` in your
+  request — so their name is what Gatekeeper shows to whoever installs the app.
+- Its expiry is capped by **their membership renewal**, which can make it much
+  shorter than the usual five years. Anything signed and timestamped before that
+  date keeps working; new builds after it need a new certificate.
+
+Notarisation needs credentials too, and the same rule applies: not their Apple ID
+and app-specific password, but an **App Store Connect API key** (App Store
+Connect › Users and Access › Integrations) with the Developer role. It is
+revocable on its own and gives access to nothing else.
 
 ## Repository
 
