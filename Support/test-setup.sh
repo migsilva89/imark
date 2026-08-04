@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Installs the Claude Code files and removes them again, in a throwaway home.
+# Installs the agent files and removes them again, in a throwaway home.
 #
 #   Support/test-setup.sh
 #
@@ -11,12 +11,12 @@ cd "$(dirname "$0")/.."
 
 APP="${IMARK_APP:-/Applications/Imark.app}"
 if [ ! -d "$APP/Contents/Resources/agent" ]; then
-  echo "FALHA $APP não tem os ficheiros do agente — corre ./build.sh primeiro"
+  echo "FAIL $APP is missing the agent files — run ./build.sh first"
   exit 1
 fi
 
 swiftc -parse-as-library Sources/Imark/AgentSetup.swift Support/test-setup.swift \
-  -o /tmp/imark-setup-test 2>/dev/null || { echo "FALHA não compilou"; exit 1; }
+  -o /tmp/imark-setup-test 2>/dev/null || { echo "FAIL did not compile"; exit 1; }
 
 HOME_DIR="$(mktemp -d)"
 trap 'rm -rf "$HOME_DIR"' EXIT

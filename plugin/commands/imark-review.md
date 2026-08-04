@@ -1,32 +1,32 @@
 ---
-description: Open something in Imark for review and wait for the reviewer's notes
-argument-hint: "<ficheiro.md> [--no-wait]"
+description: Open a markdown document in Imark for review and wait for the reviewer's notes
+argument-hint: "<file.md> [--no-wait]"
 allowed-tools: Bash(node:*)
 ---
 
-Abre um documento no Imark para o utilizador rever e espera pela decisão dele.
+Open a document in Imark for the user to review, and wait for their decision.
 
-Corre isto, passando os argumentos tal como vieram:
+Run this, passing the arguments through as they came:
 
 ```
 node "${CLAUDE_PLUGIN_ROOT}/scripts/imark.mjs" review $ARGUMENTS
 ```
 
-Só markdown — planos, specs, RFCs, docs. Se te pedirem para rever código,
-diz que o Imark é um leitor de markdown e que isso é trabalho do GitHub, do
-Plannotator ou do editor.
+Markdown only — plans, specs, RFCs, docs. If you are asked to review code, say
+that Imark is a markdown reader and that reviewing code is a job for GitHub or
+their editor.
 
-O comando bloqueia até o utilizador comentar em **seguir** ou em **rever** dentro
-da app. Isso é esperado e pode demorar: não o interrompas, não lhe ponhas
-timeout, e não perguntes se já acabou.
+The command **blocks** until the user presses Approve or Request Changes in the
+app. That is expected and can take a long time: do not interrupt it, do not put
+a timeout on it, and do not ask whether they are done.
 
-Quando voltar, o output traz a decisão e as notas, e no caso de recusa traz
-também os passos a seguir. **Segue-os pela ordem em que vêm** — em particular,
-responde ao utilizador antes de reescrever seja o que for, e pergunta em vez de
-adivinhar quando uma nota for ambígua ou duas se contradisserem.
+When it returns, the output carries the decision and the notes, and on a refusal
+it also carries the steps to take. **Follow them in the order they come** — in
+particular, reply to the user before rewriting anything, and ask rather than
+guess when a note is ambiguous or two of them contradict each other.
 
-Cita as notas pela citação a que se referem — “sobre X” — em vez de as numerar,
-porque é assim que o utilizador as vê na app.
+Refer to notes by the words they are attached to — *on “X”* — rather than by
+number, because that is how the user sees them in the app.
 
-Se o comando disser que o Imark não está instalado, diz-lhe onde ficou o
-documento e continua sem revisão.
+If the command says Imark is not installed, tell the user where the document
+ended up and carry on without the review.

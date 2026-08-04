@@ -53,7 +53,7 @@ if [ -d "$ROOT/renderer/node_modules" ]; then
 	# from the binary they have to travel with.
 	node "$ROOT/Support/licences.mjs"
 else
-	echo "aviso: renderer/node_modules em falta — a saltar o bundle JS" >&2
+	echo "warning: renderer/node_modules em falta — a saltar o bundle JS" >&2
 fi
 
 # ------------------------------------------------------------------ swift
@@ -90,7 +90,7 @@ fi
 if [ -f "$ROOT/Support/AppIcon.icns" ]; then
 	cp "$ROOT/Support/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
 else
-	echo "aviso: sem ícone — corre 'swift Support/make-icon.swift'" >&2
+	echo "warning: no icon — run 'swift Support/make-icon.swift'" >&2
 fi
 
 # The agent integration travels inside the app: the script that does the work,
@@ -129,11 +129,11 @@ fi
 # Inner bundles must be sealed before the outer one, or the outer signature
 # is invalidated the moment the extension changes.
 if [ "$SIGN_IDENTITY" = "-" ]; then
-	step "assinar (ad-hoc)"
+	step "sign (ad-hoc)"
 	TIMESTAMP="--timestamp=none"
 	EXTRA=""
 else
-	step "assinar ($SIGN_IDENTITY)"
+	step "sign ($SIGN_IDENTITY)"
 	TIMESTAMP="--timestamp"
 	EXTRA="--options=runtime"
 fi
@@ -143,21 +143,21 @@ codesign --force --sign "$SIGN_IDENTITY" $TIMESTAMP $EXTRA \
 	--entitlements "$ROOT/Support/QuickLook.entitlements" "$APPEX" >/dev/null 2>&1
 # shellcheck disable=SC2086
 codesign --force --sign "$SIGN_IDENTITY" $TIMESTAMP $EXTRA "$APP" >/dev/null 2>&1
-codesign --verify --deep --strict "$APP" && echo "assinatura ok"
+codesign --verify --deep --strict "$APP" && echo "signature ok"
 
 # --------------------------------------------------------------- install
 
 if [ "$INSTALL" -eq 1 ]; then
-	step "instalar em $INSTALL_DIR"
+	step "install into $INSTALL_DIR"
 	mkdir -p "$INSTALL_DIR"
 	# A stale copy confuses Launch Services more than a missing one.
 	rm -rf "${INSTALL_DIR:?}/$APP_NAME.app"
 	cp -R "$APP" "$INSTALL_DIR/$APP_NAME.app"
 
-	step "registar no Launch Services"
+	step "register with Launch Services"
 	"$LSREGISTER" -f "$INSTALL_DIR/$APP_NAME.app"
-	echo "registado"
-	printf '\n\033[1;32m✓ %s instalado em %s\033[0m\n' "$APP_NAME" "$INSTALL_DIR/$APP_NAME.app"
+	echo "registered"
+	printf '\n\033[1;32m✓ %s installed at %s\033[0m\n' "$APP_NAME" "$INSTALL_DIR/$APP_NAME.app"
 else
 	printf '\n\033[1;32m✓ %s\033[0m\n' "$APP"
 fi

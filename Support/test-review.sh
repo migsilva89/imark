@@ -21,13 +21,13 @@ check() {
     echo "OK   $1"
     pass=$((pass + 1))
   else
-    echo "FALHA $1"
+    echo "FAIL $1"
     fail=$((fail + 1))
   fi
 }
 refute() {
   if [[ "$2" == *"$3"* ]]; then
-    echo "FALHA $1"
+    echo "FAIL $1"
     fail=$((fail + 1))
   else
     echo "OK   $1"
@@ -35,24 +35,24 @@ refute() {
   fi
 }
 
-echo "▸ a compilar o decisor"
+echo "▸ compiling the decider"
 swiftc -parse-as-library \
   Sources/Imark/Review.swift Support/decide.swift \
   -o /tmp/imark-decide 2>/dev/null || {
-    echo "FALHA não compilou"; exit 1;
+    echo "FAIL did not compile"; exit 1;
   }
 
-run() {   # run <decisão> <notas-no-documento>  → imprime o que o agente lê
+run() {   # run <decision> <notes-in-document>  → prints what the agent reads
   local decision="$1" note="$2"
   local dir; dir="$(mktemp -d)"
   cd "$dir"
   {
-    echo "# Plano"
+    echo "# Plan"
     echo
-    echo "Um parágrafo que vai ser revisto."
+    echo "A paragraph that is going to be reviewed."
     echo
     if [[ -n "$note" ]]; then
-      echo '<!-- imark quote="vai ser revisto" by="miguel" at="2026-08-03T15:00Z"'
+      echo '<!-- imark quote="going to be reviewed" by="miguel" at="2026-08-03T15:00Z"'
       echo "$note"
       echo '-->'
     fi
@@ -69,7 +69,7 @@ run() {   # run <decisão> <notas-no-documento>  → imprime o que o agente lê
   done
   if [[ -z "$review" ]]; then
     kill "$pid" 2>/dev/null
-    echo "FALHA a revisão nunca foi escrita"
+    echo "FAIL the review was never written"
     cd "$OLDPWD"; return 1
   fi
 
@@ -80,34 +80,34 @@ run() {   # run <decisão> <notas-no-documento>  → imprime o que o agente lê
   rm -rf "$dir"
 }
 
-echo "▸ pedir alterações"
-out="$(run request-changes 'Isto está ambíguo e precisa de um número.')"
-check "diz ao agente que não foi aprovado"    "$out" "THE REVIEWER DID NOT APPROVE THIS"
-check "manda-o não reescrever já"             "$out" "Do not rewrite anything yet"
-check "manda-o perguntar quando há dúvida"    "$out" "Do not guess"
-check "leva a nota que escrevi"               "$out" "Isto está ambíguo"
-check "e a frase a que ela se refere"         "$out" "vai ser revisto"
-refute "não a dá como órfã"                   "$out" "Órfã"
+echo "▸ request changes"
+out="$(run request-changes 'This is ambiguous and needs a number.')"
+check "tells the agent it was not approved"    "$out" "THE REVIEWER DID NOT APPROVE THIS"
+check "tells it not to rewrite yet"             "$out" "Do not rewrite anything yet"
+check "tells it to ask when unsure"    "$out" "Do not guess"
+check "carries the note I wrote"               "$out" "This is ambiguous"
+check "and the phrase it refers to"         "$out" "going to be reviewed"
+refute "does not call it an orphan"                   "$out" "Orphan"
 
-echo "▸ aprovar"
-out="$(run approve 'Uma nota a ter em conta.')"
-check "diz ao agente que foi aprovado"        "$out" "APPROVED"
-check "e passa-lhe as notas na mesma"         "$out" "Uma nota a ter em conta"
-refute "sem a ordem de reescrever"            "$out" "DID NOT APPROVE"
+echo "▸ approve"
+out="$(run approve 'A note to take into account.')"
+check "tells the agent it was approved"        "$out" "APPROVED"
+check "and passes the notes anyway"         "$out" "A note to take into account"
+refute "without the order to rewrite"            "$out" "DID NOT APPROVE"
 
-echo "▸ o gancho do modo de planear"
+echo "▸ the plan-mode hook"
 
-hook() {   # hook <ligado|desligado> <decisão> → imprime o JSON que o Claude Code lê
+hook() {   # hook <on|off> <decision> → prints the JSON Claude Code reads
   local gate="$1" decision="$2"
   local dir; dir="$(mktemp -d)"
   cd "$dir"
   # The shape Claude Code puts on stdin when ExitPlanMode asks for permission.
   node -e 'require("fs").writeFileSync("ev.json", JSON.stringify({
-    tool_input: { plan: "# Plano\n\nUm passo que vai ser revisto.\n" },
+    tool_input: { plan: "# Plan\n\nA step that is going to be reviewed.\n" },
     cwd: process.cwd(),
   }))'
 
-  if [[ "$gate" == desligado ]]; then
+  if [[ "$gate" == off ]]; then
     node "$OLDPWD/plugin/scripts/imark.mjs" plan-hook < ev.json
     cd "$OLDPWD"; rm -rf "$dir"; return
   fi
@@ -127,22 +127,22 @@ hook() {   # hook <ligado|desligado> <decisão> → imprime o JSON que o Claude 
   cd "$OLDPWD"; rm -rf "$dir"
 }
 
-out="$(hook desligado approve)"
-check "sem IMARK_PLAN_REVIEW não faz nada"    "$out" "{}"
-refute "e não decide o pedido"                "$out" "behavior"
+out="$(hook off approve)"
+check "does nothing without IMARK_PLAN_REVIEW"    "$out" "{}"
+refute "and decides no permission request"                "$out" "behavior"
 
-out="$(hook ligado request-changes)"
-check "pedir alterações recusa a permissão"   "$out" '"behavior":"deny"'
-check "com a ordem de rever no motivo"        "$out" "DID NOT APPROVE"
+out="$(hook on request-changes)"
+check "request changes denies the permission"   "$out" '"behavior":"deny"'
+check "with the revise order in the reason"        "$out" "DID NOT APPROVE"
 
-out="$(hook ligado approve)"
-check "aprovar deixa o agente seguir"         "$out" '"behavior":"allow"'
-refute "sem voltar a perguntar no terminal"   "$out" "deny"
+out="$(hook on approve)"
+check "approve lets the agent carry on"         "$out" '"behavior":"allow"'
+refute "without asking again in the terminal"   "$out" "deny"
 
 echo
 if [[ $fail -eq 0 ]]; then
   echo "all good ($pass)"
 else
-  echo "$fail a falhar de $((pass + fail))"
+  echo "$fail failing of $((pass + fail))"
   exit 1
 fi

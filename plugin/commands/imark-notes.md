@@ -1,25 +1,25 @@
 ---
 description: Read the Imark comments out of a markdown file
-argument-hint: "<ficheiro.md>"
+argument-hint: "<file.md>"
 allowed-tools: Bash(node:*)
 ---
 
-Lê as notas que o utilizador deixou dentro de um ficheiro markdown com o Imark.
+Read the notes the user left inside a markdown file with Imark.
 
 ```
 node "${CLAUDE_PLUGIN_ROOT}/scripts/imark.mjs" notes $ARGUMENTS
 ```
 
-Não espera por nada e não abre a app — é para quando o utilizador já comentou e
-diz "lê os meus comentários".
+This waits for nothing and opens nothing — it is for when the user has already
+commented and says "read my comments".
 
-Cada nota traz a citação a que se refere, a secção onde caiu, e o bloco por
-cima. Isso chega para saber sobre o que é sem abrir o ficheiro; abre-o na mesma
-se precisares do contexto à volta.
+Each note carries the words it is attached to, the section it fell under, and
+the block above it. That is usually enough to know what it is about without
+opening the file; open it anyway if a note needs the text around it.
 
-Uma nota marcada como **órfã** perdeu a âncora: o texto citado já não existe no
-documento. Vale como comentário, mas não presumas que a linha por cima é aquilo
-a que se refere.
+A note marked **orphan** has lost its anchor: the quoted text is no longer in
+the document. It still counts as a comment, but do not assume the line above it
+is what it refers to.
 
-Trata cada nota como um pedido, responde a todas, e cita-as pela citação —
-“sobre X” — que é como o utilizador as vê na app.
+Treat every note as a request, answer all of them, and refer to each by the
+words it is attached to — *on “X”* — which is how the user sees them in the app.

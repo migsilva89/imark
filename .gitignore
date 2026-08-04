@@ -12,3 +12,6 @@ renderer/node_modules/
 # macOS
 .DS_Store
 renderer/.esbuild-meta.json
+
+# Working notes: launch plans, handoffs, anything not for the world
+docs/private/

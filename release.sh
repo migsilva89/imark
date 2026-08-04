@@ -59,16 +59,16 @@ rm -rf "$STAGE"
 
 if [ -z "$SIGN_IDENTITY" ]; then
 	echo
-	echo "aviso: sem IMARK_SIGN_IDENTITY a imagem não vai assinada." >&2
-	echo "       quem a abrir tem de ir a Definições › Privacidade e Segurança" >&2
-	echo "       › Abrir Mesmo Assim, uma vez." >&2
+	echo "warning: without IMARK_SIGN_IDENTITY the image is not signed." >&2
+	echo "       whoever opens it has to go to Settings › Privacy & Security" >&2
+	echo "       › Open Anyway, once." >&2
 else
 	step "assinar a imagem"
 	codesign --force --sign "$SIGN_IDENTITY" --timestamp "$DMG"
 
 	if [ -z "$NOTARY_PROFILE" ]; then
 		echo
-		echo "aviso: assinada mas não notarizada. Define IMARK_NOTARY_PROFILE" >&2
+		echo "warning: assinada mas não notarizada. Define IMARK_NOTARY_PROFILE" >&2
 		echo "       para a Apple a carimbar — sem isso o Gatekeeper continua" >&2
 		echo "       a avisar noutra máquina." >&2
 	else
@@ -81,5 +81,5 @@ else
 	fi
 fi
 
-step "pronto"
+step "done"
 printf '\033[1;32m✓ %s (%s)\033[0m\n' "$DMG" "$(du -h "$DMG" | cut -f1)"

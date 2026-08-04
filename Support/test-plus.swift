@@ -38,7 +38,7 @@ const sent = []
 window.webkit = { messageHandlers: { imark: { postMessage: (p) => sent.push(p) } } }
 
 await window.imark.render({
-  markdown: '# Título\\n\\nUm parágrafo com palavras que chegam para uma linha inteira.\\n\\nOutro parágrafo.\\n',
+  markdown: '# Heading\\n\\nA paragraph with enough words to fill a whole line.\\n\\nAnother paragraph.\\n',
   path: '/tmp/t.md',
   theme: 'dark',
 })
@@ -96,12 +96,12 @@ results.blockStillLit = para.classList.contains('block-target')
 //    rail existed at all, so the first comment anybody ever wrote vanished.
 await window.imark.render({
   markdown: [
-    '# Título',
+    '# Heading',
     '',
-    'Um parágrafo com uma nota.',
+    'A paragraph with a note.',
     '',
-    '<!-- imark quote="uma nota" by="miguel" at="2026-08-03T14:00Z"',
-    'A única nota do documento.',
+    '<!-- imark quote="a note" by="miguel" at="2026-08-03T14:00Z"',
+    'The only note in the document.',
     '-->',
     '',
   ].join('\\n'),
@@ -117,12 +117,12 @@ results.quotedNoteDoesNotWashTheBlock = document.querySelectorAll('.note-block')
 // 7. A note with no quote washes its block instead, in the note's own colour.
 await window.imark.render({
   markdown: [
-    '# Título',
+    '# Heading',
     '',
-    'Um parágrafo comentado inteiro.',
+    'A paragraph commented as a whole.',
     '',
     '<!-- imark by="miguel" at="2026-08-03T14:00Z" color="green"',
-    'Sobre o bloco todo.',
+    'About the whole block.',
     '-->',
     '',
   ].join('\\n'),
@@ -138,7 +138,7 @@ results.blockNoteIsNotAnOrphan = document.querySelectorAll('.note-dot.orphan').l
 // 7b. The pointer beside the column, not on the words: the whole reading width
 //     answers, because aiming at text to reach a margin button is backwards.
 await window.imark.render({
-  markdown: '# Título\\n\\nUm parágrafo com palavras que chegam para uma linha.\\n',
+  markdown: '# Heading\\n\\nA paragraph with enough words to fill a line.\\n',
   path: '/tmp/t.md',
   theme: 'dark',
 })
@@ -166,12 +166,12 @@ await window.imark.render({
     '---',
     '',
     '<!-- imark scope="file" by="miguel" at="2026-08-03T16:00Z"',
-    'Sobre o documento inteiro.',
+    'About the whole document.',
     '-->',
     '',
-    '# Título',
+    '# Heading',
     '',
-    'Um parágrafo que não é o dono desta nota.',
+    'A paragraph that does not own this note.',
     '',
   ].join('\\n'),
   path: '/tmp/t.md',
@@ -189,12 +189,12 @@ results.fileNoteDoesNotWashABlock = document.querySelectorAll('.note-block').len
 window.imark.setPreview(true)
 await window.imark.render({
   markdown: [
-    '# Título',
+    '# Heading',
     '',
-    'Um parágrafo com uma nota.',
+    'A paragraph with a note.',
     '',
-    '<!-- imark quote="uma nota" by="miguel" at="2026-08-03T14:00Z"',
-    'Visível em preview.',
+    '<!-- imark quote="a note" by="miguel" at="2026-08-03T14:00Z"',
+    'Visible in preview.',
     '-->',
     '',
   ].join('\\n'),
@@ -239,7 +239,7 @@ final class Harness: NSObject, WKNavigationDelegate {
             webView.callAsyncJavaScript(SCRIPT, in: nil, in: .page) { result in
                 switch result {
                 case .failure(let error):
-                    FileHandle.standardError.write(Data("js falhou: \(error)\n".utf8))
+                    FileHandle.standardError.write(Data("js failed: \(error)\n".utf8))
                     exit(1)
                 case .success(let value):
                     report(String(describing: value))
@@ -253,16 +253,16 @@ func report(_ json: String) {
     guard let data = json.data(using: .utf8),
           let checks = try? JSONSerialization.jsonObject(with: data) as? [String: Bool]
     else {
-        FileHandle.standardError.write(Data("resposta ilegível: \(json)\n".utf8))
+        FileHandle.standardError.write(Data("unreadable response: \(json)\n".utf8))
         exit(1)
     }
     var failed = 0
     for key in checks.keys.sorted() {
         let ok = checks[key] == true
         if !ok { failed += 1 }
-        print("\(ok ? "OK  " : "FALHA") \(key)")
+        print("\(ok ? "OK  " : "FAIL ") \(key)")
     }
-    print(failed == 0 ? "\nall good" : "\n\(failed) a falhar")
+    print(failed == 0 ? "\nall good" : "\n\(failed) failing")
     exit(failed == 0 ? 0 : 1)
 }
 

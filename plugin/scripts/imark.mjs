@@ -15,8 +15,8 @@ const CLOSE_LINE = /^\s*-->\s*$/
 
 // The words the reviewer comments on to end the wait. Written into every review
 // document, in the document, so nobody has to remember them.
-const APPROVE = new Set(['seguir', 'aprovar', 'aprovado', 'approve', 'go', 'ok'])
-const REVISE = new Set(['rever', 'reve', 'revisao', 'revise', 'reject', 'nao'])
+const APPROVE = new Set(['approve', 'approved', 'go', 'ok', 'ship'])
+const REVISE = new Set(['revise', 'reject', 'changes', 'rework', 'no'])
 
 // ---------------------------------------------------------------- parsing
 
@@ -111,19 +111,19 @@ const when = (iso) => {
 
 /** Notes as something an agent can act on: what was said, and about what. */
 export function formatNotes(notes) {
-  if (notes.length === 0) return '_Sem notas._'
+  if (notes.length === 0) return '_No notes._'
   return notes.map((note, i) => {
-    const who = [note.by || 'anónimo', when(note.at)].filter(Boolean).join(', ')
+    const who = [note.by || 'anonymous', when(note.at)].filter(Boolean).join(', ')
     const head = note.scope === 'file'
-      ? 'sobre o documento inteiro'
-      : (note.quote ? `sobre “${note.quote}”` : 'sobre o bloco acima')
-    const lines = [`### Nota ${i + 1} — ${head}`, `${who} · linha ${note.line}`]
-    if (note.heading) lines.push(`Secção: ${note.heading}`)
-    if (note.orphan) lines.push('⚠️ Órfã — o texto citado já não existe no documento.')
+      ? 'on the whole document'
+      : (note.quote ? `on “${note.quote}”` : 'on the block above')
+    const lines = [`### Note ${i + 1} — ${head}`, `${who} · line ${note.line}`]
+    if (note.heading) lines.push(`Section: ${note.heading}`)
+    if (note.orphan) lines.push('⚠️ Orphan — the quoted text is no longer in the document.')
     // A file note has nothing above it worth quoting — the front matter fence,
     // usually — and it is not about whatever it happens to follow.
     if (note.anchor && !note.orphan && note.scope !== 'file') lines.push(`> ${note.anchor}`)
-    lines.push('', note.body || '_(vazia)_')
+    lines.push('', note.body || '_(empty)_')
     return lines.join('\n')
   }).join('\n\n')
 }
@@ -186,15 +186,16 @@ function sendBackFeedback(result, file, toolName) {
 const DECISION = `
 ---
 
-## Decisão
+## Decision
 
-Os botões **Approve** e **Request Changes**, no topo da janela, fecham esta revisão.
-*Request Changes* devolve ao agente tudo o que comentaste; *Approve* deixa-o seguir.
+**Approve** and **Request Changes**, at the top of the window, end this review.
+*Request Changes* hands the agent everything you commented on; *Approve* lets it
+carry on.
 
-Comenta onde quiseres até lá — nada do que escreveres decide seja o que for.
+Comment wherever you like until then — nothing you write decides anything.
 
-Se estiveres a ler isto numa versão do Imark sem esses botões, comentar em
-**seguir** ou em **rever** faz o mesmo.
+If you are reading this in a build of Imark without those buttons, commenting on
+the word **approve** or the word **revise** does the same thing.
 `
 
 // ------------------------------------------------------------------ the app
@@ -213,7 +214,7 @@ function openInImark(file) {
   // screen every time the suite runs.
   if (process.env.IMARK_TEST_NO_OPEN) return
   const result = spawnSync('/usr/bin/open', ['-a', 'Imark', file], { encoding: 'utf8' })
-  if (result.status !== 0) throw new Error(result.stderr?.trim() || 'open falhou')
+  if (result.status !== 0) throw new Error(result.stderr?.trim() || 'open failed')
 }
 
 /**
@@ -319,7 +320,7 @@ function writeReview(root, { title, body, kind }) {
 const say = (text) => process.stdout.write(`${text}\n`)
 
 function report(file, result) {
-  if (!result) return say(`Sem decisão — o tempo de espera acabou. O documento ficou em ${file}.`)
+  if (!result) return say(`No decision — the wait timed out. The document is at ${file}.`)
 
   if (!result.approved) return say(sendBackFeedback(result, file, 'this command'))
 
@@ -336,10 +337,10 @@ function report(file, result) {
 
 async function cmdNotes(argv) {
   const file = argv.find((a) => !a.startsWith('-'))
-  if (!file) throw new Error('uso: imark.mjs notes <ficheiro.md> [--json]')
+  if (!file) throw new Error('usage: imark.mjs notes <file.md> [--json]')
   const notes = parseNotes(fs.readFileSync(file, 'utf8'))
   if (argv.includes('--json')) say(JSON.stringify(notes, null, 2))
-  else say(`# Notas em ${path.basename(file)} (${notes.length})\n\n${formatNotes(notes)}`)
+  else say(`# Notes in ${path.basename(file)} (${notes.length})\n\n${formatNotes(notes)}`)
 }
 
 async function cmdReview(argv) {
@@ -355,7 +356,7 @@ async function cmdReview(argv) {
     // it. Reviewing code is a real job and this is not the tool for it.
     const wrong = files.filter((file) => !file.endsWith('.md'))
     if (wrong.length > 0) {
-      throw new Error(`só markdown: ${wrong.join(', ')}`)
+      throw new Error(`markdown only: ${wrong.join(', ')}`)
     }
     document = files.map((file) => `# ${file}\n\n${embed(fs.readFileSync(file, 'utf8'))}`)
       .join('\n\n---\n\n')
@@ -367,25 +368,25 @@ async function cmdReview(argv) {
     // come before the read rather than after it: the version that checked for
     // empty input afterwards simply hung.
     if (process.stdin.isTTY) {
-      throw new Error('uso: imark.mjs review <ficheiro.md> [--no-wait]')
+      throw new Error('usage: imark.mjs review <file.md> [--no-wait]')
     }
     document = fs.readFileSync(0, 'utf8')
-    kind = 'nota'
+    kind = 'note'
     if (!document.trim()) {
-      throw new Error('uso: imark.mjs review <ficheiro.md> [--no-wait]')
+      throw new Error('usage: imark.mjs review <file.md> [--no-wait]')
     }
   }
 
-  const title = argv.includes('--title') ? argv[argv.indexOf('--title') + 1] : `Revisão — ${kind}`
+  const title = argv.includes('--title') ? argv[argv.indexOf('--title') + 1] : `Review — ${kind}`
   const file = writeReview(root, { title, body: document, kind })
 
   if (!imarkInstalled()) {
-    say(`O Imark não está instalado. O documento ficou em ${file}.`)
+    say(`Imark is not installed. The document is at ${file}.`)
     return
   }
   openInImark(file)
-  if (!wait) { say(`Aberto no Imark: ${file}`); return }
-  say(`Aberto no Imark: ${file}\nÀ espera do Approve ou do Request Changes na janela…`)
+  if (!wait) { say(`Opened in Imark: ${file}`); return }
+  say(`Opened in Imark: ${file}\nWaiting for Approve or Request Changes in the window…`)
   report(file, await waitForDecision(file))
 }
 
@@ -403,12 +404,12 @@ async function cmdPlanHook() {
   const plan = event?.tool_input?.plan ?? ''
   if (!plan.trim()) return pass()
   if (!imarkInstalled()) {
-    process.stderr.write('imark: a app não está instalada — o plano segue sem revisão.\n')
+    process.stderr.write('imark: the app is not installed — the plan goes on unreviewed.\n')
     return pass()
   }
 
   const root = event.cwd || process.cwd()
-  const file = writeReview(root, { title: 'Plano', body: plan, kind: 'plano' })
+  const file = writeReview(root, { title: 'Plan', body: plan, kind: 'plano' })
   try { openInImark(file) } catch (error) {
     process.stderr.write(`imark: ${error.message}\n`)
     return pass()
@@ -421,7 +422,7 @@ async function cmdPlanHook() {
 
   if (result.approved) {
     const notes = result.notes.length > 0
-      ? `A revisão no Imark aprovou o plano, com notas a ter em conta:\n\n${formatNotes(result.notes)}`
+      ? `The review approved the plan, with notes to take into account:\n\n${formatNotes(result.notes)}`
       : ''
     return say(JSON.stringify({
       ...(notes && { systemMessage: notes }),
@@ -453,7 +454,7 @@ try {
     case 'plan-hook': await cmdPlanHook(); break
     case 'open': openInImark(argv[0]); break
     default:
-      say('uso: imark.mjs <notes|review|open|plan-hook> …')
+      say('usage: imark.mjs <notes|review|open|plan-hook> …')
       process.exit(command ? 1 : 0)
   }
 } catch (error) {
