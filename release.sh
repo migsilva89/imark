@@ -58,6 +58,9 @@ if [ "${1:-}" != "--force" ]; then
 		Support/test-comments.swift -o /tmp/imark-release-test >/dev/null 2>&1 \
 		&& /tmp/imark-release-test >/dev/null || die "the comment tests failed"
 	node Support/test-export.mjs >/dev/null 2>&1 || die "the export test failed"
+	swift Support/test-plus.swift >/dev/null 2>&1 || die "the margin button tests failed"
+	Support/test-review.sh >/dev/null 2>&1 || die "the review round trip tests failed"
+	# test-setup.sh needs an assembled app, so it runs after the build instead.
 
 	echo "clean tree, on main, in sync, tests pass"
 fi
@@ -69,6 +72,15 @@ if [ -n "$SIGN_IDENTITY" ]; then
 	IMARK_SIGN_IDENTITY="$SIGN_IDENTITY" ./build.sh --no-install
 else
 	./build.sh --no-install
+fi
+
+# The install-and-remove suite, against the app that was just assembled rather
+# than whatever happens to sit in /Applications on this machine.
+if [ "${1:-}" != "--force" ]; then
+	step "installer checks"
+	IMARK_APP="$APP" Support/test-setup.sh >/dev/null 2>&1 \
+		|| die "the agent setup tests failed"
+	echo "setup ok"
 fi
 
 # --------------------------------------------------------------------- dmg
@@ -95,18 +107,18 @@ if [ -z "$SIGN_IDENTITY" ]; then
 	echo "       whoever opens it has to go to Settings › Privacy & Security" >&2
 	echo "       › Open Anyway, once." >&2
 else
-	step "assinar a imagem"
+	step "sign the image"
 	codesign --force --sign "$SIGN_IDENTITY" --timestamp "$DMG"
 
 	if [ -z "$NOTARY_PROFILE" ]; then
 		echo
-		echo "warning: assinada mas não notarizada. Define IMARK_NOTARY_PROFILE" >&2
-		echo "       para a Apple a carimbar — sem isso o Gatekeeper continua" >&2
-		echo "       a avisar noutra máquina." >&2
+		echo "warning: signed but not notarised. Set IMARK_NOTARY_PROFILE to have" >&2
+		echo "       Apple stamp it — without that Gatekeeper still warns on" >&2
+		echo "       somebody else's machine." >&2
 	else
 		# Waits for the verdict rather than returning a ticket to chase, and
 		# staples it so the app opens on a machine with no network.
-		step "notarizar (isto demora, é a Apple a olhar)"
+		step "notarise (this takes a while — Apple is looking at it)"
 		xcrun notarytool submit "$DMG" --keychain-profile "$NOTARY_PROFILE" --wait
 		xcrun stapler staple "$DMG"
 		xcrun stapler validate "$DMG"

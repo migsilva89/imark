@@ -11,10 +11,10 @@ and they travel with the file. If you are looking at a markdown file with blocks
 like this, that is what they are:
 
 ```markdown
-As linhas movem-se em lotes de 500, e o prazo é generoso mas exequível.
+Rows move in batches of 500, and the deadline is generous but workable.
 
-<!-- imark quote="generoso mas exequível" by="miguel" at="2026-08-02T14:31Z"
-Exequível com que equipa? Isto precisa de um número, não de um adjectivo.
+<!-- imark quote="generous but workable" by="alex" at="2026-08-02T14:31Z"
+Workable with which team? This needs a number, not an adjective.
 -->
 ```
 
