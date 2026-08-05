@@ -19,6 +19,12 @@
   <img src="https://img.shields.io/badge/licence-MIT-blue?style=flat-square" alt="MIT licence">
 </p>
 
+<p align="center">
+  <img src=".github/assets/comment.gif" width="720" alt="Selecting a block, writing a note in the popover, and the note appearing in the margin">
+</p>
+
+<p align="center"><em>Comment on anything. The note goes into the <code>.md</code> file.</em></p>
+
 > [!NOTE]
 > Imark reads; it does not edit. Comments are the one thing it writes, and they go into the document itself — see [Comments](#comments). For everything else the *Open in* button hands the file to Cursor, VS Code, Sublime, Zed, or whatever else you have installed.
 
@@ -31,6 +37,12 @@
 Both are rendering [`testdata/showcase.md`](testdata/showcase.md). For the full
 sweep — every construction, every kind of comment, and enough headings that the
 outline folds itself — open [`testdata/everything.md`](testdata/everything.md).
+
+<p align="center">
+  <img src=".github/assets/quicklook.gif" width="720" alt="Pressing the space bar in Finder and stepping through markdown files in the preview panel">
+</p>
+
+<p align="center"><em>Space bar in the Finder. No app to open first.</em></p>
 
 ### The outline rail
 
@@ -223,6 +235,12 @@ fenced block. Because comments live in the file, an agent can hand you a
 document, you can annotate it in Imark, and the agent can read your notes back
 out — with no server, no port and nothing installed on the other side. The file
 is the whole bridge.
+
+<p align="center">
+  <img src=".github/assets/review.gif" width="720" alt="Pressing Request Changes in the toolbar, and the agent picking the notes up in the terminal">
+</p>
+
+<p align="center"><em>Request Changes, and the agent reads your notes back.</em></p>
 
 [`plugin/`](plugin/README.md) is a Claude Code plugin that does exactly that:
 
