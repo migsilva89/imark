@@ -58,6 +58,10 @@ if [ "${1:-}" != "--force" ]; then
 		Support/test-comments.swift -o /tmp/imark-release-test >/dev/null 2>&1 \
 		&& /tmp/imark-release-test >/dev/null || die "the comment tests failed"
 	node Support/test-export.mjs >/dev/null 2>&1 || die "the export test failed"
+	swiftc -parse-as-library Sources/Imark/Updates.swift Sources/Imark/Settings.swift \
+		Sources/Imark/NoteColour.swift Support/test-update.swift \
+		-o /tmp/imark-release-update >/dev/null 2>&1 \
+		&& /tmp/imark-release-update >/dev/null || die "the update comparison tests failed"
 	swift Support/test-plus.swift >/dev/null 2>&1 || die "the margin button tests failed"
 	Support/test-review.sh >/dev/null 2>&1 || die "the review round trip tests failed"
 	# test-setup.sh needs an assembled app, so it runs after the build instead.

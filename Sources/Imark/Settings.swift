@@ -194,6 +194,27 @@ enum Settings {
         set { store.set(newValue, forKey: "sidebarCollapsed") }
     }
 
+    /// On by default, and honoured *before* any request is built — turning it
+    /// off means the app touches the network zero times. See Updates.swift for
+    /// what the one request is.
+    static var checksForUpdates: Bool {
+        get { store.object(forKey: "checksForUpdates") as? Bool ?? true }
+        set { store.set(newValue, forKey: "checksForUpdates"); announce() }
+    }
+
+    /// Bookkeeping for Updates, not preferences. No `announce()`: nothing in
+    /// any window changes because a timestamp moved.
+    static var lastUpdateCheck: Date {
+        get { store.object(forKey: "lastUpdateCheck") as? Date ?? .distantPast }
+        set { store.set(newValue, forKey: "lastUpdateCheck") }
+    }
+
+    /// The version the dialog already offered, so a release nags exactly once.
+    static var offeredUpdate: String {
+        get { store.string(forKey: "offeredUpdate") ?? "" }
+        set { store.set(newValue, forKey: "offeredUpdate") }
+    }
+
     static func applyThemeToApp() {
         NSApp.appearance = theme.appearance
     }
