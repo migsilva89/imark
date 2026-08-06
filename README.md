@@ -14,7 +14,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/macOS-14%2B-blue?style=flat-square" alt="macOS 14 or later">
   <img src="https://img.shields.io/badge/Swift-6-orange?style=flat-square" alt="Swift 6">
-  <img src="https://img.shields.io/badge/network-none-brightgreen?style=flat-square" alt="No network access">
+  <img src="https://img.shields.io/badge/network-update%20check%20only-brightgreen?style=flat-square" alt="Network: update check only, can be turned off">
   <img src="https://img.shields.io/badge/size-13%20MB-lightgrey?style=flat-square" alt="13 MB">
   <img src="https://img.shields.io/badge/licence-MIT-blue?style=flat-square" alt="MIT licence">
 </p>
@@ -141,7 +141,7 @@ place would trade one for the other.
 - **The folder and the recents** — every `.md` beside the open document, plus the last five you opened from anywhere else
 - **Everything GitHub-flavoured** — tables, task lists, footnotes, front matter as a header card, syntax highlighting, Mermaid diagrams, KaTeX maths
 - **Find with a counter** — `⌘F` highlights every hit and tells you which one you are on
-- **Truly offline** — a content security policy blocks every request, and the KaTeX fonts are embedded in the bundle. Remote images do not load, on purpose
+- **Offline where it counts** — documents render with every request blocked by a content security policy, KaTeX fonts embedded, remote images refused on purpose. The app's one network touch is asking GitHub once a day whether a newer version exists — a version number travels, nothing of yours does, and a switch in Settings turns it off
 - **Tabs** — several documents in one window. ⌘-click a file in the sidebar to open it in a new tab, and everything macOS gives a tabbed app comes with it: `⌘⇧[` and `⌘⇧]`, drag a tab out to its own window, Merge All Windows
 - **Native throughout** — real AppKit windows, menus, appearance switching and printing, around a WebView that only ever renders
 

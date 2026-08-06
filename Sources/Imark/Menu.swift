@@ -46,6 +46,12 @@ enum Menu {
     private static func appMenu() -> NSMenu {
         let menu = NSMenu(title: "Imark")
         menu.addItem(withTitle: "About Imark", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
+        let updates = menu.addItem(
+            withTitle: "Check for Updates…",
+            action: #selector(AppDelegate.checkForUpdates(_:)),
+            keyEquivalent: ""
+        )
+        updates.target = NSApp.delegate
         menu.addItem(.separator())
         let settings = menu.addItem(
             withTitle: "Settings…",

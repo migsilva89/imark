@@ -19,7 +19,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
             self?.showWelcomeIfEmpty()
         }
+        // Well after launch: an update dialog that beats the document to the
+        // screen makes the update feel more important than the reading.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+            Updates.checkQuietly()
+        }
     }
+
+    @objc func checkForUpdates(_ sender: Any?) { Updates.checkNow() }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         if !flag { showWelcomeIfEmpty() }
