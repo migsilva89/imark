@@ -53,6 +53,9 @@ export function extractComments(body, lineOffset = 0) {
       at: attributes.at ?? '',
       nth: Number(attributes.nth) || 1,
       colour: colourOf(attributes.color),
+      // Stamped by whoever acted on the note. Still shown — it is the record
+      // of what was asked — but quietly, because it is no longer asking.
+      resolved: attributes.resolved ?? '',
       text: unwrap(unescapeHTML(lines.slice(index + 1, end).join('\n').trim())),
       // Both ends, because editing and deleting have to find the block again.
       line: index + lineOffset,
@@ -203,6 +206,7 @@ export function attachComments(root, comments) {
       const dot = document.createElement('button')
       dot.type = 'button'
       dot.className = 'note-dot file'
+      if (note.resolved) dot.classList.add('is-resolved')
       dot.dataset.note = note.id
       if (note.colour) dot.dataset.color = note.colour
       dot.setAttribute('aria-label', 'Comment on the document')
@@ -249,6 +253,7 @@ export function attachComments(root, comments) {
     for (const piece of block.querySelectorAll('.note-anchor:not([data-note])')) {
       piece.dataset.note = note.id
       if (note.colour) piece.dataset.color = note.colour
+      if (note.resolved) piece.classList.add('is-resolved')
     }
 
     const holder = holderFor(block)
@@ -266,6 +271,7 @@ export function attachComments(root, comments) {
     const dot = document.createElement('button')
     dot.type = 'button'
     dot.className = lost ? 'note-dot orphan' : (aboutBlock ? 'note-dot block' : 'note-dot')
+    if (note.resolved) dot.classList.add('is-resolved')
     dot.dataset.note = note.id
     if (note.colour) dot.dataset.color = note.colour
     dot.setAttribute('aria-label', lost ? 'Comment with a missing quote' : 'Comment')
@@ -296,10 +302,15 @@ function buildCard(note, orphan) {
   card.className = 'note-card'
   card.dataset.note = note.id
   if (note.colour) card.dataset.color = note.colour
+  if (note.resolved) card.classList.add('is-resolved')
   card.hidden = true
 
   const head = document.createElement('header')
-  head.textContent = [note.by, formatDate(note.at)].filter(Boolean).join(' · ') || 'Note'
+  head.textContent = [
+    note.by,
+    formatDate(note.at),
+    note.resolved ? `resolved ${formatDate(note.resolved)}` : '',
+  ].filter(Boolean).join(' · ') || 'Note'
   card.appendChild(head)
 
   if (orphan) {

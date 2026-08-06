@@ -39,6 +39,7 @@ the block above it.
 | `at=` | ISO 8601 timestamp |
 | `nth=` | which occurrence of the quote, when the same words appear twice. Only written when it is above 1 |
 | `color=` | one of five names. Omitted for the default |
+| `resolved=` | ISO date stamped by whoever acted on the note. The app fades it; review rounds stop repeating it |
 
 The body is every line between the opening line and a line containing only
 `-->`. Inside it, `&amp;` is a literal `&` and `--&gt;` is a literal `-->` —
@@ -54,6 +55,11 @@ is how the user sees them in the app.
 A note reported as **orphan** has lost its anchor: the quoted words were edited
 away. It still counts, but the paragraph above it is no longer reliably what it
 is about — say so instead of guessing.
+
+Once a note is dealt with, mark it rather than deleting it: add
+`resolved="<ISO date>"` to its opening `<!-- imark` line, touching nothing else
+on that line. The note stays as the record of what was asked; the mark says it
+was done.
 
 ## Writing them
 
