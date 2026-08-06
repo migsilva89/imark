@@ -7,7 +7,9 @@
 // side ever grows a rule the other must grow it too.
 
 import { spawnSync } from 'node:child_process'
+import crypto from 'node:crypto'
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 
 const OPEN_LINE = /^\s*<!--\s*imark\b/
@@ -79,6 +81,9 @@ export function parseNotes(source) {
       at: attrs.at ?? '',
       nth: attrs.nth ? Number(attrs.nth) : 1,
       color: attrs.color ?? '',
+      // A date, stamped by whoever acted on the note. A resolved note stays in
+      // the document as the record of what was asked; it is no longer feedback.
+      resolved: attrs.resolved ?? '',
       body: unescapeBody(body.join('\n')).trim(),
       line: i + 1,
       heading: '',
@@ -125,6 +130,7 @@ export function formatNotes(notes) {
       ? 'on the whole document'
       : (note.quote ? `on “${note.quote}”` : 'on the block above')
     const lines = [`### Note ${i + 1} — ${head}`, `${who} · line ${note.line}`]
+    if (note.resolved) lines.push(`✓ Resolved ${when(note.resolved)}`)
     if (note.heading) lines.push(`Section: ${note.heading}`)
     if (note.orphan) lines.push('⚠️ Orphan — the quoted text is no longer in the document.')
     // A file note has nothing above it worth quoting — the front matter fence,
@@ -177,7 +183,10 @@ function sendBackFeedback(result, file, toolName) {
     '   same message, together. Do not guess, and do not decide for the reviewer.',
     '4. If you think a note is wrong, say so and say why. Do not drop it in silence,',
     '   and do not quietly do something you believe is a mistake.',
-    `5. Only once every note is answered, and any question you asked has an answer,`,
+    '5. When you act on a note, mark it done instead of deleting it: add',
+    '   resolved="<date>" to its opening `<!-- imark` line. The note is the',
+    '   reviewer\'s record of what was asked; resolved is yours of having done it.',
+    `6. Only once every note is answered, and any question you asked has an answer,`,
     `   rewrite and call ${toolName} again.`,
     '',
     'Two things that are not negotiable: do not resubmit the same thing unchanged,',
@@ -229,22 +238,25 @@ function openInImark(file) {
  * macOS misses the write-to-temporary-and-rename that Imark does on purpose,
  * which is exactly the write we are waiting for.
  */
-async function waitForDecision(file, { timeoutMs = 4 * 60 * 60 * 1000 } = {}) {
+async function waitForDecision(file, request, { timeoutMs = 4 * 60 * 60 * 1000 } = {}) {
   const started = Date.now()
-  const sidecar = file.replace(/\.md$/, '.decision.json')
   let seen = ''
+
+  // What the agent acts on. Verdict words are machinery, not feedback; a note
+  // already marked resolved is a record of a previous round, already dealt with.
+  const feedback = (notes) => notes.filter((note) => !verdictWord(note) && !note.resolved)
 
   while (Date.now() - started < timeoutMs) {
     // The buttons in the app's toolbar, which is how anybody finds this. They
-    // write beside the document rather than into it, so the notes stay the only
-    // thing in the file the reviewer put there.
+    // write into the handshake directory rather than into the document, so the
+    // notes stay the only thing in the file the reviewer put there.
     try {
-      const answer = JSON.parse(fs.readFileSync(sidecar, 'utf8'))
+      const answer = JSON.parse(fs.readFileSync(request.decision, 'utf8'))
       const notes = parseNotes(fs.readFileSync(file, 'utf8'))
       return {
         approved: answer.decision === 'approve',
         decision: { body: '' },
-        notes: notes.filter((note) => !verdictWord(note)),
+        notes: feedback(notes),
       }
     } catch { /* no decision yet */ }
 
@@ -262,7 +274,7 @@ async function waitForDecision(file, { timeoutMs = 4 * 60 * 60 * 1000 } = {}) {
           return {
             approved: decided.approved,
             decision: decided.note,
-            notes: notes.filter((n) => n !== decided.note),
+            notes: feedback(notes.filter((n) => n !== decided.note)),
           }
         }
       }
@@ -273,19 +285,54 @@ async function waitForDecision(file, { timeoutMs = 4 * 60 * 60 * 1000 } = {}) {
   return null
 }
 
-// -------------------------------------------------------------- review docs
+// -------------------------------------------------------------- the handshake
 
-/** `.imark/reviews/` ignores itself, so no project's .gitignore has to change. */
-function reviewsDir(root) {
-  const dir = path.join(root, '.imark', 'reviews')
+// A review no longer copies the document. The file the reviewer annotates is
+// the file — notes land in it, stay in it, and travel with it, which is the
+// whole thesis of the app. What passes between the script and the app is only
+// the request and the decision, and those live here: two small JSON files in a
+// directory neither project ever sees, deleted the moment they are read.
+//
+// The nonce is what makes two reviews two reviews. The old archive keyed
+// everything on a per-second timestamp, and a name collision made the second
+// review find the first one's decision already on disk — an approval nobody
+// gave. A fresh nonce per invocation has no history to find.
+function pendingDir() {
+  const dir = process.env.IMARK_PENDING_DIR
+    || path.join(os.homedir(), '.imark', 'pending')
   fs.mkdirSync(dir, { recursive: true })
-  const ignore = path.join(root, '.imark', '.gitignore')
-  if (!fs.existsSync(ignore)) fs.writeFileSync(ignore, '*\n')
+  // A crashed script leaves its request behind. Anything old enough that
+  // nobody can still be waiting on it is litter, not state.
+  const cutoff = Date.now() - 2 * 24 * 60 * 60 * 1000
+  for (const name of fs.readdirSync(dir)) {
+    const file = path.join(dir, name)
+    try { if (fs.statSync(file).mtimeMs < cutoff) fs.rmSync(file) } catch { /* raced */ }
+  }
   return dir
 }
 
-const slug = (value) =>
-  fold(value).slice(0, 40) || 'revisao'
+/** Announce to the app that opening `target` is a review, not a read. */
+function requestReview(target) {
+  const dir = pendingDir()
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const nonce = crypto.randomBytes(6).toString('hex')
+    const file = path.join(dir, `${nonce}.json`)
+    try {
+      fs.writeFileSync(file, `${JSON.stringify({
+        file: target,
+        at: new Date().toISOString(),
+        by: process.env.CLAUDE_CODE_ENTRYPOINT ? 'Claude Code' : 'terminal',
+      }, null, 2)}\n`, { flag: 'wx' })
+      return { file, decision: path.join(dir, `${nonce}.decision.json`) }
+    } catch { /* the one-in-2⁴⁸ collision; roll again */ }
+  }
+  throw new Error('could not register the review')
+}
+
+function withdraw(request) {
+  fs.rmSync(request.file, { force: true })
+  fs.rmSync(request.decision, { force: true })
+}
 
 /**
  * A document, ready to be pasted inside another one.
@@ -302,12 +349,16 @@ function embed(text) {
   return `\`\`\`yaml\n${match[1]}\n\`\`\`\n\n${text.slice(match[0].length)}`
 }
 
-function writeReview(root, { title, body, kind }) {
-  const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
-  const file = path.join(reviewsDir(root), `${slug(kind)}-${stamp}.md`)
-  // `imark: review` is what puts Approve and Request Changes in the app's toolbar.
-  // Without it the document is just a document, which is what every other
-  // markdown file Imark opens has to stay.
+/**
+ * A document that exists only to be reviewed — a plan from stdin, or several
+ * files that need a single window. It lives beside the handshake files and is
+ * deleted with them; there is no original for the notes to belong to.
+ *
+ * The `imark: review` front matter stays on these: a build of Imark from
+ * before the handshake still shows its buttons for them.
+ */
+function writeEphemeral({ title, body }) {
+  const file = path.join(pendingDir(), `${crypto.randomBytes(6).toString('hex')}.md`)
   const front = [
     '---',
     'imark: review',
@@ -326,7 +377,7 @@ function writeReview(root, { title, body, kind }) {
 
 const say = (text) => process.stdout.write(`${text}\n`)
 
-function report(file, result) {
+function report(file, result, { ephemeral = false } = {}) {
   if (!result) return say(`No decision — the wait timed out. The document is at ${file}.`)
 
   if (!result.approved) return say(sendBackFeedback(result, file, 'this command'))
@@ -334,10 +385,15 @@ function report(file, result) {
   say('APPROVED — the reviewer accepted this.')
   if (result.notes.length > 0) {
     say(`\nThey still left ${result.notes.length} note(s). Act on them as you go, `
-      + 'and say what you did for each.\n')
+      + 'and say what you did for each.')
+    if (!ephemeral) {
+      say('When one is done, mark it rather than deleting it: add '
+        + 'resolved="<date>" to its opening `<!-- imark` line.')
+    }
+    say('')
     say(formatNotes(result.notes))
   }
-  say(`\nThe reviewed document is at ${file}.`)
+  if (!ephemeral) say(`\nThe reviewer's notes are in the document itself: ${file}.`)
 }
 
 // ----------------------------------------------------------------- commands
@@ -351,12 +407,16 @@ async function cmdNotes(argv) {
 }
 
 async function cmdReview(argv) {
-  const root = process.cwd()
   const wait = !argv.includes('--no-wait')
   const files = argv.filter((a) => !a.startsWith('-'))
 
-  let document
-  let kind
+  // The reviewer's notes land in this file and stay there. For a real document
+  // that is the document itself; only something with no file of its own — a
+  // plan on stdin, a bundle of several files — gets a stand-in, deleted with
+  // the handshake because there is nowhere for its notes to live on.
+  let target
+  let ephemeral = false
+
   if (files.length > 0) {
     // Markdown only. Imark is a markdown reader, and a review of a `.js` here
     // would be prose typography wrapped around something that has no prose in
@@ -365,11 +425,19 @@ async function cmdReview(argv) {
     if (wrong.length > 0) {
       throw new Error(`markdown only: ${wrong.join(', ')}`)
     }
-    document = files.map((file) => `# ${file}\n\n${embed(fs.readFileSync(file, 'utf8'))}`)
-      .join('\n\n---\n\n')
-    // Without the extension: `SPEC.md` folded to `specmd`, which named every
-    // review after a file nobody has.
-    kind = path.parse(files[0]).name
+    if (files.length === 1) {
+      target = path.resolve(files[0])
+      fs.accessSync(target, fs.constants.R_OK | fs.constants.W_OK)
+    } else {
+      const title = argv.includes('--title')
+        ? argv[argv.indexOf('--title') + 1]
+        : `Review — ${path.parse(files[0]).name}`
+      const body = files
+        .map((file) => `# ${file}\n\n${embed(fs.readFileSync(file, 'utf8'))}`)
+        .join('\n\n---\n\n')
+      target = writeEphemeral({ title, body })
+      ephemeral = true
+    }
   } else {
     // Reading fd 0 from a terminal blocks forever, so the usage line has to
     // come before the read rather than after it: the version that checked for
@@ -377,24 +445,37 @@ async function cmdReview(argv) {
     if (process.stdin.isTTY) {
       throw new Error('usage: imark.mjs review <file.md> [--no-wait]')
     }
-    document = fs.readFileSync(0, 'utf8')
-    kind = 'note'
+    const document = fs.readFileSync(0, 'utf8')
     if (!document.trim()) {
       throw new Error('usage: imark.mjs review <file.md> [--no-wait]')
     }
+    const title = argv.includes('--title') ? argv[argv.indexOf('--title') + 1] : 'Review — note'
+    target = writeEphemeral({ title, body: document })
+    ephemeral = true
   }
-
-  const title = argv.includes('--title') ? argv[argv.indexOf('--title') + 1] : `Review — ${kind}`
-  const file = writeReview(root, { title, body: document, kind })
 
   if (!imarkInstalled()) {
-    say(`Imark is not installed. The document is at ${file}.`)
+    say(`Imark is not installed. The document is at ${target}.`)
     return
   }
-  openInImark(file)
-  if (!wait) { say(`Opened in Imark: ${file}`); return }
-  say(`Opened in Imark: ${file}\nWaiting for Approve or Request Changes in the window…`)
-  report(file, await waitForDecision(file))
+
+  const request = requestReview(target)
+  try {
+    openInImark(target)
+  } catch (error) {
+    withdraw(request)
+    if (ephemeral) fs.rmSync(target, { force: true })
+    throw error
+  }
+  if (!wait) { say(`Opened in Imark: ${target}`); return }
+  say(`Opened in Imark: ${target}\nWaiting for Approve or Request Changes in the window…`)
+
+  const result = await waitForDecision(target, request)
+  withdraw(request)
+  // A sent-back ephemeral stays: the feedback points the agent at its notes.
+  // The pending purge sweeps it up once nobody can still be reading it.
+  if (ephemeral && result?.approved) fs.rmSync(target, { force: true })
+  report(target, result, { ephemeral })
 }
 
 /** The ExitPlanMode gate. Off unless IMARK_PLAN_REVIEW is set: ExitPlanMode is
@@ -415,14 +496,20 @@ async function cmdPlanHook() {
     return pass()
   }
 
-  const root = event.cwd || process.cwd()
-  const file = writeReview(root, { title: 'Plan', body: plan, kind: 'plano' })
+  // A plan has no file of its own — it arrives in the hook's stdin — so it is
+  // the one review that still goes through a stand-in document.
+  const file = writeEphemeral({ title: 'Plan', body: plan })
+  const request = requestReview(file)
   try { openInImark(file) } catch (error) {
     process.stderr.write(`imark: ${error.message}\n`)
+    withdraw(request)
+    fs.rmSync(file, { force: true })
     return pass()
   }
 
-  const result = await waitForDecision(file)
+  const result = await waitForDecision(file, request)
+  withdraw(request)
+  if (result?.approved) fs.rmSync(file, { force: true })
   // Only a timeout falls through to the normal prompt. Approving in the app and
   // then being asked again in the terminal would make the review pointless.
   if (!result) return pass()

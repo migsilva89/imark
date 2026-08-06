@@ -926,6 +926,14 @@ img[data-blocked] {
   cursor: pointer;
 }
 
+/* The words of a resolved note keep only a trace of the underline: the record
+   is in the margin, and prose that stayed highlighted would still read as an
+   open question. */
+.note-anchor.is-resolved {
+  background: transparent;
+  border-bottom-color: color-mix(in srgb, var(--note) 35%, transparent);
+}
+
 /* The `+` in the left margin, on the block under the pointer. One button that
    moves, so it is fixed to the viewport rather than to the page. */
 .block-plus {
@@ -1007,6 +1015,16 @@ img[data-blocked] {
 .note-dot.orphan {
   background: transparent;
   border: 1.5px solid var(--secondary);
+}
+
+/* A resolved note was acted on. It stays — it is the record of what was asked
+   — but faded, because it is no longer asking anybody for anything. */
+.note-dot.is-resolved {
+  opacity: 0.4;
+}
+
+.note-card.is-resolved {
+  opacity: 0.65;
 }
 
 /* Floats over the right edge of the text rather than beside it. A reading
