@@ -28,6 +28,16 @@
 > [!NOTE]
 > Imark reads; it does not edit. Comments are the one thing it writes, and they go into the document itself — see [Comments](#comments). For everything else the *Open in* button hands the file to Cursor, VS Code, Sublime, Zed, or whatever else you have installed.
 
+## Install
+
+```bash
+brew install --cask migsilva89/imark/imark
+```
+
+Or download the [latest release](https://github.com/migsilva89/imark/releases/latest) and drag `Imark.app` into `/Applications`. The disk image is signed and notarised, so it opens without a Gatekeeper warning.
+
+macOS 14 or later. Imark tells you when a newer version exists — once per release, and only if you leave the check on in Settings.
+
 ## Screenshots
 
 | Document window | Quick Look preview |
