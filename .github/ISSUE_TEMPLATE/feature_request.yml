@@ -1,0 +1,29 @@
+name: Idea
+description: Something Imark could do that it does not
+labels: [idea]
+body:
+  - type: markdown
+    attributes:
+      value: >
+        Worth reading first: Imark is a reader, not an editor, it is macOS only,
+        and it keeps no vault or database. Ideas that pull in those directions
+        are the ones most likely to be turned down — see
+        [CONTRIBUTING](https://github.com/migsilva89/imark/blob/main/CONTRIBUTING.md).
+
+  - type: textarea
+    attributes:
+      label: What you were trying to do
+      description: >
+        The situation, not the solution. What you were working on when you
+        wished Imark did this.
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: What you do instead today
+      description: >
+        The workaround, or the other app you switch to. This is usually the part
+        that decides whether an idea is worth building.
+    validations:
+      required: true
