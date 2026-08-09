@@ -88,3 +88,17 @@ gh release create v0.1.0 dist/Imark-0.1.0.dmg --title "Imark 0.1.0" --notes "…
 
 GitHub does not serve release assets from a private repository, so the repo has
 to be public before the download link works for anyone else.
+
+## The notes are the changelog
+
+Whatever goes in `--notes` is published, as written, at
+[imarkmd.com/changelog](https://imarkmd.com/changelog). The site reads the
+releases from this repository once a day and renders the Markdown; there is no
+second copy to keep in step, and no separate changelog to remember.
+
+So write them for the person updating, not for the commit log. Markdown
+headings, prose, `code` and links all render. A release published with `--notes
+"fixes"` says "fixes" on the website until the next one.
+
+The site also reads the version and the `.dmg` size from the same release, so a
+tag pushed here is the whole announcement — nothing to change on the site.
