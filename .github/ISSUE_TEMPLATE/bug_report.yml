@@ -1,0 +1,34 @@
+name: Bug report
+description: Something Imark does that it should not
+labels: [bug]
+body:
+  - type: textarea
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what you got instead.
+    validations:
+      required: true
+
+  - type: input
+    attributes:
+      label: Imark version
+      description: Imark → About Imark. Or the name of the disk image you installed.
+      placeholder: "0.2.1"
+    validations:
+      required: true
+
+  - type: input
+    attributes:
+      label: macOS version
+      placeholder: "15.2"
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: The document, if it is about a document
+      description: >
+        A markdown file that shows the problem, or the few lines that matter. If
+        a comment went wrong, the `<!-- imark ... -->` block is the part to
+        paste. Only share what you are comfortable sharing.
+      render: markdown

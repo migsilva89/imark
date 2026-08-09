@@ -38,6 +38,9 @@ Or download the [latest release](https://github.com/migsilva89/imark/releases/la
 
 macOS 14 or later. Imark tells you when a newer version exists — once per release, and only if you leave the check on in Settings.
 
+> [!IMPORTANT]
+> If Imark damages one of your files, [open an issue](https://github.com/migsilva89/imark/issues/new?template=bug_report.yml) before anything else. Comments are the only thing it writes, and that is the one bug worth interrupting whatever else is happening.
+
 ## Screenshots
 
 | Document window | Quick Look preview |

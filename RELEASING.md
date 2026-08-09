@@ -100,5 +100,18 @@ So write them for the person updating, not for the commit log. Markdown
 headings, prose, `code` and links all render. A release published with `--notes
 "fixes"` says "fixes" on the website until the next one.
 
-The site also reads the version and the `.dmg` size from the same release, so a
-tag pushed here is the whole announcement — nothing to change on the site.
+The site also reads the version and the `.dmg` size from the same release, so
+there is nothing to edit there by hand.
+
+## Last step: refresh the site
+
+The site holds what it read from GitHub for a day. Until that expires — or until
+something else deploys — the download button still hands out the *previous*
+`.dmg`, which is the version people get while believing they have the new one.
+
+So after publishing, hit **Redeploy** on the site's latest production deployment
+in Vercel. It takes seconds, and it is the only part of a release that nothing
+else will do for you.
+
+Skipping it is not fatal: it corrects itself within twenty-four hours. It is the
+gap in between that costs somebody a download of the wrong version.
