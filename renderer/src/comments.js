@@ -89,16 +89,23 @@ const unescapeHTML = (value) =>
 function blockAbove(root, line) {
   let best = null
   let bestEnd = -1
+  let around = null
   for (const child of root.children) {
     const raw = child.getAttribute('data-line')
     if (!raw) continue
-    const end = Number(raw.split(',')[1])
-    if (Number.isFinite(end) && end <= line && end > bestEnd) {
+    const [from, to] = raw.split(',').map(Number)
+    // A note written under a list item lands *inside* the list's own line
+    // range: markdown-it reads the comment as part of the list and stretches
+    // the block over it. Nothing then ends above the note except whatever came
+    // before the whole list, which is not what the note is about — the quote is
+    // not in there, so a perfectly good note read as an orphan.
+    if (Number.isFinite(from) && Number.isFinite(to) && from <= line && line <= to) around = child
+    if (Number.isFinite(to) && to <= line && to > bestEnd) {
       best = child
-      bestEnd = end
+      bestEnd = to
     }
   }
-  return best
+  return around ?? best
 }
 
 /// Every text node under a block, in order, so a quote can be looked for in the
