@@ -13,6 +13,11 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/imark.mjs" notes $ARGUMENTS
 This waits for nothing and opens nothing — it is for when the user has already
 commented and says "read my comments".
 
+What comes back is the notes still asking for something. One that was already
+acted on carries `resolved=` and stays in the document as the record of what was
+asked, but it is history, not work — the header says how many were held back,
+and `--all` produces them for when the history is what the user wants.
+
 Each note carries the words it is attached to, the section it fell under, and
 the block above it. That is usually enough to know what it is about without
 opening the file; open it anyway if a note needs the text around it.

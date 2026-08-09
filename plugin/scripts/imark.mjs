@@ -11,6 +11,7 @@ import crypto from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { pathToFileURL } from 'node:url'
 
 const OPEN_LINE = /^\s*<!--\s*imark\b/
 const CLOSE_LINE = /^\s*-->\s*$/
@@ -45,6 +46,41 @@ function attributes(line) {
     out[match[1]] = unescapeAttribute(match[2])
   }
   return out
+}
+
+/**
+ * A line of markdown as the reader saw it, for comparing one against the other.
+ *
+ * `quote=` holds the *rendered* text — no `**`, no backticks, a link reduced to
+ * its words — while the anchor check looks for it in the raw source. The two
+ * have to be flattened the same way or every emphasised phrase reads as an
+ * orphan, and an orphan tells the agent to stop and ask instead of acting.
+ *
+ * This started as a lone `\s+` collapse, for a paragraph the file wraps over
+ * two lines and the quote carries as one. Inline formatting was the same bug a
+ * step further on. Both live in this one function now so they cannot drift
+ * apart again — every future rule belongs here too, on both sides at once.
+ */
+export function flatten(text) {
+  const code = []
+  return text
+    // Code spans first, contents parked out of reach: a `*` between backticks
+    // is a character, not emphasis, and stripping it would change the words.
+    .replace(/(`+)([^`]*?)\1/g, (_, __, inner) => `\u0000${code.push(inner) - 1}\u0000`)
+    // A link reads as its text. Images too — the alt text is what is spoken.
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/~~([\s\S]+?)~~/g, '$1')
+    // The delimiter has to hug its words: `**a**` is bold, but a `* ` opening a
+    // list item is a bullet, and pairing two of those across a list would join
+    // lines that never touched.
+    .replace(/\*\*(?!\s)([\s\S]+?)(?<!\s)\*\*/g, '$1')
+    .replace(/\*(?!\s)([\s\S]+?)(?<!\s)\*/g, '$1')
+    // Underscores only outside a word, or `some_var_name` loses its middle.
+    .replace(/(?<![\w])__(?!\s)([\s\S]+?)(?<!\s)__(?![\w])/g, '$1')
+    .replace(/(?<![\w])_(?!\s)([\s\S]+?)(?<!\s)_(?![\w])/g, '$1')
+    .replace(/\u0000(\d+)\u0000/g, (_, i) => code[Number(i)])
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 /**
@@ -96,11 +132,7 @@ export function parseNotes(source) {
   // Prose only — a quote that appears inside another note is not an anchor.
   const prose = lines.map((line, i) => (inside.has(i) ? '' : line))
 
-  // `quote=` holds the *rendered* text, so a paragraph the file wraps over two
-  // lines arrives with a space where the source has a newline. Comparing them
-  // literally marked freshly written notes as orphans, which tells an agent to
-  // distrust an anchor that is perfectly good.
-  const flat = prose.join('\n').replace(/\s+/g, ' ')
+  const flat = flatten(prose.join('\n'))
 
   for (const note of notes) {
     const at = note.line - 1
@@ -110,7 +142,7 @@ export function parseNotes(source) {
     }
     note.orphan = note.scope !== 'file'
       && note.quote !== ''
-      && !flat.includes(note.quote.replace(/\s+/g, ' ').trim())
+      && !flat.includes(flatten(note.quote))
   }
 
   return notes
@@ -398,12 +430,33 @@ function report(file, result, { ephemeral = false } = {}) {
 
 // ----------------------------------------------------------------- commands
 
+/**
+ * The notes in a document — by default only the ones still asking for
+ * something.
+ *
+ * A resolved note stays in the file forever, which is the point: it is the
+ * record of what was asked. But handing all of them back on every round buries
+ * the two that matter under twenty that are done, and invites an agent to
+ * solve the same thing twice. `--all` is there for when the history is what
+ * you actually want.
+ */
 async function cmdNotes(argv) {
   const file = argv.find((a) => !a.startsWith('-'))
-  if (!file) throw new Error('usage: imark.mjs notes <file.md> [--json]')
+  if (!file) throw new Error('usage: imark.mjs notes <file.md> [--all] [--json]')
+
   const notes = parseNotes(fs.readFileSync(file, 'utf8'))
-  if (argv.includes('--json')) say(JSON.stringify(notes, null, 2))
-  else say(`# Notes in ${path.basename(file)} (${notes.length})\n\n${formatNotes(notes)}`)
+  const all = argv.includes('--all')
+  const shown = all ? notes : notes.filter((note) => !note.resolved)
+  const hidden = notes.length - shown.length
+
+  if (argv.includes('--json')) return say(JSON.stringify(shown, null, 2))
+
+  // The count says what was left out as well as what is here, so an agent
+  // that needs the history knows it exists and how to ask for it.
+  const count = hidden > 0
+    ? `${shown.length} active, ${hidden} resolved — use --all to see them`
+    : `${shown.length}`
+  say(`# Notes in ${path.basename(file)} (${count})\n\n${formatNotes(shown)}`)
 }
 
 async function cmdReview(argv) {
@@ -539,19 +592,27 @@ async function cmdPlanHook() {
 
 // --------------------------------------------------------------------- main
 
-const [command, ...argv] = process.argv.slice(2)
+// Only when run as a command. This file exports its parser so tests can reach
+// it, and without the guard importing it ran the dispatch, printed the usage
+// line, and left the exports unusable for the thing they exist for.
+const invoked = process.argv[1]
+  && import.meta.url === pathToFileURL(process.argv[1]).href
 
-try {
-  switch (command) {
-    case 'notes': await cmdNotes(argv); break
-    case 'review': await cmdReview(argv); break
-    case 'plan-hook': await cmdPlanHook(); break
-    case 'open': openInImark(argv[0]); break
-    default:
-      say('usage: imark.mjs <notes|review|open|plan-hook> …')
-      process.exit(command ? 1 : 0)
+if (invoked) {
+  const [command, ...argv] = process.argv.slice(2)
+
+  try {
+    switch (command) {
+      case 'notes': await cmdNotes(argv); break
+      case 'review': await cmdReview(argv); break
+      case 'plan-hook': await cmdPlanHook(); break
+      case 'open': openInImark(argv[0]); break
+      default:
+        say('usage: imark.mjs <notes|review|open|plan-hook> …')
+        process.exit(command ? 1 : 0)
+    }
+  } catch (error) {
+    process.stderr.write(`imark: ${error.message}\n`)
+    process.exit(1)
   }
-} catch (error) {
-  process.stderr.write(`imark: ${error.message}\n`)
-  process.exit(1)
 }
