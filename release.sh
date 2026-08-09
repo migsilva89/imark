@@ -58,6 +58,7 @@ if [ "${1:-}" != "--force" ]; then
 		Support/test-comments.swift -o /tmp/imark-release-test >/dev/null 2>&1 \
 		&& /tmp/imark-release-test >/dev/null || die "the comment tests failed"
 	node Support/test-export.mjs >/dev/null 2>&1 || die "the export test failed"
+	node Support/test-notes.mjs >/dev/null 2>&1 || die "the note anchoring tests failed"
 	swiftc -parse-as-library Sources/Imark/Updates.swift Sources/Imark/Settings.swift \
 		Sources/Imark/NoteColour.swift Support/test-update.swift \
 		-o /tmp/imark-release-update >/dev/null 2>&1 \

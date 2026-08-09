@@ -26,9 +26,14 @@ Do not hand-roll a parser:
 node "${CLAUDE_PLUGIN_ROOT}/scripts/imark.mjs" notes <file.md>
 ```
 
-Add `--json` for structured output. Each note comes back with what it says, the
-quote it is attached to, who wrote it and when, the heading it falls under, and
-the block above it.
+By default this shows only the notes still asking for something. A note carrying
+`resolved=` has been dealt with — it stays in the file as the record of what was
+asked, but it is history, not work. The header says how many were left out. Add
+`--all` when the history is what you want.
+
+Add `--json` for structured output; it obeys the same rule. Each note comes back
+with what it says, the quote it is attached to, who wrote it and when, the
+heading it falls under, and the block above it.
 
 ## The format
 

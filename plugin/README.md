@@ -20,8 +20,13 @@ Needs Imark in `/Applications` and Node 20.
 
 ```
 /imark:imark-review PLAN.md       # review a markdown document
-/imark:imark-notes PLAN.md        # notes you already left
+/imark:imark-notes PLAN.md        # the notes still waiting on something
 ```
+
+`imark-notes` hands over the open notes only. One you have already dealt with is
+marked `resolved=` and stays in the document as the record of what was asked, but
+it is history rather than work — the header says how many were held back, and
+`--all` produces them.
 
 Markdown only — plans, specs, RFCs, docs. Imark is a markdown reader, and
 reviewing code is a real job this is not the tool for; that is what GitHub or
