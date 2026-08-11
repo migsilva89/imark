@@ -108,9 +108,18 @@ enum Comments {
         return out
     }
 
-    /// Puts a whole document back, for undo. No stamp check: the caller took
-    /// the snapshot and is the one asking for it back.
-    static func restore(_ text: String, to url: URL) throws {
+    /// Puts a whole document back, for undo.
+    ///
+    /// This is the only write in the app that replaces a file wholesale, which
+    /// makes it the only one that can cost somebody a document rather than a
+    /// comment. It used to skip the staleness check on the grounds that the
+    /// caller took the snapshot and is the one asking for it back — true, but
+    /// only until something else writes in between. An editor saving over the
+    /// file, or a `git checkout`, and the snapshot is a way to erase it.
+    static func restore(_ text: String, to url: URL, expecting stamp: Stamp?) throws {
+        if let stamp, let now = Stamp(of: url), now != stamp {
+            throw Failure.fileChanged
+        }
         try write(text, to: url)
     }
 
