@@ -203,9 +203,23 @@ enum CommentsTest {
                                 by: "m", on: date, into: url, expecting: nil)
         check("the note went in", try String(contentsOf: url, encoding: .utf8) != original)
 
-        try Comments.restore(original, to: url)
+        // Passing no stamp is "restore this, whatever the file looks like now".
+        // The window always passes one; the exhaustive cases live in
+        // Support/test-undo.swift, including the refusal.
+        try Comments.restore(original, to: url, expecting: nil)
         check("undo puts the file back exactly",
               try String(contentsOf: url, encoding: .utf8) == original)
+
+        // And with a stamp, restoring over somebody else's write is refused —
+        // the one guarantee this function used to be missing.
+        let stale = Comments.Stamp(of: url)
+        Thread.sleep(forTimeInterval: 1.1)
+        try "written by somebody else\n".write(to: url, atomically: true, encoding: .utf8)
+        var refused = false
+        do { try Comments.restore(original, to: url, expecting: stale) } catch { refused = true }
+        check("restoring over an outside write is refused", refused)
+        check("and that write is still there",
+              try String(contentsOf: url, encoding: .utf8) == "written by somebody else\n")
     }
 
     // MARK: - A range that no longer points at a note

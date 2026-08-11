@@ -20,7 +20,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     /// A snapshot of the whole document before each change, which is what makes
     /// undo work the same for writing, editing and deleting a note. Documents
     /// are capped at 5 MB and the stack at ten, so this stays small.
-    private var undoStack: [(text: String, what: String)] = []
+    private var undoStack = UndoStack()
     /// Set while the composer is editing a note rather than writing a new one.
     private var editingNote: ClosedRange<Int>?
     private let commentsList = CommentsList()
@@ -29,7 +29,11 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     /// Set while the composer is open for a note about the document rather than
     /// about anything in it. There is no selection behind such a note, so the
     /// save path has nothing else to tell them apart by.
-    private var composingFileNote = false
+    /// Reachable from Support/test-undo.swift, which drives a whole comment
+    /// through this controller rather than through the popover and the WebView.
+    /// A file note is the one kind that needs no selection, which makes it the
+    /// cheapest way to put a real change on the undo stack from a test.
+    var composingFileNote = false
     private(set) var reviewingComments = false
 
     private var watcher: FileWatcher?
@@ -150,7 +154,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
 
     // MARK: - Loading
 
-    private func show(_ target: URL, pushingHistory: Bool) {
+    func show(_ target: URL, pushingHistory: Bool) {
         if pushingHistory {
             back.append(url)
             forward.removeAll()
@@ -323,7 +327,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     /// came from. This is the first thing Imark does that changes a document, so
     /// it goes through an atomic replace and refuses to write over a file that
     /// moved underneath it.
-    private func saveComment(_ body: String, colour: NoteColour) {
+    func saveComment(_ body: String, colour: NoteColour) {
         if let range = editingNote {
             return updateComment(body, colour: colour, at: range)
         }
@@ -348,6 +352,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
                 expecting: stamp
             )
             lastWrite = Date()
+            sealSnapshot()
             selectionPopover.dismiss()
             content.renderer.clearSelection()
             load()
@@ -357,7 +362,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
                 self?.content.renderer.revealNote(index)
             }
         } catch {
-            undoStack.removeLast()
+            undoStack.discardLast()
             selectionPopover.reportCommentFailure(
                 (error as? LocalizedError)?.errorDescription ?? "Couldn't save the comment"
             )
@@ -383,7 +388,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
                 try Comments.remove(lines: command.lines, from: url, expecting: stamp)
                 finishWrite()
             } catch {
-                undoStack.removeLast()
+                undoStack.discardLast()
                 report(error, doing: "delete that comment")
             }
         }
@@ -397,7 +402,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
             selectionPopover.dismiss()
             finishWrite()
         } catch {
-            undoStack.removeLast()
+            undoStack.discardLast()
             selectionPopover.reportCommentFailure(
                 (error as? LocalizedError)?.errorDescription ?? "Couldn't save the comment"
             )
@@ -405,12 +410,24 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func snapshot(_ what: String) {
-        undoStack.append((text: (try? String(contentsOf: url, encoding: .utf8)) ?? "", what: what))
-        if undoStack.count > 10 { undoStack.removeFirst() }
+        undoStack.push(
+            text: (try? String(contentsOf: url, encoding: .utf8)) ?? "",
+            what: what,
+            url: url,
+            stamp: nil
+        )
+    }
+
+    /// Called once a change has landed: the entry now knows what the file looks
+    /// like with the change in it, which is what makes an outside edit
+    /// afterwards detectable.
+    private func sealSnapshot() {
+        undoStack.stampLast(Comments.Stamp(of: url))
     }
 
     private func finishWrite() {
         lastWrite = Date()
+        sealSnapshot()
         load()
     }
 
@@ -424,10 +441,13 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     }
 
     @objc func undoComment(_ sender: Any?) {
-        guard let last = undoStack.popLast() else { return NSSound.beep() }
+        guard !undoStack.isEmpty else { return NSSound.beep() }
         do {
-            try Comments.restore(last.text, to: url)
-            finishWrite()
+            // The stack knows which file each snapshot belongs to. This window
+            // may well be showing a different one by now.
+            try undoStack.undoLast()
+            lastWrite = Date()
+            load()
         } catch {
             report(error, doing: "undo that")
         }
