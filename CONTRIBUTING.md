@@ -26,6 +26,27 @@ The renderer lives in `renderer/` and is bundled with esbuild; `plugin/` is the
 single source for the agent files, copied into the app at build time. Editing
 the copy inside `Imark.app` changes nothing in the repo.
 
+## The review handshake: test the second round
+
+Everything about a review passes through `~/.imark/pending`, and that directory
+is the only state in Imark that outlives the thing that made it. A review that
+is never answered — the session closed, the process killed — leaves its request
+there, and 0.2.2 shipped an app that answered the leftover instead of the
+review the reviewer was looking at. The agent waited four hours for a decision
+that had already been made. Every suite passed: all of them reviewed a clean
+document once.
+
+So a change to `Review.swift` or to the handshake in `plugin/scripts/imark.mjs`
+is not tested until it is tested **twice over the same document, with a
+leftover in the directory**. Three cases in `Support/test-review.sh` hold that
+line — the abandoned round, the interrupted one, the sweep — and a fourth
+belongs there before the next one gets fixed.
+
+The one step no suite reaches is the press itself: a synthetic click needs
+accessibility permission a terminal does not have. Approve, Send Back, and
+closing the window without deciding have to be tried by hand, in a build, on a
+real review, before a release goes out.
+
 ## What this is not
 
 - **Not an editor.** Imark reads. Comments are the one thing it writes, and that

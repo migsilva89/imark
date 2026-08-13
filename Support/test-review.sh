@@ -169,6 +169,107 @@ check "the fresh review keeps waiting"         "$out" "still waiting"
 check "and the real decision still lands"      "$out" "DID NOT APPROVE"
 refute "the ghost approval never surfaces"     "$out" "APPROVED — the reviewer accepted this"
 
+# Shipped in 0.2.2 and found by pressing the button: a round nobody finished
+# leaves an unanswered request behind, and the app answered whichever sorted
+# first. The reviewer pressed Send Back, the corpse got the answer, and the
+# agent actually waiting was never told anything.
+echo "▸ an abandoned round cannot swallow the answer"
+abandoned() {
+  local dir; dir="$(mktemp -d)"
+  cd "$dir"
+  export IMARK_PENDING_DIR="$dir/pending"
+  mkdir -p "$IMARK_PENDING_DIR"
+  printf '# Plan\n\nA paragraph that is going to be reviewed.\n' > SPEC.md
+
+  IMARK_TEST_NO_OPEN=1 node "$OLDPWD/plugin/scripts/imark.mjs" review SPEC.md > out.txt 2>&1 &
+  local pid=$!
+  local request; request="$(wait_for "$IMARK_PENDING_DIR/*.json")"
+  if [[ -z "$request" ]]; then
+    kill "$pid" 2>/dev/null; echo "the request was never announced"
+    unset IMARK_PENDING_DIR; cd "$OLDPWD"; rm -rf "$dir"; return
+  fi
+
+  # The corpse of an earlier round, dropped in after the live one is already
+  # waiting — a script that was killed outright, so it never withdrew and the
+  # live review never saw it to clear it. Older stamp, and a name that sorts
+  # before anything the script rolls: the version that took whichever came
+  # first alphabetically handed this one the answer.
+  cat > "$IMARK_PENDING_DIR/0000deadbeef.json" <<EOF
+{ "file": "$(pwd)/SPEC.md", "at": "2026-08-13T21:31:17.392Z", "by": "Claude Code" }
+EOF
+
+  {
+    echo
+    echo '<!-- imark quote="going to be reviewed" by="miguel" at="2026-08-13T21:38Z"'
+    echo 'This needs a number.'
+    echo '-->'
+  } >> SPEC.md
+  /tmp/imark-decide "$(pwd)/SPEC.md" request-changes 1 > /dev/null
+
+  # Four polls: if it were going to wake up it would have by now.
+  for _ in $(seq 1 8); do kill -0 "$pid" 2>/dev/null || break; sleep 0.25; done
+  if kill -0 "$pid" 2>/dev/null; then
+    kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null
+    echo "STILL-WAITING: the answer went somewhere else"
+  else
+    wait "$pid" 2>/dev/null; cat out.txt
+  fi
+  unset IMARK_PENDING_DIR; cd "$OLDPWD"; rm -rf "$dir"
+}
+out="$(abandoned)"
+refute "the live review is not left hanging"    "$out" "STILL-WAITING"
+check "it gets the decision"                    "$out" "DID NOT APPROVE"
+check "with the note that was written"          "$out" "This needs a number"
+
+# The other half of the same bug: the round that leaves the corpse behind.
+echo "▸ an interrupted review takes its request with it"
+interrupted() {
+  local dir; dir="$(mktemp -d)"
+  cd "$dir"
+  export IMARK_PENDING_DIR="$dir/pending"
+  printf '# Plan\n\nA paragraph that is going to be reviewed.\n' > SPEC.md
+
+  IMARK_TEST_NO_OPEN=1 node "$OLDPWD/plugin/scripts/imark.mjs" review SPEC.md > out.txt 2>&1 &
+  local pid=$!
+  local request; request="$(wait_for "$IMARK_PENDING_DIR/*.json")"
+  # Closing the session, or Ctrl-C in the terminal.
+  kill -TERM "$pid" 2>/dev/null
+  wait "$pid" 2>/dev/null
+  sleep 0.25
+  local left; left="$(ls "$IMARK_PENDING_DIR" 2>/dev/null)"
+  [[ -n "$left" ]] && echo "LEFTOVER: $left"
+  unset IMARK_PENDING_DIR; cd "$OLDPWD"; rm -rf "$dir"
+}
+refute "nothing is left for the app to answer"  "$(interrupted)" "LEFTOVER"
+
+# And the belt to that pair of braces: whatever a killed round did leave, the
+# next review of the same document takes down before it opens the window.
+echo "▸ a new round clears the last one's leftovers"
+sweeps() {
+  local dir; dir="$(mktemp -d)"
+  cd "$dir"
+  export IMARK_PENDING_DIR="$dir/pending"
+  mkdir -p "$IMARK_PENDING_DIR"
+  printf '# Plan\n\nA paragraph that is going to be reviewed.\n' > SPEC.md
+  cat > "$IMARK_PENDING_DIR/0000deadbeef.json" <<EOF
+{ "file": "$(pwd)/SPEC.md", "at": "2026-08-13T21:31:17.392Z", "by": "Claude Code" }
+EOF
+  # A request for somebody else's document, which is none of our business.
+  cat > "$IMARK_PENDING_DIR/0000cafe0000.json" <<EOF
+{ "file": "$(pwd)/OTHER.md", "at": "2026-08-13T21:31:17.392Z", "by": "Claude Code" }
+EOF
+
+  IMARK_TEST_NO_OPEN=1 node "$OLDPWD/plugin/scripts/imark.mjs" review SPEC.md > out.txt 2>&1 &
+  local pid=$!
+  sleep 1
+  ls "$IMARK_PENDING_DIR" | sed 's/^/PENDING: /'
+  kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null
+  unset IMARK_PENDING_DIR; cd "$OLDPWD"; rm -rf "$dir"
+}
+out="$(sweeps)"
+refute "the corpse for this document is gone"   "$out" "PENDING: 0000deadbeef.json"
+check "another document's review is untouched"  "$out" "PENDING: 0000cafe0000.json"
+
 echo "▸ the plan-mode hook"
 
 hook() {   # hook <on|off> <decision> → prints the JSON Claude Code reads
