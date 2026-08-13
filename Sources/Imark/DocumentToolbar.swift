@@ -160,7 +160,10 @@ extension DocumentWindowController: NSToolbarDelegate {
             // The palette's own red, the same one you can paint a note with.
             // Borrowing GitHub's would have put a colour in the window that
             // appears nowhere else in the app.
-            return reviewButton(identifier, title: "Request Changes",
+            // "Send Back", not GitHub's "Request Changes": this is a document,
+            // not a diff, and the button is not filing a review — it is handing
+            // the document back to whoever wrote it, with your notes on it.
+            return reviewButton(identifier, title: "Send Back",
                                 symbol: "arrow.uturn.backward",
                                 tip: "Send your notes back and hold the work",
                                 tint: NoteColour.red.colour,
@@ -200,7 +203,7 @@ extension DocumentWindowController: NSToolbarDelegate {
         // said instead of inviting you to say it twice.
         if Review.decision(for: url) != nil {
             button.isEnabled = false
-            button.title = filled ? "Approved" : "Changes Requested"
+            button.title = filled ? "Approved" : "Sent Back"
         }
 
         let item = NSToolbarItem(itemIdentifier: identifier)
@@ -275,15 +278,46 @@ extension DocumentWindowController: NSToolbarDelegate {
         // nothing about what to change, which is the one outcome nobody wants.
         guard noteCount > 0 else {
             let alert = NSAlert()
-            alert.messageText = "Request changes with no notes?"
+            alert.messageText = "Send it back with no notes?"
             alert.informativeText = "You haven't commented on anything. "
                 + "The agent will be told to revise without being told what to change."
-            alert.addButton(withTitle: "Request Changes Anyway")
+            alert.addButton(withTitle: "Send Back Anyway")
             alert.addButton(withTitle: "Cancel")
             guard alert.runModal() == .alertFirstButtonReturn else { return }
             return finishReview(.requestChanges)
         }
         finishReview(.requestChanges)
+    }
+
+    /// Closing the window is not an answer, and somebody is waiting for one.
+    ///
+    /// A silent close used to leave the agent on the other end blocked on a
+    /// window that was no longer on screen — until the wait timed out, four
+    /// hours later. So the window asks on the way out, and closing is not one
+    /// of the things it offers: you answer, or you go back to reviewing.
+    @objc func windowShouldClose(_ sender: NSWindow) -> Bool {
+        guard Review.isReview(url), Review.decision(for: url) == nil else { return true }
+
+        let alert = NSAlert()
+        alert.messageText = "Finish this review?"
+        alert.informativeText = "Something is waiting for your answer, and closing "
+            + "the window doesn't give it one."
+        // First is the default and the one Escape lands on: the safe way out of a
+        // dialogue nobody asked for is back to the document.
+        alert.addButton(withTitle: "Keep Reviewing")
+        alert.addButton(withTitle: "Approve")
+        alert.addButton(withTitle: "Send Back")
+
+        switch alert.runModal() {
+        case .alertSecondButtonReturn: finishReview(.approve)
+        // Through the button's own action, so sending back with nothing
+        // commented still gets the warning it gets from the toolbar.
+        case .alertThirdButtonReturn: sendReviewBack(nil)
+        default: break
+        }
+        // Either way this close does not happen: deciding closes the window
+        // itself a moment later, once the button has shown what was pressed.
+        return false
     }
 
     private func finishReview(_ decision: Review.Decision) {

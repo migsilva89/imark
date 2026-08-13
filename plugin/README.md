@@ -39,7 +39,7 @@ window:
 | | |
 |---|---|
 | **Approve** | the agent carries on, with any notes you left |
-| **Request Changes** | the agent gets every note and revises instead |
+| **Send Back** | the agent gets every note and revises instead |
 
 Your notes are written into the document, exactly as if you had commented on it
 outside a review — they stay there, and they travel with the file. When the

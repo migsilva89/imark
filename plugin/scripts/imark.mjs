@@ -236,8 +236,8 @@ const DECISION = `
 
 ## Decision
 
-**Approve** and **Request Changes**, at the top of the window, end this review.
-*Request Changes* hands the agent everything you commented on; *Approve* lets it
+**Approve** and **Send Back**, at the top of the window, end this review.
+*Send Back* hands the agent everything you commented on; *Approve* lets it
 carry on.
 
 Comment wherever you like until then — nothing you write decides anything.
@@ -343,9 +343,35 @@ function pendingDir() {
   return dir
 }
 
+/**
+ * The requests an earlier round left behind for this same file.
+ *
+ * A review nobody finished — the session ended, the agent was interrupted,
+ * the terminal went — leaves its request on disk with no decision beside it,
+ * and the app cannot tell that corpse from somebody actually waiting. Two of
+ * them for one document is how a decision went to a script that was no longer
+ * listening while the live one waited for four hours. The app now answers the
+ * newest, and this clears the rest so there is nothing to be confused by.
+ */
+function forgetEarlierRequests(dir, target) {
+  const resolved = fs.realpathSync(target)
+  for (const name of fs.readdirSync(dir)) {
+    if (!name.endsWith('.json') || name.endsWith('.decision.json')) continue
+    const file = path.join(dir, name)
+    try {
+      const payload = JSON.parse(fs.readFileSync(file, 'utf8'))
+      if (!payload.file) continue
+      if (fs.realpathSync(payload.file) !== resolved) continue
+      fs.rmSync(file, { force: true })
+      fs.rmSync(path.join(dir, `${name.slice(0, -'.json'.length)}.decision.json`), { force: true })
+    } catch { /* unreadable, or gone while we looked: not ours to keep */ }
+  }
+}
+
 /** Announce to the app that opening `target` is a review, not a read. */
 function requestReview(target) {
   const dir = pendingDir()
+  forgetEarlierRequests(dir, target)
   for (let attempt = 0; attempt < 3; attempt++) {
     const nonce = crypto.randomBytes(6).toString('hex')
     const file = path.join(dir, `${nonce}.json`)
@@ -364,6 +390,25 @@ function requestReview(target) {
 function withdraw(request) {
   fs.rmSync(request.file, { force: true })
   fs.rmSync(request.decision, { force: true })
+}
+
+/**
+ * Take the request down if this process is killed rather than answered.
+ *
+ * A review is a long wait, and the thing waiting is a coding agent inside a
+ * session somebody can close at any moment. Withdrawing only on the happy path
+ * meant every abandoned round left a request on disk for the app to answer
+ * later instead of the live one.
+ */
+function withdrawWhenKilled(request) {
+  // The codes a shell reports for a signal, so being killed still reads as
+  // being killed rather than as a review that finished.
+  for (const [signal, code] of [['SIGINT', 130], ['SIGTERM', 143], ['SIGHUP', 129]]) {
+    process.once(signal, () => {
+      withdraw(request)
+      process.exit(code)
+    })
+  }
 }
 
 /**
@@ -513,6 +558,7 @@ async function cmdReview(argv) {
   }
 
   const request = requestReview(target)
+  withdrawWhenKilled(request)
   try {
     openInImark(target)
   } catch (error) {
@@ -521,7 +567,7 @@ async function cmdReview(argv) {
     throw error
   }
   if (!wait) { say(`Opened in Imark: ${target}`); return }
-  say(`Opened in Imark: ${target}\nWaiting for Approve or Request Changes in the window…`)
+  say(`Opened in Imark: ${target}\nWaiting for Approve or Send Back in the window…`)
 
   const result = await waitForDecision(target, request)
   withdraw(request)
@@ -553,6 +599,7 @@ async function cmdPlanHook() {
   // the one review that still goes through a stand-in document.
   const file = writeEphemeral({ title: 'Plan', body: plan })
   const request = requestReview(file)
+  withdrawWhenKilled(request)
   try { openInImark(file) } catch (error) {
     process.stderr.write(`imark: ${error.message}\n`)
     withdraw(request)
