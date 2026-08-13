@@ -21,7 +21,7 @@ notes are written into the document as `<!-- imark … -->` blocks and stay
 there; they travel with the file. Content piped on stdin, or several files at
 once, gets a temporary stand-in document instead, cleaned up afterwards.
 
-The command **blocks** until the user presses Approve or Request Changes in the
+The command **blocks** until the user presses Approve or Send Back in the
 app. That is expected and can take a long time: do not interrupt it, do not put
 a timeout on it, and do not ask whether they are done.
 

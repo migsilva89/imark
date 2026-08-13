@@ -36,12 +36,20 @@ enum Review {
     /// before cleaning up. One still unanswered always wins over it — otherwise
     /// the leftovers of a dead review would show a fresh one as already decided,
     /// and the buttons the reviewer needs would never appear.
+    ///
+    /// Between two unanswered requests for the same file the newest wins, and it
+    /// has to be the newest: a review the reviewer walked away from leaves its
+    /// request behind unanswered, and the whoever-sorts-first version handed the
+    /// decision to that corpse — the agent actually waiting was never told
+    /// anything and the window looked answered. The one that opened the window
+    /// in front of the reviewer is the last one to have asked.
     private static func request(for url: URL) -> URL? {
         guard let names = try? FileManager.default
             .contentsOfDirectory(atPath: pendingDir.path) else { return nil }
         let target = url.resolvingSymlinksInPath().path
-        var answered: URL?
-        for name in names.sorted()
+        var waiting: (file: URL, at: String)?
+        var answered: (file: URL, at: String)?
+        for name in names
         where name.hasSuffix(".json") && !name.hasSuffix(".decision.json") {
             let file = pendingDir.appendingPathComponent(name)
             guard let data = try? Data(contentsOf: file),
@@ -49,10 +57,17 @@ enum Review {
                   let requested = payload["file"] as? String,
                   URL(fileURLWithPath: requested).resolvingSymlinksInPath().path == target
             else { continue }
-            if !FileManager.default.fileExists(atPath: answer(to: file).path) { return file }
-            if answered == nil { answered = file }
+            // The stamp the script wrote when it asked. All of them are UTC in
+            // the same shape, so later reads as greater; a request without one
+            // is older than anything that has one, never newer.
+            let candidate = (file, payload["at"] as? String ?? "")
+            if FileManager.default.fileExists(atPath: answer(to: file).path) {
+                if answered == nil || candidate.1 > answered!.at { answered = candidate }
+            } else if waiting == nil || candidate.1 > waiting!.at {
+                waiting = candidate
+            }
         }
-        return answered
+        return (waiting ?? answered)?.file
     }
 
     private static func answer(to request: URL) -> URL {

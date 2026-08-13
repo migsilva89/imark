@@ -250,10 +250,10 @@ out — with no server, no port and nothing installed on the other side. The fil
 is the whole bridge.
 
 <p align="center">
-  <img src=".github/assets/review.gif" width="720" alt="Pressing Request Changes in the toolbar, and the agent picking the notes up in the terminal">
+  <img src=".github/assets/review.gif" width="720" alt="Pressing Send Back in the toolbar, and the agent picking the notes up in the terminal">
 </p>
 
-<p align="center"><em>Request Changes, and the agent reads your notes back.</em></p>
+<p align="center"><em>Send Back, and the agent reads your notes back.</em></p>
 
 [`plugin/`](plugin/README.md) is a Claude Code plugin that does exactly that:
 
