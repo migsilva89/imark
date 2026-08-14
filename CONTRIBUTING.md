@@ -22,9 +22,50 @@ node Support/test-export.mjs
 swift Support/test-plus.swift
 ```
 
-The renderer lives in `renderer/` and is bundled with esbuild; `plugin/` is the
-single source for the agent files, copied into the app at build time. Editing
-the copy inside `Imark.app` changes nothing in the repo.
+The rest of the suites, the ones a release runs:
+
+```bash
+swiftc -parse-as-library Sources/Imark/Comments.swift Sources/Imark/NoteColour.swift \
+  Support/test-comments.swift -o /tmp/imark-test && /tmp/imark-test
+Support/test-setup.sh
+```
+
+## Where things are
+
+```
+Sources/Imark/           the app
+Sources/ImarkQuickLook/  the Quick Look extension
+Sources/ImarkRender/     the renderer both of them share
+renderer/                JavaScript source
+Resources/               build output — not edited by hand
+Support/                 Info.plist, entitlements, generators, and tests
+testdata/                documents that exercise the renderer
+plugin/                  the Claude Code plugin — uses the app, is not part of it
+```
+
+The renderer is the only part that knows how to turn Markdown into anything. The
+Swift side handles windows, files and navigation, and talks to it in messages
+over a private `imark://` scheme, so images beside a document load without
+opening `file://` to the page. There is no `.xcodeproj`: Swift Package Manager
+compiles it and `build.sh` assembles the `.app`.
+
+`plugin/` is the single source for the agent files, copied into the app at build
+time. Editing the copy inside `Imark.app` changes nothing in the repo.
+
+The app icon is drawn in code from the rules in the design document:
+
+```bash
+swift Support/make-icon.swift
+```
+
+Two helpers exist for looking at the UI without photographing the whole desktop.
+`Support/shoot.swift` renders a page in an off-screen web view, and
+`Support/window-id.swift` resolves a window id so a screenshot can be taken of
+one window:
+
+```bash
+screencapture -x -o -l"$(swift Support/window-id.swift Imark)" shot.png
+```
 
 ## The review handshake: test the second round
 
