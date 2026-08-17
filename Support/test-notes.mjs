@@ -84,6 +84,76 @@ check('the formatted quote is anchored', notes[0].orphan === false)
 check('the plain quote is anchored', notes[1].orphan === false)
 check('the missing quote is an orphan', notes[2].orphan === true)
 
+// ------------------------------------------------------------------- fences
+
+// A document that shows the comment format used to grow a note by an author
+// nobody has met: the reader scanned line by line and a fenced example line is
+// the same line as a real one. This project's README is the example.
+const example = [
+  '```markdown',
+  '<!-- imark quote="a phrase" by="john" at="2026-08-02T14:31Z"',
+  'An example, not a note.',
+  '-->',
+  '```',
+]
+
+console.log('▸ a note inside a fence is an example, not a note')
+check('a fenced example is not a note',
+  parseNotes(['# Doc', '', 'Nobody commented on this document.', '', ...example, ''].join('\n')).length === 0)
+
+const mixed = parseNotes([
+  '# Doc',
+  '',
+  'The format looks like this:',
+  '',
+  ...example,
+  '',
+  'A paragraph somebody read.',
+  '',
+  '<!-- imark quote="A paragraph somebody read." by="m" at="2026-08-09T10:00Z"',
+  'A real one.',
+  '-->',
+  '',
+].join('\n'))
+check('a real note after an example is still read', mixed.length === 1 && mixed[0].body === 'A real one.',
+  JSON.stringify(mixed.map((note) => note.body)))
+
+console.log('▸ and an unclosed fence is not a fence')
+const unclosed = parseNotes([
+  '# Doc',
+  '',
+  '```markdown',
+  '<!-- imark quote="Doc" by="m" at="2026-08-09T10:00Z"',
+  'Somebody is still typing the block.',
+  '-->',
+  '',
+  'A paragraph.',
+  '',
+  '<!-- imark quote="A paragraph." by="m" at="2026-08-09T11:00Z"',
+  'Below it, and still wanted.',
+  '-->',
+  '',
+].join('\n'))
+check('a fence that never closes swallows nothing', unclosed.length === 2,
+  JSON.stringify(unclosed.map((note) => note.body)))
+
+check('a tilde fence is a fence too',
+  parseNotes(['# Doc', '', '~~~markdown', ...example.slice(1, 4), '~~~', ''].join('\n')).length === 0)
+
+// A longer fence closes only with a run at least as long, so the inner three
+// backticks below are content and the example stays inside one block.
+check('a longer fence is not closed by a shorter run',
+  parseNotes([
+    '# Doc',
+    '',
+    '````markdown',
+    '```markdown',
+    ...example.slice(1, 4),
+    '```',
+    '````',
+    '',
+  ].join('\n')).length === 0)
+
 // -------------------------------------------------------------- the command
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'imark-notes-'))

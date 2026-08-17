@@ -9,7 +9,7 @@
 globalThis.window = { addEventListener() {} }
 globalThis.document = { querySelector: () => null, querySelectorAll: () => [] }
 
-const { toVisibleText } = await import('../renderer/src/comments.js')
+const { toVisibleText, extractComments } = await import('../renderer/src/comments.js')
 
 let failures = 0
 
@@ -82,6 +82,62 @@ const check = (name, condition, detail = '') => {
   )
   check('the quote is unescaped for reading', out.includes('on *“"quoted" & more”*'), out)
   check('and so is the note', out.includes('an arrow --> here'), out)
+}
+
+/* -------------------------------------------------------- a fenced example */
+// A document that teaches the format — this project's README does — used to grow
+// a note nobody wrote: a dot in the margin, a line in the count, and an example
+// exported as if it were somebody's feedback. Both readers of the file have to
+// agree about that, so `extractComments` is checked here beside the exporter.
+{
+  const example = [
+    '```markdown',
+    '<!-- imark quote="a phrase" by="john" at="2026-08-02T14:31Z"',
+    'An example, not a note.',
+    '-->',
+    '```',
+  ]
+
+  const fenced = ['# Doc', '', 'Nobody commented on this document.', '', ...example, ''].join('\n')
+  check('a fenced example is not a note', extractComments(fenced).comments.length === 0)
+  check('and the exporter leaves it as it found it', toVisibleText(fenced) === fenced)
+
+  const after = [
+    ...example,
+    '',
+    'A paragraph somebody read.',
+    '',
+    '<!-- imark quote="A paragraph somebody read." by="m" at="2026-08-02T14:31Z"',
+    'A real one.',
+    '-->',
+  ].join('\n')
+  const found = extractComments(after).comments
+  check('a real note after an example is still read', found.length === 1 && found[0].text === 'A real one.',
+    JSON.stringify(found.map((note) => note.text)))
+  check('the example survives the export', toVisibleText(after).includes('```markdown'))
+
+  const unclosed = [
+    '# Doc',
+    '',
+    '```markdown',
+    '<!-- imark quote="Doc" by="m" at="2026-08-02T14:31Z"',
+    'Somebody is still typing the block.',
+    '-->',
+    '',
+    'A paragraph.',
+    '',
+    '<!-- imark quote="A paragraph." by="m" at="2026-08-02T14:31Z"',
+    'Below it, and still wanted.',
+    '-->',
+  ].join('\n')
+  check('a fence that never closes swallows nothing', extractComments(unclosed).comments.length === 2,
+    JSON.stringify(extractComments(unclosed).comments.map((note) => note.text)))
+
+  const tildes = ['# Doc', '', '~~~markdown', ...example.slice(1, 4), '~~~', ''].join('\n')
+  check('a tilde fence is a fence too', extractComments(tildes).comments.length === 0)
+
+  const longer = ['# Doc', '', '````markdown', '```markdown', ...example.slice(1, 4), '```', '````', ''].join('\n')
+  check('a longer fence is not closed by a shorter run', extractComments(longer).comments.length === 0)
 }
 
 console.log(failures === 0 ? '\nall good' : `\n${failures} failing`)

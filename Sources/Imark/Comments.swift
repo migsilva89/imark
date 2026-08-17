@@ -178,7 +178,7 @@ enum Comments {
             block.append("")
         }
 
-        let index = countNotes(in: lines.prefix(at))
+        let index = countNotes(in: lines, above: at)
         lines.insert(contentsOf: block, at: at)
         try write(lines.joined(separator: "\n"), to: url)
         return index
@@ -254,8 +254,68 @@ enum Comments {
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private static func countNotes(in lines: ArraySlice<String>) -> Int {
-        lines.filter { $0.range(of: #"^\s*<!--\s*imark\b"#, options: .regularExpression) != nil }.count
+    /// How many notes the document holds above `line`, which is the position the
+    /// new one takes in the list the renderer builds. Fenced examples are left
+    /// out because the renderer leaves them out too: counting one here would
+    /// open the note above the one somebody just wrote.
+    ///
+    /// Asked of the whole document rather than of the lines above `line`, so a
+    /// fence opened above the insertion point and closed below it is still read
+    /// as a fence.
+    private static func countNotes(in lines: [String], above line: Int) -> Int {
+        let fenced = fencedLines(lines)
+        return lines.indices.prefix(line)
+            .filter { !fenced.contains($0) }
+            .filter {
+                lines[$0].range(of: #"^\s*<!--\s*imark\b"#, options: .regularExpression) != nil
+            }
+            .count
+    }
+
+    /// A code fence, the way CommonMark draws one: a run of three or more
+    /// backticks or tildes, indented by no more than three spaces.
+    private static func fenceRun(_ line: String) -> (marker: Character, length: Int)? {
+        let body = line.drop { $0 == " " }
+        guard line.count - body.count <= 3, let marker = body.first,
+              marker == "`" || marker == "~"
+        else { return nil }
+        let length = body.prefix { $0 == marker }.count
+        guard length >= 3 else { return nil }
+        return (marker, length)
+    }
+
+    /// A fence closes only with its own character and at least as long a run, and
+    /// carries nothing else: anything after the run is an info string, which only
+    /// an opening fence may have.
+    private static func closes(_ line: String, _ open: (marker: Character, length: Int)) -> Bool {
+        guard let run = fenceRun(line), run.marker == open.marker, run.length >= open.length
+        else { return false }
+        return String(line.drop { $0 == " " }.drop { $0 == open.marker }).isBlank
+    }
+
+    /// The lines of every closed code fence, the fences included. A note inside
+    /// one is an example of the format rather than a note — the same reading the
+    /// renderer and the plugin take, and the three have to agree or the app and
+    /// the file disagree about what the document holds.
+    ///
+    /// A fence that never closes is not a fence, it is somebody mid-sentence, and
+    /// taking it at its word would silently lose every note below it.
+    private static func fencedLines(_ lines: [String]) -> Set<Int> {
+        var fenced: Set<Int> = []
+        var index = 0
+        while index < lines.count {
+            guard let open = fenceRun(lines[index]) else {
+                index += 1
+                continue
+            }
+            guard let end = lines.indices.dropFirst(index + 1).first(where: { closes(lines[$0], open) }) else {
+                index += 1
+                continue
+            }
+            fenced.formUnion(index...end)
+            index = end + 1
+        }
+        return fenced
     }
 
     // MARK: - Saving
