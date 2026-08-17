@@ -19,6 +19,7 @@ that breaks one cannot ship anyway.
 Support/test-review.sh
 node Support/test-notes.mjs
 node Support/test-export.mjs
+node Support/test-math.mjs
 swift Support/test-plus.swift
 ```
 
