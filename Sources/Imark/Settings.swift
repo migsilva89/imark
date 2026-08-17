@@ -135,6 +135,16 @@ enum Settings {
         set { store.set(newValue.rawValue, forKey: "width"); announce() }
     }
 
+    /// Whether the YAML front matter is shown as a card above the document. On
+    /// by default, as it has always been — but plenty of files carry front
+    /// matter for tooling rather than for the person reading, and there was no
+    /// way to put it away. Hiding it only hides the card: the lines still count
+    /// towards the file, so a note stays where it was written.
+    static var showsFrontMatter: Bool {
+        get { store.object(forKey: "showsFrontMatter") as? Bool ?? true }
+        set { store.set(newValue, forKey: "showsFrontMatter"); announce() }
+    }
+
     static var theme: Theme {
         get { Theme(rawValue: store.string(forKey: "theme") ?? "") ?? .system }
         set { store.set(newValue.rawValue, forKey: "theme"); announce() }

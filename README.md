@@ -37,7 +37,7 @@
 - **Outline rail** — a tick per heading down the edge of every document, tapering around the pointer, with a card that names the section before you commit to going there
 - **Wiki-links** — `[[note]]` resolves against the folder and opens in the same window, with back and forward history
 - **The folder and the recents** — every `.md` beside the open document, plus the last five you opened from anywhere else
-- **Everything GitHub-flavoured** — tables, task lists, footnotes, front matter as a header card, syntax highlighting, Mermaid diagrams, KaTeX maths
+- **Everything GitHub-flavoured** — tables, task lists, footnotes, front matter as a header card you can put away from the View menu, syntax highlighting, Mermaid diagrams, KaTeX maths
 - **Actions on a selection** — comment on it, translate it on device, or search the web for it in your default browser
 - **Find with a counter** — `⌘F` highlights every hit and tells you which one you are on
 - **Tabs** — several documents in one window, with everything macOS gives a tabbed app: `⌘⇧[` and `⌘⇧]`, drag a tab out, Merge All Windows

@@ -129,6 +129,15 @@ enum Menu {
         }
         menu.addItem(withTitle: "Column Width", action: nil, keyEquivalent: "").submenu = widths
 
+        // A tick rather than a title that flips between "Show" and "Hide": the
+        // front matter is a thing the document either shows or does not, and a
+        // checked item says which without having to be read twice.
+        menu.addItem(
+            withTitle: "Show Front Matter",
+            action: #selector(DocumentWindowController.toggleFrontMatter(_:)),
+            keyEquivalent: ""
+        )
+
         menu.addItem(.separator())
         menu.addItem(withTitle: "Back", action: #selector(DocumentWindowController.goBack(_:)), keyEquivalent: "[")
         menu.addItem(withTitle: "Forward", action: #selector(DocumentWindowController.goForward(_:)), keyEquivalent: "]")

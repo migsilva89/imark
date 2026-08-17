@@ -262,6 +262,23 @@ function renderFrontMatter(data) {
   </header>`
 }
 
+// Hidden with CSS rather than by leaving the card out of the HTML: the front
+// matter still occupies its lines in the file, and a document that is not built
+// again is a document whose notes cannot move.
+function applyFrontMatter(shown) {
+  document.documentElement.dataset.frontMatter = shown ? 'shown' : 'hidden'
+}
+
+function setFrontMatter(shown) {
+  applyFrontMatter(shown)
+  // The card's height comes out of the page with it, so everything below moves
+  // — and the rails are drawn from where things were. Without this the heading
+  // tick and the note mark stay at the old height, pointing above their words.
+  // A render does this for itself, further down; a toggle has nothing else.
+  buildRail(content())
+  buildNoteRail()
+}
+
 /* --------------------------------------------------------------- mermaid */
 
 let mermaidSeq = 0
@@ -751,7 +768,7 @@ let renderToken = 0
 // Kept so comments can be exported without asking Swift to hand the file back.
 let lastSource = ''
 
-async function render({ markdown, path, theme, preview, rail }) {
+async function render({ markdown, path, theme, preview, rail, frontMatter }) {
   const token = ++renderToken
   lastSource = markdown ?? ''
   docDir = path ? path.slice(0, path.lastIndexOf('/')) || '/' : '/'
@@ -766,6 +783,9 @@ async function render({ markdown, path, theme, preview, rail }) {
   // owns the left edge. Absent means no rail at all.
   if (rail) document.documentElement.dataset.rail = rail
   else delete document.documentElement.dataset.rail
+  // Carried too, so a document opened after the card was put away does not
+  // flash it back for the length of one render.
+  if (frontMatter !== undefined) applyFrontMatter(frontMatter)
 
   const { data, body, offset } = splitFrontMatter(markdown ?? '')
   lineOffset = offset
@@ -1215,6 +1235,7 @@ window.imark = {
   setWidth(width) {
     document.documentElement.dataset.width = width
   },
+  setFrontMatter,
   setPreview(on) {
     document.documentElement.dataset.preview = on ? 'true' : 'false'
   },
