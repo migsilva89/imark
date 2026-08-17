@@ -134,15 +134,17 @@ headings, prose, `code` and links all render. A release published with `--notes
 The site also reads the version and the `.dmg` size from the same release, so
 there is nothing to edit there by hand.
 
-## Last step: refresh the site
+## The site catches up on its own
 
-The site holds what it read from GitHub for a day. Until that expires — or until
-something else deploys — the download button still hands out the *previous*
-`.dmg`, which is the version people get while believing they have the new one.
+Nothing to do here. `imark-site` runs a workflow every half hour that reads the
+latest release, writes the version and the `.dmg` size into `lib/release.json`
+when the number has moved, and that commit is what makes Vercel rebuild
+imarkmd.com. Redeploying by hand used to be the last step of a release; it is
+not one any more.
 
-So after publishing, hit **Redeploy** on the site's latest production deployment
-in Vercel. It takes seconds, and it is the only part of a release that nothing
-else will do for you.
+To watch it, or to stop waiting for the half hour:
 
-Skipping it is not fatal: it corrects itself within twenty-four hours. It is the
-gap in between that costs somebody a download of the wrong version.
+```bash
+gh run list --repo migsilva89/imark-site --limit 3
+gh workflow run check-release.yml --repo migsilva89/imark-site
+```

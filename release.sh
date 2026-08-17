@@ -148,14 +148,14 @@ fi
 step "done"
 printf '\033[1;32m✓ %s (%s)\033[0m\n' "$DMG" "$(du -h "$DMG" | cut -f1)"
 
-# The two things a built image does not do by itself. Homebrew reads a cask in
+# The one thing a built image does not do by itself. Homebrew reads a cask in
 # another repository, and it goes on installing the previous version until that
 # file is written — which is the one way somebody downloads an old Imark while
-# being told it is the new one.
+# being told it is the new one. The site is not on this list: imark-site reads
+# the releases here twice an hour and rebuilds itself when the number moves.
 cat <<-EOF
 
 	then, to publish:
 	  gh release create v$VERSION "$DMG" --title "Imark $VERSION" --notes "…"
 	  Support/tap.sh          point Homebrew at it
-	  Vercel › Redeploy       so the site stops serving the previous .dmg
 EOF
