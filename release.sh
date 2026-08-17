@@ -70,6 +70,7 @@ if [ "${1:-}" != "--force" ]; then
 		-o /tmp/imark-release-update >/dev/null 2>&1 \
 		&& /tmp/imark-release-update >/dev/null || die "the update comparison tests failed"
 	swift Support/test-plus.swift >/dev/null 2>&1 || die "the margin button tests failed"
+	swift Support/test-front-matter.swift >/dev/null 2>&1 || die "the front matter tests failed"
 	Support/test-review.sh >/dev/null 2>&1 || die "the review round trip tests failed"
 	# test-setup.sh needs an assembled app, so it runs after the build instead.
 

@@ -85,6 +85,10 @@ public final class RendererView: NSView {
     private let bridge = Bridge()
     private var previewMode = false
     private var railSide: String?
+    /// Whether the front matter card is drawn. Shown unless something says
+    /// otherwise, so Quick Look and anything else that never sets it keep the
+    /// behaviour they have always had.
+    private var frontMatter = true
 
     /// Which palette to ask the page for on each side of the system's light and
     /// dark switch. The names are `[data-theme]` values in the stylesheet, and
@@ -141,6 +145,7 @@ public final class RendererView: NSView {
             // call lands before the page is ready and is silently dropped.
             "preview": previewMode,
             "rail": railSide ?? "",
+            "frontMatter": frontMatter,
         ])
     }
 
@@ -169,6 +174,14 @@ public final class RendererView: NSView {
 
     public func setWidth(_ name: String) {
         call("window.imark.setWidth", name)
+    }
+
+    /// Shows or hides the front matter card. Remembered here as well as sent,
+    /// because the next document is rendered from scratch and would otherwise
+    /// come back with the card the reader had just put away.
+    public func setFrontMatter(_ shown: Bool) {
+        frontMatter = shown
+        call("window.imark.setFrontMatter", shown)
     }
 
     /// Quick Look shows the same document in a much smaller panel: tighter

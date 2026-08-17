@@ -605,6 +605,10 @@ pre code {
 
 .fm-chip + .fm-chip::before { content: ', '; color: var(--secondary); }
 
+/* Put away from the View menu. The card is still in the page — the document
+   underneath it is untouched, so nothing anchored in it moves. */
+:root[data-front-matter='hidden'] .front-matter { display: none; }
+
 /* -------------------------------------------------------------- diagrams */
 
 .mermaid-block {

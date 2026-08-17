@@ -518,6 +518,9 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         case #selector(chooseWidth(_:)):
             item.state = (item.representedObject as? String) == Settings.width.rawValue ? .on : .off
             return true
+        case #selector(toggleFrontMatter(_:)):
+            item.state = Settings.showsFrontMatter ? .on : .off
+            return true
         case #selector(nextComment(_:)), #selector(previousComment(_:)),
              #selector(exportComments(_:)):
             return noteCount > 0
@@ -545,6 +548,13 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         guard let width = Settings.Width(rawValue: sender.representedObject as? String ?? "") else { return }
         Settings.width = width
         content.renderer.setWidth(width.rawValue)
+    }
+
+    /// Shows or hides the card the front matter is drawn in. The document is not
+    /// rendered again: the page only stops drawing the card, so the file, its
+    /// line numbers and every note anchored in it stay exactly as they were.
+    @objc func toggleFrontMatter(_ sender: Any?) {
+        Settings.showsFrontMatter.toggle()
     }
 
     /// System → Light → Dark → System. The button announces the change, every
@@ -621,6 +631,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         content.renderer.applyTheme()
         content.renderer.setTextScale(Settings.textScale)
         content.renderer.setWidth(Settings.width.rawValue)
+        content.renderer.setFrontMatter(Settings.showsFrontMatter)
         refreshThemeButton()
     }
 
