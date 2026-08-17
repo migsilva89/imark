@@ -11,7 +11,7 @@ import crypto from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { pathToFileURL } from 'node:url'
+import { fileURLToPath } from 'node:url'
 
 const OPEN_LINE = /^\s*<!--\s*imark\b/
 const CLOSE_LINE = /^\s*-->\s*$/
@@ -642,8 +642,23 @@ async function cmdPlanHook() {
 // Only when run as a command. This file exports its parser so tests can reach
 // it, and without the guard importing it ran the dispatch, printed the usage
 // line, and left the exports unusable for the thing they exist for.
+//
+// Both sides are resolved first, because the loader hands over the real path
+// while the caller's is the one they typed. Through a link the two differ — and
+// on macOS /tmp is itself a link — so the guard read a plain invocation as an
+// import: no window, no error, exit 0, and an agent told the review was over
+// before it began. If a path cannot be resolved it is compared as given, which
+// is the behaviour that was there before.
+const realPath = (file) => {
+  try {
+    return fs.realpathSync(file)
+  } catch {
+    return file
+  }
+}
+
 const invoked = process.argv[1]
-  && import.meta.url === pathToFileURL(process.argv[1]).href
+  && realPath(fileURLToPath(import.meta.url)) === realPath(process.argv[1])
 
 if (invoked) {
   const [command, ...argv] = process.argv.slice(2)
