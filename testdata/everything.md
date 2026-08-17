@@ -214,6 +214,14 @@ $$
 That one is real: it is the curve the outline rail uses to taper around wherever
 you are pointing, with $\sigma = 1.15$.
 
+An equation may also be broken over as many lines as it takes to stay readable,
+and the subscripts in it are subscripts rather than italics:
+
+$$ \mathbf{K}_e^L = \mathbf{K}_m^L
++ \mathbf{K}_b^L $$
+
+And a dollar sign on its own is money: the licence costs $0 and always will.
+
 ## Definition lists
 
 Orphan

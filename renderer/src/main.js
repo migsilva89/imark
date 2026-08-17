@@ -7,9 +7,9 @@ import mark from 'markdown-it-mark'
 import hljs from 'highlight.js'
 import { load as parseYaml } from 'js-yaml'
 import katex from 'katex'
-import renderMathInElement from 'katex/contrib/auto-render'
 import mermaid from 'mermaid'
 
+import math from './math.js'
 import wikilink from './wikilink.js'
 import {
   attachComments,
@@ -116,6 +116,14 @@ const stampLines = (token) => {
   token.attrSet('data-line', `${token.map[0] + lineOffset},${token.map[1] + lineOffset}`)
 }
 
+// For the blocks whose HTML is built by hand below, which never reach
+// renderToken and so have to be given the same attribute themselves.
+const lineAttr = (token) =>
+  token.map ? ` data-line="${token.map[0] + lineOffset},${token.map[1] + lineOffset}"` : ''
+
+// Down here rather than in the chain above only because it needs lineAttr.
+md.use(math, { lines: lineAttr })
+
 const defaultRenderToken = md.renderer.renderToken.bind(md.renderer)
 md.renderer.renderToken = (tokens, idx, options) => {
   if (tokens[idx].nesting !== -1) stampLines(tokens[idx])
@@ -175,9 +183,7 @@ md.renderer.rules.fence = (tokens, idx, options, env, self) => {
   const info = (token.info || '').trim().split(/\s+/)[0]
   // Built by hand rather than through renderToken, so the offset has to be
   // applied here too — this is exactly where it was forgotten once already.
-  const lines = token.map
-    ? ` data-line="${token.map[0] + lineOffset},${token.map[1] + lineOffset}"`
-    : ''
+  const lines = lineAttr(token)
   if (info === 'mermaid') {
     return `<div class="mermaid-block"${lines} data-graph="${encodeURIComponent(token.content)}"></div>`
   }
@@ -307,25 +313,6 @@ async function renderMermaid(root, theme) {
         error?.message ?? error,
       )}</pre></div>`
     }
-  }
-}
-
-/* ------------------------------------------------------------------ math */
-
-function renderMath(root) {
-  try {
-    renderMathInElement(root, {
-      delimiters: [
-        { left: '$$', right: '$$', display: true },
-        { left: '\\[', right: '\\]', display: true },
-        { left: '$', right: '$', display: false },
-        { left: '\\(', right: '\\)', display: false },
-      ],
-      ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
-      throwOnError: false,
-    })
-  } catch {
-    /* math is best-effort */
   }
 }
 
@@ -803,7 +790,6 @@ async function render({ markdown, path, theme, preview, rail }) {
   matchIndex = -1
 
   addCopyButtons(root)
-  renderMath(root)
   activeHeadings = buildToc(root)
   buildRail(root)
   // After the outline rail, never before: the marks are placed against its

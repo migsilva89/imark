@@ -7,6 +7,7 @@
     "build": "node build.mjs"
   },
   "dependencies": {
+    "@vscode/markdown-it-katex": "^1.1.2",
     "highlight.js": "^11.10.0",
     "js-yaml": "^5.2.3",
     "katex": "^0.16.11",

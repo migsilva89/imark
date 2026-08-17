@@ -663,6 +663,11 @@ img[data-blocked] {
 
 .katex { font-size: 1.05em; }
 .katex-display { overflow-x: auto; overflow-y: hidden; padding: 4px 0; }
+/* A display equation written inside a sentence is a span, not a paragraph, so
+   that the sentence around it is not cut in two. It still owns its own line. */
+.katex-block { display: block; }
+/* The message KaTeX leaves in place of a formula it could not read. */
+.katex-error { color: var(--note-red); }
 
 /* --------------------------------------------------- Quick Look preview */
 

@@ -66,6 +66,7 @@ if [ "${1:-}" != "--force" ]; then
 	node Support/test-export.mjs >/dev/null 2>&1 || die "the export test failed"
 	node Support/test-notes.mjs >/dev/null 2>&1 || die "the note anchoring tests failed"
 	node Support/test-invocation.mjs >/dev/null 2>&1 || die "the plugin invocation tests failed"
+	node Support/test-math.mjs >/dev/null 2>&1 || die "the math tests failed"
 	swift build >/dev/null 2>&1 \
 		&& swiftc -parse-as-library -I .build/debug/Modules \
 			$(find Sources/Imark -name '*.swift' ! -name main.swift) \
