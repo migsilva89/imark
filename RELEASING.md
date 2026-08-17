@@ -40,7 +40,19 @@ It is stored once and stays in the keychain. Nothing about it belongs in a file.
 
 ## Every release
 
-Bump `CFBundleShortVersionString` in `Support/Imark-Info.plist`, commit, push.
+Set the version, commit, push:
+
+```bash
+Support/bump.sh 0.2.4
+```
+
+The version is written in four files — the app, the Quick Look extension and the
+two manifests Claude Code reads to install the plugin — and one command writes
+all four. `Support/bump.sh --check` says whether they agree; the release refuses
+to build when they do not, because the marketplace would go on offering an old
+number for a new app. Nothing else needs editing: the site reads the version,
+the notes and the `.dmg` size off the GitHub release.
+
 Then:
 
 ```bash
@@ -88,6 +100,25 @@ gh release create v0.1.0 dist/Imark-0.1.0.dmg --title "Imark 0.1.0" --notes "…
 
 GitHub does not serve release assets from a private repository, so the repo has
 to be public before the download link works for anyone else.
+
+## Homebrew
+
+`brew install --cask migsilva89/imark/imark` reads a single file in a second
+repository — `Casks/imark.rb` in `migsilva89/homebrew-imark` — which names a
+version and the checksum of its `.dmg`. Publishing the release does not touch
+it. One command does, once the release is up:
+
+```bash
+Support/tap.sh
+```
+
+It takes the checksum from the asset as GitHub serves it — the bytes `brew`
+downloads — writes the two lines, pushes, and reads the file back to confirm.
+`Support/tap.sh --check` says which version Homebrew is handing out right now.
+
+Skipping it is the worst of the three misses: the website and the in-app update
+offer the new version while `brew upgrade` quietly installs the old one and
+reports success.
 
 ## The notes are the changelog
 
