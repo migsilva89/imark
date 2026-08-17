@@ -19,11 +19,92 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
             self?.showWelcomeIfEmpty()
         }
+        // Written straight away, and said a moment later. An agent could be
+        // reading the skill at any time, so the files are not left stale while a
+        // timer runs; the sentence about it can wait for the window.
+        refreshAgentFiles()
         // Well after launch: an update dialog that beats the document to the
         // screen makes the update feel more important than the reading.
         DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
             Updates.checkQuietly()
         }
+    }
+
+    // MARK: - Agent files
+
+    /// The agent files are copies that live in other programs' folders, and a
+    /// copy goes stale. Imark does not install itself, so the first launch of a
+    /// new version is the first moment new code runs and the only place the
+    /// refresh can happen. See AgentSetup.refresh for what it will and will not
+    /// overwrite.
+    private func refreshAgentFiles() {
+        guard Settings.agentFilesVersion != Updates.current else { return }
+        // Nothing of ours out there to bring forward. Left unrecorded on
+        // purpose, so the day somebody does set up, the next launch checks.
+        guard AgentSetup.hasInstalledFiles else { return }
+        guard let report = try? AgentSetup.refresh() else { return }
+        Settings.agentFilesVersion = Updates.current
+        // Copies replaced by newer copies of the same thing is the whole point
+        // of the refresh, and nobody asked for a dialog about it. The one case
+        // worth a sentence is a file left alone, because that one leaves the
+        // person with something only they can decide.
+        guard !report.kept.isEmpty else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
+            self?.reportKeptAgentFiles(report)
+        }
+    }
+
+    /// The files somebody edited themselves, said once: their copy stays, and it
+    /// is now a version behind the app that reads it. Not phrased as a failure —
+    /// nothing failed, and keeping their work was the right thing to do — but
+    /// they are the only ones who can decide what to do about the difference.
+    private func reportKeptAgentFiles(_ report: AgentSetup.Refresh) {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        func list(_ files: [URL]) -> String {
+            files
+                .map { $0.path.replacingOccurrences(of: home, with: "~") }
+                .joined(separator: "\n")
+        }
+
+        // One file or several changes every clause in these sentences, so both
+        // are written out whole rather than stitched together from fragments.
+        // Stitched, the singular came out as "These has changes of your own in
+        // it", which is what reading it on screen showed.
+        let one = report.kept.count == 1
+        var lines = [
+            one
+                ? "Imark \(Updates.current) has newer instructions for your coding agents. This "
+                    + "file has changes of your own in it, so Imark left it exactly as it was:"
+                : "Imark \(Updates.current) has newer instructions for your coding agents. These "
+                    + "files have changes of your own in them, so Imark left them exactly as "
+                    + "they were:",
+            "",
+            list(report.kept),
+            "",
+            one
+                ? "Your agent goes on reading your version, so it is following the older "
+                    + "instructions. Imark's own copy is inside the app, in "
+                    + "Contents/Resources/agent, if you want to bring your changes across."
+                : "Your agent goes on reading your versions, so it is following the older "
+                    + "instructions. Imark's own copies are inside the app, in "
+                    + "Contents/Resources/agent, if you want to bring your changes across.",
+        ]
+        if !report.updated.isEmpty {
+            lines += [
+                "",
+                report.updated.count == 1
+                    ? "The other file was still Imark's own, untouched, so it was brought up to date."
+                    : "The other files were still Imark's own, untouched, so they were brought "
+                        + "up to date.",
+            ]
+        }
+
+        let alert = NSAlert()
+        alert.messageText = report.kept.count == 1
+            ? "One agent file was left as you had it"
+            : "\(report.kept.count) agent files were left as you had them"
+        alert.informativeText = lines.joined(separator: "\n")
+        alert.runModal()
     }
 
     @objc func checkForUpdates(_ sender: Any?) { Updates.checkNow() }

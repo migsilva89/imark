@@ -1,0 +1,34 @@
+# Every version of the agent files Imark has ever shipped, one line per version:
+# the SHA-256 of the file as it lives in plugin/, followed by the name it takes
+# inside the app bundle's agent folder.
+#
+# It exists so that the app can tell its own stale copy from somebody's edit.
+# When a new version rewrites the copies in ~/.claude and ~/.codex it only
+# touches a file whose contents are on this list — that file is ours, nobody's
+# work is in it, and it can be replaced without asking. Anything else is an edit
+# somebody made, and an edit is theirs to keep even when it is out of date.
+#
+# build.sh appends the hash of whatever it is about to put in the bundle, so a
+# release records itself. Lines are never removed: a line that goes away is a
+# person whose old copy stops being recognised and stops being brought forward.
+#
+# The hashes are of the file with `${CLAUDE_PLUGIN_ROOT}` still in it, which is
+# what the installer puts back before hashing an installed copy — otherwise the
+# same shipped file would hash differently on every machine, depending on where
+# the app happens to live.
+
+# v0.1.0
+3e9df18d0d6b6f23f6821fb22887219a0be37af5e9e48ea98669bb10db8bf6a6  SKILL.md
+480313d8f96f93b59716cfbd43047ff97e20f483ebd0f31ecd697c8d88797a1e  commands/imark-review.md
+f2bdf21a4a2211238b2ecf5b88153d931cf047bb8397a387c686e8ada02b6326  commands/imark-notes.md
+
+# v0.2.0
+47d27a8cb0af7d14b2a42ddc7ab47c74b09b5337d59a825948402b60153aab2a  SKILL.md
+132e71badebf17bd01d9ec0e510ece14ab41692e3a829e3ed36096246d13517c  commands/imark-review.md
+
+# v0.2.1, unchanged through v0.2.2
+aba6977f2c360fb6b5df3179298a26a4c8a6dbb60250c97187f4c14c7aed432b  SKILL.md
+fff991c12c6598dc9517600672bff649310296e7d953f78465ea72a86a463419  commands/imark-notes.md
+
+# v0.2.3
+506f016829d1de7c619f8d5eee651f6053fe67d901ef25324051e9fc18270f01  commands/imark-review.md
