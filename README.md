@@ -169,6 +169,11 @@ names every file before writing it, and undoing it is deleting those. Claude Cod
 and Codex read the same `SKILL.md`; only Claude Code also takes the two loose
 commands.
 
+Those files are copies, so a new version of Imark brings them forward on its
+first launch and says which ones it rewrote. A copy you edited yourself is never
+overwritten — Imark only replaces a file that still matches something it shipped,
+and tells you the rest were left alone.
+
 ## What it touches
 
 | Where | What, and when |
@@ -176,7 +181,7 @@ commands.
 | The `.md` you are reading | only when you comment. Written to a temporary file beside it and moved into place; it refuses to save at all if the document changed on disk since Imark read it |
 | `~/.imark/pending` | while an agent is waiting on a review: which document, and what you decided. Deleted when the agent reads it |
 | `~/Library/Preferences/pt.miguelsilva.imark.plist` | your settings — theme, text size, width, the update check |
-| `~/.claude/skills`, `~/.codex/skills`, … | only if you accept the offer to set up your coding agents, and only the files the alert names |
+| `~/.claude/skills`, `~/.codex/skills`, … | only if you accept the offer to set up your coding agents, and only the files the alert names. A new version rewrites those same files once, on its first launch, unless you edited them |
 | The network | one request a day to `api.github.com` asking whether a newer version exists. A version number travels, nothing of yours does, and Settings turns it off |
 
 > [!IMPORTANT]

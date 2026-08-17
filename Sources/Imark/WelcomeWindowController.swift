@@ -203,6 +203,9 @@ final class WelcomeWindowController: NSWindowController {
 
         do {
             try AgentSetup.install()
+            // What is on disk is this version's copy, so the refresh on the next
+            // launch has nothing to bring forward until the next update.
+            Settings.agentFilesVersion = Updates.current
         } catch {
             let failure = NSAlert()
             failure.messageText = "Imark couldn't set that up."

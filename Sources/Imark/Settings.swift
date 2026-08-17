@@ -215,6 +215,14 @@ enum Settings {
         set { store.set(newValue, forKey: "offeredUpdate") }
     }
 
+    /// The version of Imark whose copies of the agent files are on disk. It is
+    /// what tells the first launch after an update from every launch after that,
+    /// which is when those copies get brought forward. See AgentSetup.refresh.
+    static var agentFilesVersion: String {
+        get { store.string(forKey: "agentFilesVersion") ?? "" }
+        set { store.set(newValue, forKey: "agentFilesVersion") }
+    }
+
     static func applyThemeToApp() {
         NSApp.appearance = theme.appearance
     }

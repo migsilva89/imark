@@ -112,6 +112,23 @@ cp "$ROOT/plugin/scripts/imark.mjs" "$APP/Contents/Resources/agent/imark.mjs"
 cp "$ROOT/plugin/skills/imark-comments/SKILL.md" "$APP/Contents/Resources/agent/SKILL.md"
 cp "$ROOT"/plugin/commands/*.md "$APP/Contents/Resources/agent/commands/"
 
+# The app rewrites those copies on the first launch of a new version, and it has
+# to know which files out there are its own before it overwrites anything. So
+# every version it ships gets its hash recorded here, once, and the record
+# travels in the bundle. A build that forgot this would ship an app that
+# recognises nothing and therefore refreshes nothing.
+SHIPPED="$ROOT/Support/shipped-agent-files.txt"
+record_shipped() {
+	local name="$1" file="$2" hash
+	hash="$(shasum -a 256 "$file" | cut -d' ' -f1)"
+	grep -qF "$hash  $name" "$SHIPPED" || printf '%s  %s\n' "$hash" "$name" >> "$SHIPPED"
+}
+record_shipped "SKILL.md" "$ROOT/plugin/skills/imark-comments/SKILL.md"
+for command in "$ROOT"/plugin/commands/*.md; do
+	record_shipped "commands/$(basename "$command")" "$command"
+done
+cp "$SHIPPED" "$APP/Contents/Resources/agent/shipped.txt"
+
 # macOS shows Credits.html in the standard About panel on its own, so the
 # third-party notices travel with the binary without a line of UI code.
 if [ -f "$ROOT/Support/Credits.html" ]; then
