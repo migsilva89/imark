@@ -5,7 +5,7 @@
   },
   "metadata": {
     "description": "Review plans, diffs and documents in Imark, the offline macOS markdown reader.",
-    "version": "0.1.0"
+    "version": "0.2.3"
   },
   "plugins": [
     {

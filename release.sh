@@ -52,6 +52,12 @@ if [ "${1:-}" != "--force" ]; then
 			|| die "main and origin/main have diverged — push or pull first"
 	fi
 
+	# The app, the Quick Look extension and the two plugin manifests all carry
+	# the version, and nothing complains when one of them stays behind — the
+	# marketplace just keeps offering an old number for a new build.
+	Support/bump.sh --check >/dev/null \
+		|| die "the version is not the same in every file — see above"
+
 	# The suites, because a signed and notarised broken build is worse than an
 	# unsigned one: it carries somebody's name and opens without a warning.
 	swiftc -parse-as-library Sources/Imark/Comments.swift Sources/Imark/NoteColour.swift \
@@ -138,3 +144,15 @@ fi
 
 step "done"
 printf '\033[1;32m✓ %s (%s)\033[0m\n' "$DMG" "$(du -h "$DMG" | cut -f1)"
+
+# The two things a built image does not do by itself. Homebrew reads a cask in
+# another repository, and it goes on installing the previous version until that
+# file is written — which is the one way somebody downloads an old Imark while
+# being told it is the new one.
+cat <<-EOF
+
+	then, to publish:
+	  gh release create v$VERSION "$DMG" --title "Imark $VERSION" --notes "…"
+	  Support/tap.sh          point Homebrew at it
+	  Vercel › Redeploy       so the site stops serving the previous .dmg
+EOF
