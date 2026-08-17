@@ -42,6 +42,7 @@ enum CommentsTest {
 
         try placement()
         try ordering()
+        try fencedExamples()
         try escaping()
         try conflict()
         try atomicity()
@@ -96,6 +97,68 @@ enum CommentsTest {
         let middle = try Comments.insert(quote: "Two", body: "b", after: 6, occurrence: 1,
                                          by: "m", on: date, into: url, expecting: nil)
         check("a note between them counts only what precedes it", middle == 1, "got \(middle)")
+    }
+
+    // MARK: - A document that shows the format
+
+    /// The index insert returns is the note's place in the list the renderer
+    /// builds, and the renderer skips fenced examples. Counting one here would
+    /// open the note above the one that was just written.
+    static func fencedExamples() throws {
+        let example = """
+        # Doc
+
+        Nobody commented on this document.
+
+        ```markdown
+        <!-- imark quote="a phrase" by="john" at="2026-08-02T14:31Z"
+        An example, not a note.
+        -->
+        ```
+        """
+
+        let fenced = fixture(example)
+        let first = try Comments.insert(quote: "Doc", body: "n", after: 1, occurrence: 1,
+                                        by: "m", on: date, into: fenced, expecting: nil)
+        check("a note inside a fence is not counted", first == 0, "got \(first)")
+
+        let after = fixture("""
+        \(example)
+
+        <!-- imark quote="Nobody commented" by="m" at="2026-08-02T14:31Z"
+        A real one, below the example.
+        -->
+        """)
+        let below = try Comments.insert(quote: "Doc", body: "n", after: 99, occurrence: 1,
+                                        by: "m", on: date, into: after, expecting: nil)
+        check("a real note after an example still counts", below == 1, "got \(below)")
+
+        // The fence never closes, so it is not a fence, and the note in it is a
+        // note. Anything else loses every note below an unclosed fence.
+        let unclosed = fixture("""
+        # Doc
+
+        ```markdown
+        <!-- imark quote="Doc" by="m" at="2026-08-02T14:31Z"
+        Somebody is still typing the block.
+        -->
+        """)
+        let past = try Comments.insert(quote: "Doc", body: "n", after: 99, occurrence: 1,
+                                       by: "m", on: date, into: unclosed, expecting: nil)
+        check("an unclosed fence hides nothing", past == 1, "got \(past)")
+
+        let tildes = fixture("""
+        # Doc
+
+        ~~~markdown
+        <!-- imark quote="a phrase" by="john" at="2026-08-02T14:31Z"
+        An example, not a note.
+        -->
+        ~~~
+        """)
+        let beside = try Comments.insert(quote: "Doc", body: "n", after: 99, occurrence: 1,
+                                         by: "m", on: date, into: tildes, expecting: nil)
+        check("a tilde fence counts as a fence", beside == 0, "got \(beside)")
     }
 
     // MARK: - Text that could break the block

@@ -15,6 +15,49 @@ const bridge = (payload) => {
 const OPEN = /^\s*<!--\s*imark\b(.*)$/
 const ATTR = /(\w+)="([^"]*)"/g
 
+/// A code fence, the way CommonMark draws one: a run of three or more backticks
+/// or tildes, indented by no more than three spaces. The run itself is captured
+/// because a fence closes only with the same character and at least as long a
+/// run — a ```` line inside a ``` block is content, not the end of it.
+const FENCE = /^ {0,3}(`{3,}|~{3,})(.*)$/
+
+const closesFence = (line, opening) => {
+  const fence = FENCE.exec(line)
+  return (
+    !!fence &&
+    fence[1][0] === opening[0] &&
+    fence[1].length >= opening.length &&
+    // A closing fence carries nothing else; anything after the run is an info
+    // string, which only an opening fence may have.
+    fence[2].trim() === ''
+  )
+}
+
+/// The lines of every closed code fence, the fences included. A note inside one
+/// is an example of the format, not a note: a document that teaches the format —
+/// this project's README does — otherwise grows a note by an author nobody has
+/// met, counted in the status bar and handed to an agent in a review.
+///
+/// A fence that never closes is not a fence, it is somebody mid-sentence. Taking
+/// it at its word would swallow the rest of the document and every real note in
+/// it, without saying so. Kept in step with plugin/scripts/imark.mjs, which has
+/// to answer the same question about the same file.
+function fencedLines(lines) {
+  const fenced = new Set()
+  for (let index = 0; index < lines.length; index += 1) {
+    const open = FENCE.exec(lines[index])
+    if (!open) continue
+
+    let end = index + 1
+    while (end < lines.length && !closesFence(lines[end], open[1])) end += 1
+    if (end >= lines.length) continue
+
+    for (let i = index; i <= end; i += 1) fenced.add(i)
+    index = end
+  }
+  return fenced
+}
+
 /// The colours a note may carry. A closed set on purpose: the value comes out
 /// of somebody's file and ends up in a `data-color` attribute, so anything
 /// unrecognised has to become the default rather than reach the stylesheet.
@@ -29,10 +72,11 @@ const colourOf = (raw) => (COLOURS.has(raw) ? raw : '')
 export function extractComments(body, lineOffset = 0) {
   const lines = body.split('\n')
   const comments = []
+  const fenced = fencedLines(lines)
 
   for (let index = 0; index < lines.length; index += 1) {
     const open = OPEN.exec(lines[index])
-    if (!open) continue
+    if (!open || fenced.has(index)) continue
 
     let end = index
     while (end < lines.length && !lines[end].includes('-->')) end += 1
@@ -751,10 +795,12 @@ window.addEventListener('resize', () => buildNoteRail())
 export function toVisibleText(source) {
   const lines = source.split('\n')
   const out = []
+  const fenced = fencedLines(lines)
 
   for (let index = 0; index < lines.length; index += 1) {
     const open = OPEN.exec(lines[index])
-    if (!open) {
+    // A fenced example is prose about the format and comes out as it went in.
+    if (!open || fenced.has(index)) {
       out.push(lines[index])
       continue
     }

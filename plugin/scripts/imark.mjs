@@ -16,6 +16,51 @@ import { pathToFileURL } from 'node:url'
 const OPEN_LINE = /^\s*<!--\s*imark\b/
 const CLOSE_LINE = /^\s*-->\s*$/
 
+// A code fence, the way CommonMark draws one: three or more backticks or tildes,
+// indented by no more than three spaces. The run is captured because a fence
+// closes only with the same character and at least as long a run.
+const FENCE_LINE = /^ {0,3}(`{3,}|~{3,})(.*)$/
+
+const closesFence = (line, opening) => {
+  const fence = FENCE_LINE.exec(line)
+  return (
+    !!fence &&
+    fence[1][0] === opening[0] &&
+    fence[1].length >= opening.length &&
+    // Only an opening fence may carry an info string.
+    fence[2].trim() === ''
+  )
+}
+
+/**
+ * The lines of every closed code fence, the fences included.
+ *
+ * A note inside one is an example of the format, not a note. Without this a
+ * document that teaches the format hands the agent feedback nobody wrote — and a
+ * fenced example whose `quote=` happens to be one of the deciding words would
+ * end a review with nobody having pressed anything.
+ *
+ * A fence that never closes is not a fence, it is somebody mid-sentence: taking
+ * it at its word would drop every real note below it in silence. The renderer
+ * asks the same question of the same file in renderer/src/comments.js, so the
+ * two have to answer it alike.
+ */
+function fencedLines(lines) {
+  const fenced = new Set()
+  for (let i = 0; i < lines.length; i++) {
+    const open = FENCE_LINE.exec(lines[i])
+    if (!open) continue
+
+    let end = i + 1
+    while (end < lines.length && !closesFence(lines[end], open[1])) end++
+    if (end >= lines.length) continue
+
+    for (let j = i; j <= end; j++) fenced.add(j)
+    i = end
+  }
+  return fenced
+}
+
 // The words the reviewer comments on to end the wait. Written into every review
 // document, in the document, so nobody has to remember them.
 //
@@ -94,9 +139,10 @@ export function parseNotes(source) {
   const lines = source.split('\n')
   const notes = []
   const inside = new Set()
+  const fenced = fencedLines(lines)
 
   for (let i = 0; i < lines.length; i++) {
-    if (!OPEN_LINE.test(lines[i])) continue
+    if (!OPEN_LINE.test(lines[i]) || fenced.has(i)) continue
 
     const attrs = attributes(lines[i])
     const body = []
