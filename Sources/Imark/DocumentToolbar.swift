@@ -12,7 +12,6 @@ private extension NSToolbarItem.Identifier {
     static let editMode = NSToolbarItem.Identifier("editMode")
     static let save = NSToolbarItem.Identifier("save")
     static let revert = NSToolbarItem.Identifier("revert")
-    static let ask = NSToolbarItem.Identifier("ask")
     static let reviewSendBack = NSToolbarItem.Identifier("reviewSendBack")
     static let reviewApprove = NSToolbarItem.Identifier("reviewApprove")
 }
@@ -55,8 +54,12 @@ extension DocumentWindowController: NSToolbarDelegate {
         // a theme paints the rendered document, and a comment is written onto a
         // phrase in it. What it gains is the two ways out of a dirty buffer.
         if editMode {
+            // Open in… stays: handing the file to Cursor, VS Code or Claude is
+            // exactly what somebody who has just opened it as text may want next,
+            // and it is this app's whole answer to "can it also do X" — it cannot,
+            // and it knows who can.
             return [.toggleSidebar, .sidebarTrackingSeparator, .flexibleSpace,
-                    .editMode, .ask, .find, .revert, .save]
+                    .editMode, .find, .openIn, .revert, .save]
         }
         guard Review.isReview(url) else { return reading }
 
@@ -114,7 +117,6 @@ extension DocumentWindowController: NSToolbarDelegate {
         case .comments: return noteCount > 0
         // Both are about text that is not in the file yet.
         case .save, .revert: return editMode && content.editor.isDirty
-        case .ask: return Assistants.anyInstalled
         default: return true
         }
     }
@@ -178,31 +180,6 @@ extension DocumentWindowController: NSToolbarDelegate {
             return button(identifier, symbol: "arrow.uturn.backward", label: "Revert",
                           tip: "Throw away your changes and read the file again",
                           action: #selector(revertDocument(_:)))
-
-        case .ask:
-            // A split button when there is more than one assistant on the
-            // machine: the face runs the one you used last, the chevron picks.
-            let item = NSMenuToolbarItem(itemIdentifier: identifier)
-            item.image = NSImage(systemSymbolName: "sparkles", accessibilityDescription: "Ask AI")
-            item.label = "Ask AI"
-            // Spelled out on the button itself, not only in the tooltip. The
-            // toolbar is icons everywhere else because everything else is a verb
-            // people already know; sparkles alone says nothing about what runs.
-            item.title = "Ask AI"
-            // One walk of the disk, shared with the menu: finding them means
-            // stat-ing a path list per assistant, and the menu names the same
-            // ones the tooltip counts.
-            let installed = Assistants.installed
-            item.toolTip = installed.isEmpty
-                ? "Install one of \(Assistants.builtinLabels.joined(separator: ", ")) to ask about this document"
-                : "Ask an assistant about this document, in a panel that writes nothing"
-            item.menu = assistantsMenu(installed)
-            item.showsIndicator = installed.count > 1
-            if !installed.isEmpty {
-                item.target = self
-                item.action = #selector(askAssistant(_:))
-            }
-            return item
 
         case .comments:
             // "Comments" alone names the subject, not the action, and left
@@ -279,26 +256,6 @@ extension DocumentWindowController: NSToolbarDelegate {
         default:
             return nil
         }
-    }
-
-    /// One entry per assistant found on the machine, in the order the registry
-    /// puts them: the built-ins it recognises first.
-    private func assistantsMenu(_ installed: [Assistants.CLI]) -> NSMenu {
-        let menu = NSMenu()
-        for cli in installed {
-            let item = menu.addItem(
-                withTitle: cli.label,
-                action: #selector(askAssistant(_:)),
-                keyEquivalent: ""
-            )
-            item.target = self
-            item.representedObject = cli.id
-            item.toolTip = "Runs \(cli.invocationDescription)"
-        }
-        if menu.items.isEmpty {
-            menu.addItem(withTitle: "No assistant CLI found", action: nil, keyEquivalent: "")
-        }
-        return menu
     }
 
     /// Wide enough to carry a word, because these two have to be read rather

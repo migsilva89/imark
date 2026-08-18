@@ -63,11 +63,8 @@ The app icon is drawn in code from the rules in the design document:
 swift Support/make-icon.swift
 ```
 
-Three helpers exist for looking at the UI without photographing the whole desktop.
-`Support/shoot.swift` renders a page in an off-screen web view;
-`Support/shoot-panel.swift` draws a panel of the app — the Ask sheet — into a PNG
-and prints every view's frame, which needs no screen-recording permission and is
-the only way to catch a sheet that lays out one point wide; and
+Two helpers exist for looking at the UI without photographing the whole desktop.
+`Support/shoot.swift` renders a page in an off-screen web view, and
 `Support/window-id.swift` resolves a window id so a screenshot can be taken of
 one window:
 

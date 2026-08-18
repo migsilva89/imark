@@ -59,7 +59,6 @@ enum EditorTest {
         try theEditorFollowsTheFile()
         try aSaveWillNotLandOnSomebodyElsesWork()
         try typingIsUndoneByTyping()
-        theAssistantThatWasNotThere()
 
         try? FileManager.default.removeItem(at: folder)
         print(failures == 0 ? "\nall good" : "\n\(failures) failing")
@@ -186,42 +185,6 @@ enum EditorTest {
               window.content.editor.text.contains("with my change"))
         window.close()
         spin(0.3)
-    }
-
-    /// Ask runs a CLI that may not be where we thought it was. When the launch
-    /// fails there is no process, and Close pressing Cancel on one that never
-    /// started is an uncaught exception — the app disappearing because a binary
-    /// moved.
-    static func theAssistantThatWasNotThere() {
-        print("▸ the assistant that was not there")
-        let missing = Assistants.CLI(
-            id: "nope", label: "Nothing",
-            executable: URL(fileURLWithPath: "/nowhere/at/all"),
-            argumentTemplate: "{prompt}"
-        )
-        let run = AssistantRun()
-        var threw = false
-        do {
-            _ = try run.run(missing, prompt: "hello", in: URL(fileURLWithPath: "/tmp"))
-        } catch {
-            threw = true
-        }
-        check("a CLI that is not there fails rather than hangs", threw)
-        // The line that used to take the app with it.
-        run.cancel()
-        check("and cancelling afterwards is survivable", true)
-
-        // A real one still answers, and answers with what it printed.
-        let echo = Assistants.CLI(
-            id: "echo", label: "echo",
-            executable: URL(fileURLWithPath: "/bin/echo"),
-            argumentTemplate: "{prompt}"
-        )
-        let result = try? AssistantRun().run(echo, prompt: "an answer", in: URL(fileURLWithPath: "/tmp"))
-        check("what the CLI printed comes back",
-              result?.output.trimmingCharacters(in: .whitespacesAndNewlines) == "an answer",
-              result?.output ?? "nil")
-        check("and it did not time out", result?.timedOut == false)
     }
 
     /// ⌘Z while the file is open as text means the typing, not the app's own undo

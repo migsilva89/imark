@@ -31,7 +31,6 @@
 ## What it does
 
 - **Editing, when you ask for it** — one switch in the toolbar, and the page becomes the file: line numbers, Markdown in colour, a bar beside every line you have changed, `⌘S` to write it. Reading is the state it opens in
-- **Ask an assistant** — while editing, ask whichever CLI you already have — Claude Code, Codex, Cursor, opencode — about the document. It runs with the login that CLI already has, so there is no key to enter, and it writes nothing: the answer comes back as text and you decide
 - **Comments in the file** — select, comment, edit or delete, and the note lives in the document as an HTML comment, so it survives being emailed, committed, or opened in anything else. `⌘Z` undoes any of it
 - **Quick Look previews** — the space bar in the Finder renders the document, not raw text, using the same engine as the app
 - **Live reload** — saving in your editor updates the view in under 300ms, keeping your scroll position, and it survives the delete-and-rename that editors call an atomic save
@@ -97,13 +96,11 @@ A save cannot land on somebody else's work: it goes through the same check every
 comment does, and if the file moved since Imark read it the save is refused and
 says so. `⌘Z` afterwards puts the document back the way it was.
 
-### Ask
-
-While editing, *Ask* runs a command-line assistant you already have — Claude
-Code, Codex, Cursor, opencode — in the document's own folder, and shows what it
-said. There is no API key in Imark and no account to make: the CLI carries its
-own login. It **writes nothing**. The answer is text in a panel; copying it into
-the editor is your keystroke, not the app's.
+*Open in…* stays in the toolbar while you edit, with Cursor, VS Code, Zed,
+Sublime — and Claude and ChatGPT — so the moment a change is bigger than a line,
+the file goes to something built for it. Imark runs nothing on your machine and
+asks nothing of your accounts; when you come back, the reader is where you left
+it, and the notes are still in the file.
 
 ## Comments
 

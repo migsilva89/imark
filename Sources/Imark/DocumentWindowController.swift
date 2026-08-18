@@ -28,7 +28,6 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     /// launches, because reading is what the app is for.
     private(set) var editMode = false
     private let commentsList = CommentsList()
-    private let askPanel = AskPanel()
     private var notes: [NoteSummary] = []
     private(set) var noteCount = 0
     /// Set while the composer is open for a note about the document rather than
@@ -564,26 +563,6 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         content.editor.load(text)
         refreshEditedDot()
         refreshSaveButtons()
-    }
-
-    /// The Ask button, and every entry in its menu. A menu item carries the id of
-    /// the assistant it names; the button itself carries none and means "the one
-    /// you used last".
-    @objc func askAssistant(_ sender: Any?) {
-        let chosen = (sender as? NSMenuItem)?.representedObject as? String
-        guard let cli = chosen.flatMap(Assistants.cli(id:)) ?? Assistants.preferred else {
-            let alert = NSAlert()
-            alert.messageText = "No assistant found on this Mac"
-            alert.informativeText = "Imark runs a command-line assistant you already have: "
-                + Assistants.builtinLabels.joined(separator: ", ")
-                + ". It uses whichever login that CLI already has, so there is no key to enter here."
-            alert.alertStyle = .informational
-            if let window { alert.beginSheetModal(for: window) } else { alert.runModal() }
-            return
-        }
-        Settings.preferredAssistant = cli.id
-        guard let window else { return }
-        askPanel.show(for: url, using: cli, in: window)
     }
 
     enum UnsavedAnswer { case save, discard, cancel }
