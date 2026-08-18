@@ -194,6 +194,13 @@ enum Settings {
 
     /// Path of the last editor used from "Open in", so the toolbar button can
     /// go straight there instead of guessing every time.
+    /// Which assistant the Ask button goes to, by id. Nothing stored means the
+    /// first one found on the machine.
+    static var preferredAssistant: String? {
+        get { store.string(forKey: "preferredAssistant") }
+        set { store.set(newValue, forKey: "preferredAssistant") }
+    }
+
     static var preferredEditor: URL? {
         get { store.string(forKey: "preferredEditor").map(URL.init(fileURLWithPath:)) }
         set { store.set(newValue?.path, forKey: "preferredEditor"); announce() }

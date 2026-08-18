@@ -52,6 +52,7 @@ enum CommentsTest {
         try undoing()
         try staleRanges()
         try colours()
+        try savingWholeDocument()
 
         try? FileManager.default.removeItem(at: folder)
         print(failures == 0 ? "\nall good" : "\n\(failures) failing")
@@ -371,5 +372,32 @@ enum CommentsTest {
         check("50 notes in a row, none lost", text.components(separatedBy: "<!-- imark").count == 51)
         check("and the document itself is still there",
               text.contains("Paragraph one.") && text.contains("Paragraph two."))
+    }
+
+    // MARK: - Editing document text
+
+    static func savingWholeDocument() throws {
+        let url = fixture("One.\n\nTwo.\n")
+        try Comments.save("One, edited.\n\nTwo.\n", to: url, expecting: Comments.Stamp(of: url))
+        check("the whole document is written",
+              try! String(contentsOf: url, encoding: .utf8) == "One, edited.\n\nTwo.\n")
+
+        // Somebody else wrote while the editor was open.
+        let raced = fixture("Theirs.\n")
+        let stamp = Comments.Stamp(of: raced)
+        try! "Somebody else's work.\n".write(to: raced, atomically: true, encoding: .utf8)
+        var refused = false
+        do { try Comments.save("mine\n", to: raced, expecting: stamp) }
+        catch Comments.Failure.fileChanged { refused = true } catch {}
+        check("a save over somebody else's write is refused", refused)
+        check("and their work is intact",
+              try! String(contentsOf: raced, encoding: .utf8) == "Somebody else's work.\n")
+
+        // The permissions and the creation date belong to the file, not to us.
+        let owned = fixture("Text.\n")
+        try! FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: owned.path)
+        try Comments.save("Text, edited.\n", to: owned, expecting: nil)
+        let mode = try! FileManager.default.attributesOfItem(atPath: owned.path)[.posixPermissions] as! NSNumber
+        check("an atomic save keeps the file's own permissions", mode.intValue == 0o600, "\(mode)")
     }
 }

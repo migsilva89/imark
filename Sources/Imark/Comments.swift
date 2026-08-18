@@ -110,17 +110,13 @@ enum Comments {
 
     /// Puts a whole document back, for undo.
     ///
-    /// This is the only write in the app that replaces a file wholesale, which
-    /// makes it the only one that can cost somebody a document rather than a
-    /// comment. It used to skip the staleness check on the grounds that the
-    /// caller took the snapshot and is the one asking for it back — true, but
-    /// only until something else writes in between. An editor saving over the
-    /// file, or a `git checkout`, and the snapshot is a way to erase it.
+    /// The same write as `save`, and deliberately so: it used to skip the
+    /// staleness check on the grounds that the caller took the snapshot and is
+    /// the one asking for it back — true, but only until something else writes in
+    /// between. An editor saving over the file, or a `git checkout`, and the
+    /// snapshot is a way to erase it.
     static func restore(_ text: String, to url: URL, expecting stamp: Stamp?) throws {
-        if let stamp, let now = Stamp(of: url), now != stamp {
-            throw Failure.fileChanged
-        }
-        try write(text, to: url)
+        try save(text, to: url, expecting: stamp)
     }
 
     /// A file can shrink under us — a stale range must not take neighbouring
@@ -182,6 +178,29 @@ enum Comments {
         lines.insert(contentsOf: block, at: at)
         try write(lines.joined(separator: "\n"), to: url)
         return index
+    }
+
+    // MARK: - Editing document text
+
+    /// Whether a line opens one of our own comment blocks. The renderer, the
+    /// plugin and this file all have to agree on what a note looks like, so the
+    /// test lives in one place rather than being spelled out at each use.
+    static func isNote(_ line: String) -> Bool {
+        line.range(of: #"^\s*<!--\s*imark\b"#, options: .regularExpression) != nil
+    }
+
+    /// The whole document, as somebody typed it in the editor.
+    ///
+    /// The only write in the app that replaces a file wholesale rather than a
+    /// block inside it, which makes it the only one that can cost somebody a
+    /// document rather than a comment. It refuses if the file moved since Imark
+    /// read it: an outside edit is somebody's work, and a buffer that was opened
+    /// before it is not a reason to erase it.
+    static func save(_ text: String, to url: URL, expecting stamp: Stamp?) throws {
+        if let stamp, let now = Stamp(of: url), now != stamp {
+            throw Failure.fileChanged
+        }
+        try write(text, to: url)
     }
 
     // MARK: - Shaping
@@ -266,9 +285,7 @@ enum Comments {
         let fenced = fencedLines(lines)
         return lines.indices.prefix(line)
             .filter { !fenced.contains($0) }
-            .filter {
-                lines[$0].range(of: #"^\s*<!--\s*imark\b"#, options: .regularExpression) != nil
-            }
+            .filter { isNote(lines[$0]) }
             .count
     }
 
