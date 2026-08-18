@@ -231,6 +231,7 @@ and tells you the rest were left alone.
 | `⌘P` | Print or export PDF | `⌘⇧C` | Show all comments |
 | `⌘'` / `⌘⇧'` | Next / previous comment | `⌘Z` | Undo the last change |
 | `⌘E` | Reading or editing | `⌘S` | Save the file |
+| `⌘X` / `⌘C` / `⌘V` | Cut, copy, paste | `⇧⌘Z` | Redo your typing |
 | `⌘/` | This table, in the app | | |
 
 `⌘/` opens the same list inside the app, built by reading the menu bar rather
@@ -277,9 +278,16 @@ it, with no error and no log entry.
 
 ### What does `⌘Z` undo?
 
-The last change to the document — a note written, edited or deleted — up to ten
-deep. Each one is a snapshot of the whole file taken before the change. It only
-covers changes Imark made; edits from your own editor are your editor's to undo.
+While reading: the last change to the document — a note written, edited or
+deleted — up to ten deep. Each one is a snapshot of the whole file taken before
+the change.
+
+While editing: the typing, like any editor, with `⇧⌘Z` to put it back. The two
+never mix, because putting a whole document back is not what `⌘Z` means with a
+caret on screen.
+
+Either way it only covers changes Imark made; edits from your own editor are your
+editor's to undo.
 
 ### What happens if two people comment on the same words?
 

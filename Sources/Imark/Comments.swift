@@ -186,7 +186,12 @@ enum Comments {
     /// plugin and this file all have to agree on what a note looks like, so the
     /// test lives in one place rather than being spelled out at each use.
     static func isNote(_ line: String) -> Bool {
-        line.range(of: #"^\s*<!--\s*imark\b"#, options: .regularExpression) != nil
+        // A plain substring search first. The editor's highlighter asks this of
+        // every line of the document on every keystroke, and building the pattern
+        // is the expensive half of asking — while a line with no `<!--` in it
+        // cannot match the pattern anyway.
+        guard line.contains("<!--") else { return false }
+        return line.range(of: #"^\s*<!--\s*imark\b"#, options: .regularExpression) != nil
     }
 
     /// The whole document, as somebody typed it in the editor.
@@ -197,8 +202,11 @@ enum Comments {
     /// read it: an outside edit is somebody's work, and a buffer that was opened
     /// before it is not a reason to erase it.
     static func save(_ text: String, to url: URL, expecting stamp: Stamp?) throws {
-        if let stamp, let now = Stamp(of: url), now != stamp {
-            throw Failure.fileChanged
+        // A vanished file is a changed file. Written as "no stamp to compare" this
+        // used to fall through and recreate the document from a buffer opened
+        // before somebody deleted or moved it.
+        if let stamp {
+            guard let now = Stamp(of: url), now == stamp else { throw Failure.fileChanged }
         }
         try write(text, to: url)
     }

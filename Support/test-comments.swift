@@ -393,6 +393,24 @@ enum CommentsTest {
         check("and their work is intact",
               try! String(contentsOf: raced, encoding: .utf8) == "Somebody else's work.\n")
 
+        // A file that was deleted or moved while the editor held it open.
+        let gone = fixture("Here for now.\n")
+        let goneStamp = Comments.Stamp(of: gone)
+        try! FileManager.default.removeItem(at: gone)
+        refused = false
+        do { try Comments.save("my buffer\n", to: gone, expecting: goneStamp) }
+        catch Comments.Failure.fileChanged { refused = true } catch {}
+        check("a save onto a file that vanished is refused", refused)
+        check("and it is not recreated from the buffer",
+              !FileManager.default.fileExists(atPath: gone.path))
+
+        // With no stamp there is nothing to compare against, and the caller is
+        // saying so — undo restoring a file it has just written, for instance.
+        let fresh = folder.appendingPathComponent("written-from-nothing.md")
+        try Comments.save("brand new\n", to: fresh, expecting: nil)
+        check("with no stamp, a save still writes",
+              (try? String(contentsOf: fresh, encoding: .utf8)) == "brand new\n")
+
         // The permissions and the creation date belong to the file, not to us.
         let owned = fixture("Text.\n")
         try! FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: owned.path)

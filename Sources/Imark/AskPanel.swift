@@ -25,6 +25,10 @@ final class AskPanel: NSObject {
     private let spinner = NSProgressIndicator()
     private let status = NSTextField(labelWithString: "")
 
+    /// The one line an empty transcript shows, held onto so the first message can
+    /// take it away without having to go looking for it.
+    private var emptyLine: NSTextField?
+
     private var cli: Assistants.CLI?
     private var document = URL(fileURLWithPath: "/")
     private var folder = URL(fileURLWithPath: "/")
@@ -40,6 +44,11 @@ final class AskPanel: NSObject {
         self.document = document
         folder = document.deletingLastPathComponent()
         turns = []
+        // The panel outlives the sheet, so the last conversation was still hanging
+        // in the transcript the next time Ask was pressed — under a fresh empty-state
+        // line, on a model that had forgotten all of it.
+        transcript.views.forEach(transcript.removeView)
+        emptyLine = nil
 
         let panel = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 680, height: 470),
@@ -49,7 +58,6 @@ final class AskPanel: NSObject {
         )
         panel.title = "Ask \(cli.label)"
         panel.contentView = build()
-        panel.setContentSize(NSSize(width: 680, height: 470))
         panel.minSize = NSSize(width: 480, height: 360)
         sheet = panel
         parent.beginSheet(panel)
@@ -157,8 +165,8 @@ final class AskPanel: NSObject {
             "Ask anything about this document. The answer comes back here as text.")
         empty.font = .systemFont(ofSize: 12)
         empty.textColor = .tertiaryLabelColor
-        empty.identifier = NSUserInterfaceItemIdentifier("empty")
         transcript.addView(empty, in: .top)
+        emptyLine = empty
 
         return well
     }
@@ -201,7 +209,9 @@ final class AskPanel: NSObject {
 
         sendButton.target = self
         sendButton.action = #selector(ask)
-        sendButton.keyEquivalent = "\r"
+        // Deliberately not the default button: `\r` as its key equivalent takes
+        // plain Return away from the composer, and a question worth asking often has
+        // two lines in it. ⌘↩ sends, and the hint beside the button says so.
         sendButton.bezelStyle = .rounded
 
         stopButton.target = self
@@ -258,9 +268,10 @@ final class AskPanel: NSObject {
     /// accent colour; an answer is what the CLI printed, monospaced, because it is
     /// usually Markdown and often quotes lines of the file.
     private func addMessage(_ text: String, from role: Role) {
-        transcript.views
-            .filter { $0.identifier?.rawValue == "empty" }
-            .forEach { transcript.removeView($0) }
+        if let emptyLine {
+            transcript.removeView(emptyLine)
+            self.emptyLine = nil
+        }
 
         let who = NSTextField(labelWithString: role.label(cli: cli))
         who.font = .systemFont(ofSize: 10.5, weight: .semibold)
@@ -271,10 +282,9 @@ final class AskPanel: NSObject {
         let heading = NSStackView(views: [who])
         heading.spacing = 8
         if role == .answer {
-            let copy = LinkButton(title: "Copy", target: self, action: #selector(copyLast))
-            copy.isBordered = false
-            copy.font = .systemFont(ofSize: 10.5)
-            copy.contentTintColor = .imarkAccent
+            // Carries its own text: every Copy used to reach for `turns.last`, so in
+            // a conversation of five answers all five copied the newest one.
+            let copy = CopyButton(text: text, target: self, action: #selector(copyAnswer(_:)))
             heading.addView(copy, in: .trailing)
         }
 
@@ -290,7 +300,6 @@ final class AskPanel: NSObject {
         block.orientation = .vertical
         block.alignment = .leading
         block.spacing = 3
-        block.identifier = NSUserInterfaceItemIdentifier(role == .answer ? "answer" : "question")
 
         transcript.addView(block, in: .top)
         NSLayoutConstraint.activate([
@@ -395,12 +404,17 @@ final class AskPanel: NSObject {
         spinner.startAnimation(nil)
         sendButton.isEnabled = false
         stopButton.isHidden = false
-        status.stringValue = "\(cli?.label ?? "Working")… 0s"
+        showElapsed()
         ticker = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-            guard let self else { return }
-            let seconds = Int(Date().timeIntervalSince(startedAt))
-            status.stringValue = "\(cli?.label ?? "Working")… \(seconds)s"
+            self?.showElapsed()
         }
+    }
+
+    /// The first label and every tick after it, so "0s" and "12s" are the same
+    /// sentence rather than two that have to be kept saying the same thing.
+    private func showElapsed() {
+        let seconds = Int(Date().timeIntervalSince(startedAt))
+        status.stringValue = "\(cli?.label ?? "Working")… \(seconds)s"
     }
 
     private func end() {
@@ -420,10 +434,11 @@ final class AskPanel: NSObject {
         status.stringValue = "Stopping…"
     }
 
-    @objc private func copyLast() {
-        guard let answer = turns.last?.answer else { return }
+    @objc private func copyAnswer(_ sender: CopyButton) {
         NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(answer, forType: .string)
+        NSPasteboard.general.setString(sender.text, forType: .string)
+        sender.title = "Copied"
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { sender.title = "Copy" }
     }
 
     @objc private func closeSheet() {
@@ -451,6 +466,25 @@ extension AskPanel: NSTextViewDelegate {
         ask()
         return true
     }
+}
+
+/// A Copy that knows which answer it belongs to.
+final class CopyButton: LinkButton {
+    let text: String
+
+    init(text: String, target: AnyObject, action: Selector) {
+        self.text = text
+        super.init(frame: .zero)
+        self.title = "Copy"
+        self.target = target
+        self.action = action
+        isBordered = false
+        font = .systemFont(ofSize: 10.5)
+        contentTintColor = .imarkAccent
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("not supported") }
 }
 
 /// Top-down layout inside a scroll view, so the first message is at the top.

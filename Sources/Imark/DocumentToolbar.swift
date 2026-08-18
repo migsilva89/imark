@@ -114,7 +114,7 @@ extension DocumentWindowController: NSToolbarDelegate {
         case .comments: return noteCount > 0
         // Both are about text that is not in the file yet.
         case .save, .revert: return editMode && content.editor.isDirty
-        case .ask: return !Assistants.installed.isEmpty
+        case .ask: return Assistants.anyInstalled
         default: return true
         }
     }
@@ -162,11 +162,11 @@ extension DocumentWindowController: NSToolbarDelegate {
             control.segmentStyle = .texturedRounded
             control.selectedSegment = editMode ? 1 : 0
             control.setToolTip("Reading — nothing here changes the file", forSegment: 0)
-            control.setToolTip("Editing — click a block to write in it (⇧⌘E)", forSegment: 1)
+            control.setToolTip("Editing — the file as text, and ⌘S writes it (⌘E)", forSegment: 1)
             let item = NSToolbarItem(itemIdentifier: identifier)
             item.view = control
             item.label = "Mode"
-            item.toolTip = "Reading or editing (⇧⌘E)"
+            item.toolTip = "Reading or editing (⌘E)"
             return item
 
         case .save:
@@ -189,11 +189,14 @@ extension DocumentWindowController: NSToolbarDelegate {
             // toolbar is icons everywhere else because everything else is a verb
             // people already know; sparkles alone says nothing about what runs.
             item.title = "Ask AI"
+            // One walk of the disk, shared with the menu: finding them means
+            // stat-ing a path list per assistant, and the menu names the same
+            // ones the tooltip counts.
             let installed = Assistants.installed
             item.toolTip = installed.isEmpty
                 ? "Install one of \(Assistants.builtinLabels.joined(separator: ", ")) to ask about this document"
                 : "Ask an assistant about this document, in a panel that writes nothing"
-            item.menu = assistantsMenu()
+            item.menu = assistantsMenu(installed)
             item.showsIndicator = installed.count > 1
             if !installed.isEmpty {
                 item.target = self
@@ -280,9 +283,9 @@ extension DocumentWindowController: NSToolbarDelegate {
 
     /// One entry per assistant found on the machine, in the order the registry
     /// puts them: the built-ins it recognises first.
-    private func assistantsMenu() -> NSMenu {
+    private func assistantsMenu(_ installed: [Assistants.CLI]) -> NSMenu {
         let menu = NSMenu()
-        for cli in Assistants.installed {
+        for cli in installed {
             let item = menu.addItem(
                 withTitle: cli.label,
                 action: #selector(askAssistant(_:)),
@@ -415,7 +418,7 @@ extension DocumentWindowController: NSToolbarDelegate {
     /// of the things it offers: you answer, or you go back to reviewing.
     @objc func windowShouldClose(_ sender: NSWindow) -> Bool {
         // Unsaved text first: it is the one thing here that cannot be got back.
-        guard mayLeaveDocument("close this window") else { return false }
+        guard mayLeaveDocument() else { return false }
         guard Review.isReview(url), Review.decision(for: url) == nil else { return true }
 
         let alert = NSAlert()

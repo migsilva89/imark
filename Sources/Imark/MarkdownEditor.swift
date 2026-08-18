@@ -116,6 +116,23 @@ final class MarkdownEditorView: NSView {
         window?.makeFirstResponder(textView)
     }
 
+    /// Typing is undone by the text view's own stack, not by the app's — the app's
+    /// undo puts whole documents back, which is not what ⌘Z means while typing.
+    var canUndo: Bool { textView.undoManager?.canUndo ?? false }
+    var canRedo: Bool { textView.undoManager?.canRedo ?? false }
+
+    func undo() {
+        textView.undoManager?.undo()
+        refresh()
+        onEdit?()
+    }
+
+    func redo() {
+        textView.undoManager?.redo()
+        refresh()
+        onEdit?()
+    }
+
     /// The system's own find bar, from ⌘F — the text view owns it, and the menu
     /// item has no reference to the text view.
     func showFind() {
@@ -128,15 +145,31 @@ final class MarkdownEditorView: NSView {
     /// Re-highlights and repaints. Cheap enough per keystroke at the size Imark
     /// already caps documents to.
     private func refresh() {
+        // Both of these read the whole buffer, which is fine at the size documents
+        // actually are and a stall on a file that is mostly generated. Past the
+        // ceiling the text is still editable — it just stops being coloured, which
+        // is a cost worth paying to keep typing instant.
+        guard textView.string.utf8.count <= Self.highlightLimit else {
+            gutter.modifiedLines = []
+            gutter.needsDisplay = true
+            return
+        }
         MarkdownHighlighter.apply(to: textView)
         gutter.modifiedLines = Self.modifiedLines(current: textView.string, original: diskText)
         gutter.needsDisplay = true
     }
 
+    /// Where colouring stops. Half a megabyte of Markdown is about 8,000 lines,
+    /// well past anything written by hand.
+    private static let highlightLimit = 512 * 1_024
+
     /// Which lines differ from the file on disk. A real diff, not a positional
     /// compare: one inserted line would otherwise flag everything below it and
     /// drown the signal the bars exist to give.
     static func modifiedLines(current: String, original: String) -> Set<Int> {
+        // Opening a file and saving one both land here with the two sides equal,
+        // and a diff is the slowest possible way to find that out.
+        guard current != original else { return [] }
         let now = current.components(separatedBy: "\n")
         let disk = original.components(separatedBy: "\n")
         var changed: Set<Int> = []
@@ -316,11 +349,31 @@ final class LineGutter: NSView {
     override var isFlipped: Bool { true }
 
     /// The 1-based line the caret sits on, which draws brighter than the rest.
+    /// Counted with `lineRange`, the same way the numbers beside it are drawn.
+    /// Counting `\n` characters instead looks equivalent and is not: on a file
+    /// saved by a Windows editor, Swift reads `\r\n` as one character that is not
+    /// a newline, so the caret lit a line further and further off the more line
+    /// breaks it had passed.
     private var caretLine: Int {
         guard let textView else { return 0 }
         let source = textView.string as NSString
-        let upToCaret = source.substring(to: min(textView.selectedRange().location, source.length))
-        return upToCaret.reduce(into: 1) { if $1 == "\n" { $0 += 1 } }
+        return Self.lineNumber(at: textView.selectedRange().location, in: source)
+    }
+
+    /// Pulled out of the property so it can be tested on its own: the CRLF case
+    /// is the whole reason it is written this way, and it is not reachable through
+    /// a text view without one.
+    static func lineNumber(at caret: Int, in source: NSString) -> Int {
+        let caret = min(max(0, caret), source.length)
+        var number = 1
+        var location = 0
+        while location < caret {
+            let line = source.lineRange(for: NSRange(location: location, length: 0))
+            guard NSMaxRange(line) <= caret, NSMaxRange(line) > location else { break }
+            number += 1
+            location = NSMaxRange(line)
+        }
+        return number
     }
 
     override func draw(_ rect: NSRect) {

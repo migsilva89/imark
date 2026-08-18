@@ -73,6 +73,12 @@ if [ "${1:-}" != "--force" ]; then
 			$(find Sources/ImarkRender -name '*.swift') \
 			Support/test-undo.swift -o /tmp/imark-release-undo >/dev/null 2>&1 \
 		&& /tmp/imark-release-undo >/dev/null || die "the undo tests failed"
+	swift build >/dev/null 2>&1 \
+		&& swiftc -parse-as-library -I .build/debug/Modules \
+			$(find Sources/Imark -name '*.swift' ! -name main.swift) \
+			$(find Sources/ImarkRender -name '*.swift') \
+			Support/test-editor.swift -o /tmp/imark-release-editor >/dev/null 2>&1 \
+		&& /tmp/imark-release-editor >/dev/null || die "the editor tests failed"
 	swiftc -parse-as-library Sources/Imark/Updates.swift Sources/Imark/Settings.swift \
 		Sources/Imark/NoteColour.swift Support/test-update.swift \
 		-o /tmp/imark-release-update >/dev/null 2>&1 \

@@ -304,7 +304,18 @@ final class ContentViewController: NSViewController {
     /// Confirmation that the file is genuinely being watched. Without it a
     /// silent re-render is indistinguishable from nothing happening.
     func flashReloaded() {
-        statusRight.stringValue = "Updated just now"
+        flash("Updated just now")
+    }
+
+    /// The file moved under an editor with unsaved text in it. Nothing was
+    /// reloaded — that would have taken the text with it — so this is the only
+    /// warning there is until the save refuses.
+    func flashChangedOnDisk() {
+        flash("Changed on disk · your text is still here")
+    }
+
+    private func flash(_ message: String) {
+        statusRight.stringValue = message
         flashWork?.cancel()
         let work = DispatchWorkItem { [weak self] in
             guard let self else { return }
@@ -339,6 +350,6 @@ extension ContentViewController: NSSearchFieldDelegate {
 /// Underlined and in the accent colour, so it reads as a link — and so it has
 /// to behave like one under the pointer too. Used by the status bar's comment
 /// count and by the Copy under an answer in the Ask panel.
-final class LinkButton: NSButton {
+class LinkButton: NSButton {
     override func resetCursorRects() { addCursorRect(bounds, cursor: .pointingHand) }
 }

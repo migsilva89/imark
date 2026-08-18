@@ -105,8 +105,18 @@ enum Menu {
     private static func editMenu() -> NSMenu {
         let menu = NSMenu(title: "Edit")
         menu.addItem(withTitle: "Undo", action: #selector(DocumentWindowController.undoComment(_:)), keyEquivalent: "z")
+        let redo = menu.addItem(
+            withTitle: "Redo",
+            action: #selector(DocumentWindowController.redoTyping(_:)),
+            keyEquivalent: "z"
+        )
+        redo.keyEquivalentModifierMask = [.command, .shift]
         menu.addItem(.separator())
+        // Cut and Paste arrived with the editor: in a reader there was nothing to
+        // cut, and ⌘V did nothing at all until the file could be typed in.
+        menu.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
         menu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        menu.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
         menu.addItem(.separator())
         // A tick rather than two titles: editing is a state the window is in,
         // and the same key puts it back.

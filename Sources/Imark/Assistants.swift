@@ -56,6 +56,13 @@ enum Assistants {
         }
     }
 
+    /// Whether there is one at all, without building the list of them. The
+    /// toolbar asks this every time it validates, which is once per keystroke
+    /// while the editor is open, so it stops at the first one it finds.
+    static var anyInstalled: Bool {
+        builtins.contains { locate($0.binary) != nil }
+    }
+
     static func cli(id: String) -> CLI? {
         installed.first { $0.id == id }
     }
@@ -84,10 +91,18 @@ enum Assistants {
             "/opt/homebrew/bin/\(name)",
             "/usr/local/bin/\(name)",
         ]
-        if let versions = try? fm.contentsOfDirectory(atPath: "\(home)/.nvm/versions/node") {
-            candidates += versions.map { "\(home)/.nvm/versions/node/\($0)/bin/\(name)" }
+        if let found = candidates.first(where: { fm.isExecutableFile(atPath: $0) }) {
+            return URL(fileURLWithPath: found)
         }
-        return candidates.first { fm.isExecutableFile(atPath: $0) }.map { URL(fileURLWithPath: $0) }
+        // nvm last, and only once everything above has missed: it is the one
+        // candidate that costs a directory listing rather than a stat, and this
+        // runs while somebody is typing.
+        guard let versions = try? fm.contentsOfDirectory(atPath: "\(home)/.nvm/versions/node")
+        else { return nil }
+        return versions
+            .map { "\(home)/.nvm/versions/node/\($0)/bin/\(name)" }
+            .first { fm.isExecutableFile(atPath: $0) }
+            .map { URL(fileURLWithPath: $0) }
     }
 }
 
@@ -124,14 +139,29 @@ final class AssistantRun: @unchecked Sendable {
         task.standardError = pipe
 
         lock.lock(); process = task; lock.unlock()
-        try task.run()
+        do {
+            try task.run()
+        } catch {
+            // Nothing was launched, so nothing is running. Left in place, the next
+            // Cancel would call `terminate()` on a Process that never started, and
+            // AppKit answers that with an uncaught exception: the app disappears
+            // because a CLI was not where we thought it was.
+            lock.lock(); process = nil; lock.unlock()
+            throw error
+        }
 
-        // Read while it runs: a chatty answer fills the pipe's buffer and both
-        // sides sit waiting for the other.
+        // Read while it runs, in pieces: a chatty answer fills the pipe's buffer
+        // and both sides sit waiting for the other. In pieces rather than to the
+        // end, so what a CLI said before it was killed is still an answer.
         let sink = Sink()
         let finished = DispatchSemaphore(value: 0)
         DispatchQueue(label: "pt.miguelsilva.imark.ask").async {
-            sink.set(pipe.fileHandleForReading.readDataToEndOfFile())
+            let handle = pipe.fileHandleForReading
+            while true {
+                let chunk = handle.availableData
+                if chunk.isEmpty { break }
+                sink.append(chunk)
+            }
             finished.signal()
         }
 
@@ -139,7 +169,12 @@ final class AssistantRun: @unchecked Sendable {
         if finished.wait(timeout: .now() + timeout) == .timedOut {
             timedOut = true
             task.terminate()
-            _ = finished.wait(timeout: .now() + 5)
+            // A CLI that ignores SIGTERM would otherwise hang the panel forever on
+            // the wait below, with the Stop button already pressed.
+            if finished.wait(timeout: .now() + 5) == .timedOut, task.isRunning {
+                kill(task.processIdentifier, SIGKILL)
+                _ = finished.wait(timeout: .now() + 2)
+            }
         }
         task.waitUntilExit()
         lock.lock(); process = nil; lock.unlock()
@@ -155,7 +190,10 @@ final class AssistantRun: @unchecked Sendable {
         lock.lock()
         let task = process
         lock.unlock()
-        task?.terminate()
+        // Only a launched process can be terminated; asking a Process that never
+        // started raises an uncaught exception rather than returning an error.
+        guard let task, task.isRunning else { return }
+        task.terminate()
     }
 
     /// Hands the child's output from the reader queue back to the caller without
@@ -163,7 +201,7 @@ final class AssistantRun: @unchecked Sendable {
     private final class Sink: @unchecked Sendable {
         private var data = Data()
         private let lock = NSLock()
-        func set(_ value: Data) { lock.lock(); data = value; lock.unlock() }
+        func append(_ value: Data) { lock.lock(); data.append(value); lock.unlock() }
         func get() -> Data { lock.lock(); defer { lock.unlock() }; return data }
     }
 }

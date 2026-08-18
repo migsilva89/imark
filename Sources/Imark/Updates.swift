@@ -8,13 +8,15 @@ import AppKit
 /// leave the machine; this call carries none of them. It can be turned off in
 /// Settings, and the setting is respected before the request is ever built.
 ///
-/// No Sparkle, no downloading, no installing. The app points at the release
-/// page and gets out of the way — for an app this size, an update mechanism
-/// that could rewrite the binary would be a bigger risk than the staleness it
-/// prevents.
+/// No Sparkle, no downloading, no installing. The app points at the site and
+/// gets out of the way — for an app this size, an update mechanism that could
+/// rewrite the binary would be a bigger risk than the staleness it prevents.
 enum Updates {
-    /// Where "Download" lands. The page, not the asset: release notes first.
-    static let page = URL(string: "https://github.com/migsilva89/imark/releases/latest")!
+    /// Where "Download" lands: the site, not the release page on GitHub. The
+    /// version numbers still come from GitHub, because that is where a release is
+    /// made, but somebody who pressed Download is being sent somewhere to read —
+    /// and a page of assets and checksums is not that.
+    static let page = URL(string: "https://imarkmd.com")!
 
     private static let api = URL(
         string: "https://api.github.com/repos/migsilva89/imark/releases/latest"
