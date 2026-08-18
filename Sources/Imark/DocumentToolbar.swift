@@ -9,6 +9,9 @@ private extension NSToolbarItem.Identifier {
     static let comments = NSToolbarItem.Identifier("comments")
     static let shortcuts = NSToolbarItem.Identifier("shortcuts")
     static let commentFile = NSToolbarItem.Identifier("commentFile")
+    static let editMode = NSToolbarItem.Identifier("editMode")
+    static let save = NSToolbarItem.Identifier("save")
+    static let revert = NSToolbarItem.Identifier("revert")
     static let reviewSendBack = NSToolbarItem.Identifier("reviewSendBack")
     static let reviewApprove = NSToolbarItem.Identifier("reviewApprove")
 }
@@ -21,6 +24,11 @@ extension DocumentWindowController: NSToolbarDelegate {
         toolbar.allowsUserCustomization = false
         window?.toolbar = toolbar
         window?.toolbarStyle = .unified
+        // The system's own item arrives with a label and no tooltip, so it is the
+        // one button in the row that answers nothing when you hover it.
+        if let sidebar = toolbar.items.first(where: { $0.itemIdentifier == .toggleSidebar }) {
+            sidebar.toolTip = "Show or Hide Sidebar (⌘\\)"
+        }
     }
 
     public func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
@@ -40,7 +48,19 @@ extension DocumentWindowController: NSToolbarDelegate {
         // else is waiting on should not sit next to Find.
         let reading: [NSToolbarItem.Identifier] =
             [.toggleSidebar, .sidebarTrackingSeparator, .flexibleSpace,
-             .commentFile, .comments, .theme, .find, .export, .openIn]
+             .editMode, .commentFile, .comments, .theme, .find, .export, .openIn]
+
+        // Editing keeps the switch and loses everything that is about the page:
+        // a theme paints the rendered document, and a comment is written onto a
+        // phrase in it. What it gains is the two ways out of a dirty buffer.
+        if editMode {
+            // Open in… stays: handing the file to Cursor, VS Code or Claude is
+            // exactly what somebody who has just opened it as text may want next,
+            // and it is this app's whole answer to "can it also do X" — it cannot,
+            // and it knows who can.
+            return [.toggleSidebar, .sidebarTrackingSeparator, .flexibleSpace,
+                    .editMode, .find, .openIn, .revert, .save]
+        }
         guard Review.isReview(url) else { return reading }
 
         // A review keeps only what a reviewer does. Open in and Export are ways
@@ -77,6 +97,14 @@ extension DocumentWindowController: NSToolbarDelegate {
         item.toolTip = on ? "Hide All Comments (⇧⌘C)" : "Show All Comments (⇧⌘C)"
     }
 
+    /// Which side of the switch is lit. A tinted glyph says "on" only to somebody
+    /// who has seen it off; two segments with one of them lit say which state the
+    /// window is in without anything to compare against.
+    func refreshEditButton() {
+        let item = window?.toolbar?.items.first { $0.itemIdentifier == .editMode }
+        (item?.view as? NSSegmentedControl)?.selectedSegment = editMode ? 1 : 0
+    }
+
     func refreshThemeButton() {
         let item = window?.toolbar?.items.first { $0.itemIdentifier == .theme }
         (item?.view as? ThemeButton)?.show(Settings.theme)
@@ -85,7 +113,19 @@ extension DocumentWindowController: NSToolbarDelegate {
     /// Greyed out on a document with nothing to show. A button that only ever
     /// beeps is worse than one that admits there is nothing behind it.
     public func validateToolbarItem(_ item: NSToolbarItem) -> Bool {
-        item.itemIdentifier == .comments ? noteCount > 0 : true
+        switch item.itemIdentifier {
+        case .comments: return noteCount > 0
+        // Both are about text that is not in the file yet.
+        case .save, .revert: return editMode && content.editor.isDirty
+        default: return true
+        }
+    }
+
+    /// The toolbar validates on its own schedule, which is a beat behind a
+    /// keystroke. Asking it directly is what makes Save light up on the first
+    /// character typed rather than a moment later.
+    func refreshSaveButtons() {
+        window?.toolbar?.validateVisibleItems()
     }
 
     public func toolbar(
@@ -105,6 +145,41 @@ extension DocumentWindowController: NSToolbarDelegate {
             return button(identifier, symbol: "text.bubble", label: "Comment on Document",
                           tip: "Comment on the whole document",
                           action: #selector(commentOnDocument(_:)))
+
+        case .editMode:
+            // First in the row of things you do to the document: it is the only
+            // one that changes what the document says.
+            //
+            // Two segments rather than one pencil that lights up. Reading is
+            // where this app lives, so it is a state worth naming on screen
+            // instead of being the absence of the other one.
+            let eye = NSImage(systemSymbolName: "eye", accessibilityDescription: "Reading")!
+            let pencil = NSImage(systemSymbolName: "pencil", accessibilityDescription: "Editing")!
+            let control = NSSegmentedControl(
+                images: [eye, pencil],
+                trackingMode: .selectOne,
+                target: self,
+                action: #selector(chooseMode(_:))
+            )
+            control.segmentStyle = .texturedRounded
+            control.selectedSegment = editMode ? 1 : 0
+            control.setToolTip("Reading — nothing here changes the file", forSegment: 0)
+            control.setToolTip("Editing — the file as text, and ⌘S writes it (⌘E)", forSegment: 1)
+            let item = NSToolbarItem(itemIdentifier: identifier)
+            item.view = control
+            item.label = "Mode"
+            item.toolTip = "Reading or editing (⌘E)"
+            return item
+
+        case .save:
+            return button(identifier, symbol: "arrow.down.doc", label: "Save",
+                          tip: "Write your changes to the file (⌘S)",
+                          action: #selector(saveDocument(_:)))
+
+        case .revert:
+            return button(identifier, symbol: "arrow.uturn.backward", label: "Revert",
+                          tip: "Throw away your changes and read the file again",
+                          action: #selector(revertDocument(_:)))
 
         case .comments:
             // "Comments" alone names the subject, not the action, and left
@@ -209,6 +284,9 @@ extension DocumentWindowController: NSToolbarDelegate {
         let item = NSToolbarItem(itemIdentifier: identifier)
         item.view = button
         item.label = title
+        // On the view as well as the item: a view-based toolbar item never shows
+        // the item's own tooltip, because the pointer is over the view.
+        button.toolTip = tip
         item.toolTip = tip
         return item
     }
@@ -296,6 +374,8 @@ extension DocumentWindowController: NSToolbarDelegate {
     /// hours later. So the window asks on the way out, and closing is not one
     /// of the things it offers: you answer, or you go back to reviewing.
     @objc func windowShouldClose(_ sender: NSWindow) -> Bool {
+        // Unsaved text first: it is the one thing here that cannot be got back.
+        guard mayLeaveDocument() else { return false }
         guard Review.isReview(url), Review.decision(for: url) == nil else { return true }
 
         let alert = NSAlert()

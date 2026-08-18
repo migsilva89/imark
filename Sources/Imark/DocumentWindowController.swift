@@ -7,7 +7,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
 
     private let split = NSSplitViewController()
     private let sidebar = SidebarViewController()
-    private let content = ContentViewController()
+    let content = ContentViewController()
     private var sidebarItem: NSSplitViewItem!
 
     private let selectionPopover = SelectionPopover()
@@ -23,6 +23,10 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     private var undoStack = UndoStack()
     /// Set while the composer is editing a note rather than writing a new one.
     private var editingNote: ClosedRange<Int>?
+    /// Whether the window is showing the file as text instead of as a page. A
+    /// window opens reading, always: this is not remembered between documents or
+    /// launches, because reading is what the app is for.
+    private(set) var editMode = false
     private let commentsList = CommentsList()
     private var notes: [NoteSummary] = []
     private(set) var noteCount = 0
@@ -115,6 +119,8 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         buildToolbar()
 
         content.onMessage = { [weak self] in self?.handle($0) }
+        content.editor.onEdit = { [weak self] in self?.editorChanged() }
+        content.editor.onSave = { [weak self] in self?.saveDocument(nil) }
         content.onFindClosed = { [weak self] in
             self?.window?.makeFirstResponder(self?.content.renderer)
         }
@@ -155,6 +161,16 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     // MARK: - Loading
 
     func show(_ target: URL, pushingHistory: Bool) {
+        // Another document in the same window means this one is being put down.
+        guard mayLeaveDocument() else { return }
+        // It goes down reading: an editor left open on a file you are no longer
+        // looking at is a buffer waiting to be written over the wrong thing. The
+        // question about unsaved text was asked on the line above, so this only
+        // has to put the mode back.
+        if editMode {
+            editMode = false
+            applyEditMode()
+        }
         if pushingHistory {
             back.append(url)
             forward.removeAll()
@@ -176,6 +192,13 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
                 // outside change would be a lie and would fight the reload we
                 // are already doing.
                 guard Date().timeIntervalSince(self.lastWrite) > 1.0 else { return }
+                // Following the file is the reason this app exists, and also the
+                // one thing that could erase what somebody typed. With unsaved text
+                // in the editor it stands still and says so in the status bar; the
+                // save will refuse on its own when it comes.
+                guard !self.content.editor.isDirty else {
+                    return self.content.flashChangedOnDisk()
+                }
                 self.load()
                 self.content.flashReloaded()
             case .vanished:
@@ -190,14 +213,18 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         // the answer.
         Review.forget()
         buildToolbar()
+        // The toolbar is rebuilt on every load, which resets the pencil to its
+        // off face while the window is still in editing mode.
+        refreshEditButton()
 
-        guard var text = try? String(contentsOf: url, encoding: .utf8) else {
+        guard let source = try? String(contentsOf: url, encoding: .utf8) else {
             content.renderer.render(
                 markdown: "# Can't read this file\n\n`\(url.path)`\n\nIt exists, but it isn't UTF-8 text.",
                 path: url.path
             )
             return
         }
+        var text = source
 
         if text.utf8.count > Self.sizeLimit {
             let prefix = String(decoding: Array(text.utf8.prefix(Self.sizeLimit)), as: UTF8.self)
@@ -205,6 +232,15 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         }
 
         stamp = Comments.Stamp(of: url)
+        // The editor follows the file as well, and gets the file itself rather than
+        // the copy truncated above for rendering. Without this the buffer kept the
+        // text from whenever editing began while `stamp` moved on with the reload,
+        // so the next save passed the staleness check and wrote a stale document
+        // over somebody else's edit.
+        //
+        // Only when there is nothing unsaved: the caller checked that before
+        // reloading at all, and this is the second lock on the same door.
+        if editMode, !content.editor.isDirty { content.editor.load(source) }
         content.renderer.render(markdown: text, path: url.path)
     }
 
@@ -409,6 +445,169 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
+    // MARK: - Editing the document
+
+    /// ⌘E, and the menu item that carries the tick.
+    @objc func toggleEditMode(_ sender: Any?) {
+        setEditMode(!editMode)
+    }
+
+    /// The switch in the toolbar: reading on the left, the pencil on the right.
+    @objc func chooseMode(_ sender: NSSegmentedControl) {
+        setEditMode(sender.selectedSegment == 1)
+    }
+
+    /// Entering editing reads the file again — the page may have been rendered
+    /// from a copy that is minutes old. Leaving it asks first if there is
+    /// anything unsaved, because the way back is a re-render and the buffer would
+    /// go with it.
+    private func setEditMode(_ on: Bool) {
+        // Clicking the segment that is already lit used to re-enter the mode, which
+        // re-read the file and loaded it over whatever was typed, without asking.
+        guard on != editMode else { return }
+        if on {
+            guard let text = try? String(contentsOf: url, encoding: .utf8) else {
+                return report(Comments.Failure.unreadable, doing: "edit this file")
+            }
+            stamp = Comments.Stamp(of: url)
+            content.editor.load(text)
+        } else {
+            // The same question the window asks on the way out, and the segment
+            // has already moved under the pointer — putting it back is what makes
+            // staying mean staying.
+            guard mayLeaveDocument() else { return refreshEditButton() }
+        }
+
+        editMode = on
+        selectionPopover.dismiss()
+        commentsList.dismiss()
+        applyEditMode()
+        if !on { load() }
+    }
+
+    /// Puts the mode on screen: which of the two views is showing, which row of
+    /// buttons is in the toolbar, and the marks that say whether anything is
+    /// unsaved. Separate from `setEditMode` because putting the editor down on
+    /// the way to another document has to do all of this and none of the asking.
+    private func applyEditMode() {
+        content.showEditor(editMode)
+        // The row changes with the mode: Save and Revert have nothing to do with
+        // reading, and Comments has nothing to do with a file open as text.
+        buildToolbar()
+        refreshEditButton()
+        refreshEditedDot()
+    }
+
+    /// Called on every keystroke: the only thing it does is keep the window's
+    /// close button, the toolbar and the menu telling the same story.
+    private func editorChanged() {
+        refreshEditedDot()
+        refreshSaveButtons()
+    }
+
+    /// The system's own mark for a document with unsaved changes — a dot in the
+    /// close button. Free, and where people already look for it.
+    private func refreshEditedDot() {
+        window?.isDocumentEdited = editMode && content.editor.isDirty
+    }
+
+    @objc func saveDocument(_ sender: Any?) {
+        _ = saveDocument()
+    }
+
+    /// Writes the buffer over the file. Returns whether it landed, so the places
+    /// that save on the way out can stop when it did not.
+    @discardableResult
+    private func saveDocument() -> Bool {
+        guard editMode, content.editor.isDirty else { return true }
+        // Read before snapshotting. The snapshot is what ⌘Z restores, and a file
+        // that cannot be read snapshots as an empty string — so a save on a
+        // vanished file, followed by ⌘Z, emptied the document.
+        guard (try? String(contentsOf: url, encoding: .utf8)) != nil else {
+            report(Comments.Failure.fileChanged, doing: "save this file")
+            return false
+        }
+        do {
+            snapshot("Edit")
+            try Comments.save(content.editor.text, to: url, expecting: stamp)
+            content.editor.markSaved()
+            lastWrite = Date()
+            sealSnapshot()
+            stamp = Comments.Stamp(of: url)
+            refreshEditedDot()
+            refreshSaveButtons()
+            return true
+        } catch {
+            undoStack.discardLast()
+            report(error, doing: "save this file")
+            return false
+        }
+    }
+
+    /// Throws the buffer away and reads the file again. Asks first: this is the
+    /// one command in the app whose whole job is to lose what you typed.
+    @objc func revertDocument(_ sender: Any?) {
+        guard editMode, content.editor.isDirty else { return }
+        let alert = NSAlert()
+        alert.messageText = "Throw away your changes?"
+        alert.informativeText = "The file on disk goes back into the editor. This cannot be undone."
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Throw Away")
+        alert.addButton(withTitle: "Keep Editing")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+
+        guard let text = try? String(contentsOf: url, encoding: .utf8) else {
+            return report(Comments.Failure.unreadable, doing: "read this file again")
+        }
+        stamp = Comments.Stamp(of: url)
+        content.editor.load(text)
+        refreshEditedDot()
+        refreshSaveButtons()
+    }
+
+    enum UnsavedAnswer { case save, discard, cancel }
+
+    /// One question, asked wherever unsaved text is about to be lost: leaving
+    /// editing, opening another document, closing the window.
+    func askAboutUnsaved() -> UnsavedAnswer {
+        let alert = NSAlert()
+        alert.messageText = "Save your changes to \(url.lastPathComponent)?"
+        alert.informativeText = "You have edits that are not in the file yet."
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Save")
+        alert.addButton(withTitle: "Don't Save")
+        alert.addButton(withTitle: "Cancel")
+        switch alert.runModal() {
+        case .alertFirstButtonReturn: return .save
+        case .alertSecondButtonReturn: return .discard
+        default: return .cancel
+        }
+    }
+
+    /// Whether it is safe to leave this document behind. Answers the same
+    /// question for the window closing, for another file being opened in it, and
+    /// for the switch going back to reading.
+    /// Throws the buffer away and puts the file back in it, without asking — the
+    /// asking already happened. Without this, "Don't Save" left the editor dirty
+    /// forever, and the watcher's dirty guard then kept live reload switched off
+    /// for the rest of the window's life.
+    private func discardBuffer() {
+        guard let text = try? String(contentsOf: url, encoding: .utf8) else { return }
+        stamp = Comments.Stamp(of: url)
+        content.editor.load(text)
+        refreshEditedDot()
+        refreshSaveButtons()
+    }
+
+    func mayLeaveDocument() -> Bool {
+        guard editMode, content.editor.isDirty else { return true }
+        switch askAboutUnsaved() {
+        case .save: return saveDocument()
+        case .discard: discardBuffer(); return true
+        case .cancel: return false
+        }
+    }
+
     private func snapshot(_ what: String) {
         undoStack.push(
             text: (try? String(contentsOf: url, encoding: .utf8)) ?? "",
@@ -441,6 +640,13 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     }
 
     @objc func undoComment(_ sender: Any?) {
+        // While the file is open as text, ⌘Z means the typing. The app's own undo
+        // puts whole documents back, which here would throw away everything since
+        // the last save and leave the buffer showing text no longer in the file.
+        if editMode {
+            guard content.editor.canUndo else { return NSSound.beep() }
+            return content.editor.undo()
+        }
         guard !undoStack.isEmpty else { return NSSound.beep() }
         do {
             // The stack knows which file each snapshot belongs to. This window
@@ -453,17 +659,29 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
+    /// ⇧⌘Z. Only ever the editor's: a comment that was taken back is written
+    /// again from its own card, not from the menu.
+    @objc func redoTyping(_ sender: Any?) {
+        guard editMode, content.editor.canRedo else { return NSSound.beep() }
+        content.editor.redo()
+    }
+
     // MARK: - Actions
 
     @objc func reloadDocument(_ sender: Any?) { load() }
 
     @objc func goBack(_ sender: Any?) {
+        // Asked before the stacks are touched: `show` can be called off by the
+        // unsaved-text question, and an entry taken off for a move that never
+        // happened is a step of history nobody can get back to.
+        guard mayLeaveDocument() else { return }
         guard let previous = back.popLast() else { return NSSound.beep() }
         forward.append(url)
         show(previous, pushingHistory: false)
     }
 
     @objc func goForward(_ sender: Any?) {
+        guard mayLeaveDocument() else { return }
         guard let next = forward.popLast() else { return NSSound.beep() }
         back.append(url)
         show(next, pushingHistory: false)
@@ -485,6 +703,9 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     /// ignoring what you had already told it.
     @objc func performFind(_ sender: Any?) {
         selectionPopover.dismiss()
+        // The editor has the system's own find bar, with its match counter and
+        // its Replace field. Ours is for the page.
+        if editMode { return content.editor.showFind() }
         content.showFind(with: selection?.text)
     }
 
@@ -510,8 +731,21 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         case #selector(undoComment(_:)):
             // Named after what it will actually put back, so the menu never
             // offers a vague "Undo" that might mean something else.
+            if editMode {
+                item.title = "Undo Typing"
+                return content.editor.canUndo
+            }
             item.title = undoStack.last.map { "Undo \($0.what)" } ?? "Undo"
             return !undoStack.isEmpty
+        case #selector(toggleEditMode(_:)):
+            item.state = editMode ? .on : .off
+            return true
+        case #selector(redoTyping(_:)):
+            return editMode && content.editor.canRedo
+        case #selector(saveDocument(_:)), #selector(revertDocument(_:)):
+            // Both are about text that is not in the file yet, and there is none
+            // of that while the window is reading.
+            return editMode && content.editor.isDirty
         case #selector(toggleAllComments(_:)):
             item.state = reviewingComments ? .on : .off
             return noteCount > 0

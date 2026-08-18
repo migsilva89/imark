@@ -26,10 +26,11 @@
 <p align="center"><em>Comment on anything. The note goes into the <code>.md</code> file.</em></p>
 
 > [!NOTE]
-> Imark reads; it does not edit. Comments are the one thing it writes, and they go into the document itself — see [Comments](#comments). For everything else the *Open in* button hands the file to Cursor, VS Code, Sublime, Zed, or whatever else you have installed.
+> Imark opens reading, and reading is what it is for. The switch in the toolbar turns it into an editor for the file you already have open — see [Editing](#editing) — and comments go into the document itself, as HTML comments, so they travel with it.
 
 ## What it does
 
+- **Editing, when you ask for it** — one switch in the toolbar, and the page becomes the file: line numbers, Markdown in colour, a bar beside every line you have changed, `⌘S` to write it. Reading is the state it opens in
 - **Comments in the file** — select, comment, edit or delete, and the note lives in the document as an HTML comment, so it survives being emailed, committed, or opened in anything else. `⌘Z` undoes any of it
 - **Quick Look previews** — the space bar in the Finder renders the document, not raw text, using the same engine as the app
 - **Live reload** — saving in your editor updates the view in under 300ms, keeping your scroll position, and it survives the delete-and-rename that editors call an atomic save
@@ -76,6 +77,30 @@ Or download the [latest release](../../releases/latest) and drag `Imark.app` int
 macOS 14 or later. Imark tells you when a newer version exists — once per release, and only if you leave the check on in Settings.
 
 To make it the default for `.md`: launch it with no document open and click **Make Imark the default for .md**, or use the same item in the **Imark** menu. Once it is the default, both quietly disappear.
+
+## Editing
+
+The toolbar has one switch: an eye and a pencil. The eye is the app you know —
+nothing on screen offers to change the file. The pencil replaces the page with
+the document as text, in a plain editor: line numbers, Markdown in colour, a bar
+in the gutter beside every line that differs from the file on disk, and the
+system's own find bar with its counter and its replace field.
+
+`⌘S` writes it. Until you do, **live reload stands still** — following the file
+is the reason this app exists and also the one thing that could erase what you
+typed, so while there is anything unsaved the window stops watching. The close
+button carries the system's edited dot, *Revert* throws the buffer away and reads
+the file again, and closing the window or opening another document asks first.
+
+A save cannot land on somebody else's work: it goes through the same check every
+comment does, and if the file moved since Imark read it the save is refused and
+says so. `⌘Z` afterwards puts the document back the way it was.
+
+*Open in…* stays in the toolbar while you edit, with Cursor, VS Code, Zed,
+Sublime — and Claude and ChatGPT — so the moment a change is bigger than a line,
+the file goes to something built for it. Imark runs nothing on your machine and
+asks nothing of your accounts; when you come back, the reader is where you left
+it, and the notes are still in the file.
 
 ## Comments
 
@@ -201,7 +226,9 @@ and tells you the rest were left alone.
 | `⌘[` / `⌘]` | Back / forward | `⌘R` | Reload |
 | `⌘+` / `⌘-` / `⌘0` | Text size | `⌘⇧R` | Reveal in Finder |
 | `⌘P` | Print or export PDF | `⌘⇧C` | Show all comments |
-| `⌘'` / `⌘⇧'` | Next / previous comment | `⌘Z` | Undo the last comment change |
+| `⌘'` / `⌘⇧'` | Next / previous comment | `⌘Z` | Undo the last change |
+| `⌘E` | Reading or editing | `⌘S` | Save the file |
+| `⌘X` / `⌘C` / `⌘V` | Cut, copy, paste | `⇧⌘Z` | Redo your typing |
 | `⌘/` | This table, in the app | | |
 
 `⌘/` opens the same list inside the app, built by reading the menu bar rather
@@ -248,9 +275,16 @@ it, with no error and no log entry.
 
 ### What does `⌘Z` undo?
 
-The last change to the document — a note written, edited or deleted — up to ten
-deep. Each one is a snapshot of the whole file taken before the change. It only
-covers changes Imark made; edits from your own editor are your editor's to undo.
+While reading: the last change to the document — a note written, edited or
+deleted — up to ten deep. Each one is a snapshot of the whole file taken before
+the change.
+
+While editing: the typing, like any editor, with `⇧⌘Z` to put it back. The two
+never mix, because putting a whole document back is not what `⌘Z` means with a
+caret on screen.
+
+Either way it only covers changes Imark made; edits from your own editor are your
+editor's to undo.
 
 ### What happens if two people comment on the same words?
 

@@ -80,6 +80,16 @@ enum Menu {
         menu.addItem(withTitle: "Open…", action: #selector(AppDelegate.openDocument(_:)), keyEquivalent: "o")
         menu.addItem(.separator())
         menu.addItem(withTitle: "Close", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+        menu.addItem(
+            withTitle: "Save",
+            action: #selector(DocumentWindowController.saveDocument(_:)),
+            keyEquivalent: "s"
+        )
+        menu.addItem(
+            withTitle: "Revert to Saved",
+            action: #selector(DocumentWindowController.revertDocument(_:)),
+            keyEquivalent: ""
+        )
         menu.addItem(.separator())
         let reveal = menu.addItem(withTitle: "Reveal in Finder", action: #selector(DocumentWindowController.revealInFinder(_:)), keyEquivalent: "r")
         reveal.keyEquivalentModifierMask = [.command, .shift]
@@ -95,8 +105,26 @@ enum Menu {
     private static func editMenu() -> NSMenu {
         let menu = NSMenu(title: "Edit")
         menu.addItem(withTitle: "Undo", action: #selector(DocumentWindowController.undoComment(_:)), keyEquivalent: "z")
+        let redo = menu.addItem(
+            withTitle: "Redo",
+            action: #selector(DocumentWindowController.redoTyping(_:)),
+            keyEquivalent: "z"
+        )
+        redo.keyEquivalentModifierMask = [.command, .shift]
         menu.addItem(.separator())
+        // Cut and Paste arrived with the editor: in a reader there was nothing to
+        // cut, and ⌘V did nothing at all until the file could be typed in.
+        menu.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
         menu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        menu.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        menu.addItem(.separator())
+        // A tick rather than two titles: editing is a state the window is in,
+        // and the same key puts it back.
+        menu.addItem(
+            withTitle: "Editing Mode",
+            action: #selector(DocumentWindowController.toggleEditMode(_:)),
+            keyEquivalent: "e"
+        )
         menu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
         menu.addItem(.separator())
         menu.addItem(withTitle: "Find…", action: #selector(DocumentWindowController.performFind(_:)), keyEquivalent: "f")

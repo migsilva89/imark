@@ -5,6 +5,9 @@ import ImarkRender
 /// underneath. Owns the renderer and forwards its messages upward.
 final class ContentViewController: NSViewController {
     let renderer = RendererView(frame: .zero)
+    /// The same document as text. Built with the pane rather than on demand so
+    /// the switch between reading and editing is instant and keeps its scroll.
+    let editor = MarkdownEditorView(frame: .zero)
 
     var onMessage: ((RendererMessage) -> Void)?
     var onFindClosed: (() -> Void)?
@@ -33,10 +36,12 @@ final class ContentViewController: NSViewController {
         // Back to front: the document runs the full height and everything else
         // sits over it. The header is what makes that readable — it blurs the
         // text passing underneath so the toolbar has something to stand on.
-        for subview in [renderer, header, findBar, status] {
+        for subview in [renderer, editor, header, findBar, status] {
             subview.translatesAutoresizingMaskIntoConstraints = false
             view.addSubview(subview)
         }
+
+        editor.isHidden = true
 
         header.material = .headerView
         header.blendingMode = .withinWindow
@@ -63,6 +68,14 @@ final class ContentViewController: NSViewController {
             renderer.topAnchor.constraint(equalTo: view.topAnchor),
             renderer.bottomAnchor.constraint(equalTo: status.topAnchor),
 
+            // The editor starts below the toolbar rather than under it: prose
+            // sliding under a blur reads as more page above, but a line of source
+            // disappearing behind glass just looks like a clipped line.
+            editor.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            editor.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            editor.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            editor.bottomAnchor.constraint(equalTo: status.topAnchor),
+
             status.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             status.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             status.bottomAnchor.constraint(equalTo: view.bottomAnchor),
@@ -86,6 +99,14 @@ final class ContentViewController: NSViewController {
             }
             self?.onMessage?(message)
         }
+    }
+
+    /// Which of the two is on screen. Both are always built; only one is shown,
+    /// so neither has to be rebuilt to come back.
+    func showEditor(_ on: Bool) {
+        editor.isHidden = !on
+        renderer.isHidden = on
+        if on { editor.focus() } else { renderer.focus() }
     }
 
     // MARK: - Find
@@ -283,7 +304,18 @@ final class ContentViewController: NSViewController {
     /// Confirmation that the file is genuinely being watched. Without it a
     /// silent re-render is indistinguishable from nothing happening.
     func flashReloaded() {
-        statusRight.stringValue = "Updated just now"
+        flash("Updated just now")
+    }
+
+    /// The file moved under an editor with unsaved text in it. Nothing was
+    /// reloaded — that would have taken the text with it — so this is the only
+    /// warning there is until the save refuses.
+    func flashChangedOnDisk() {
+        flash("Changed on disk · your text is still here")
+    }
+
+    private func flash(_ message: String) {
+        statusRight.stringValue = message
         flashWork?.cancel()
         let work = DispatchWorkItem { [weak self] in
             guard let self else { return }
@@ -316,7 +348,8 @@ extension ContentViewController: NSSearchFieldDelegate {
 
 
 /// Underlined and in the accent colour, so it reads as a link — and so it has
-/// to behave like one under the pointer too.
-private final class LinkButton: NSButton {
+/// to behave like one under the pointer too. Used by the status bar's comment
+/// count and by the Copy under an answer in the Ask panel.
+class LinkButton: NSButton {
     override func resetCursorRects() { addCursorRect(bounds, cursor: .pointingHand) }
 }

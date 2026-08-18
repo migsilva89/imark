@@ -192,8 +192,6 @@ enum Settings {
         set { store.set(newValue.rawValue, forKey: "searchEngine"); announce() }
     }
 
-    /// Path of the last editor used from "Open in", so the toolbar button can
-    /// go straight there instead of guessing every time.
     static var preferredEditor: URL? {
         get { store.string(forKey: "preferredEditor").map(URL.init(fileURLWithPath:)) }
         set { store.set(newValue?.path, forKey: "preferredEditor"); announce() }

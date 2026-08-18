@@ -148,6 +148,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 
+    /// ⌘Q does not go through `windowShouldClose`, so without this a window with
+    /// unsaved text in the editor was thrown away silently — the one path out of
+    /// the app that never asked.
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        for controller in controllers {
+            controller.window?.makeKeyAndOrderFront(nil)
+            guard controller.mayLeaveDocument() else { return .terminateCancel }
+        }
+        return .terminateNow
+    }
+
     // MARK: - Windows
 
     /// `host` asks for the document to land as a tab beside that window rather

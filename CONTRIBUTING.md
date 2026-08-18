@@ -17,6 +17,10 @@ that breaks one cannot ship anyway.
 
 ```bash
 Support/test-review.sh
+swiftc -parse-as-library -I .build/debug/Modules \
+  $(find Sources/Imark -name '*.swift' ! -name main.swift) \
+  $(find Sources/ImarkRender -name '*.swift') \
+  Support/test-editor.swift -o /tmp/imark-test-editor && /tmp/imark-test-editor
 node Support/test-notes.mjs
 node Support/test-export.mjs
 node Support/test-math.mjs
