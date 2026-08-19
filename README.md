@@ -203,15 +203,16 @@ and tells you the rest were left alone.
 
 | Where | What, and when |
 |---|---|
-| The `.md` you are reading | only when you comment. Written to a temporary file beside it and moved into place; it refuses to save at all if the document changed on disk since Imark read it |
+| The `.md` you are reading | when you save an edit or a comment. Written to a temporary file beside it and moved into place; it refuses to save at all if the document changed on disk since Imark read it |
 | `~/.imark/pending` | while an agent is waiting on a review: which document, and what you decided. Deleted when the agent reads it |
 | `~/Library/Preferences/pt.miguelsilva.imark.plist` | your settings — theme, text size, width, the update check |
 | `~/.claude/skills`, `~/.codex/skills`, … | only if you accept the offer to set up your coding agents, and only the files the alert names. A new version rewrites those same files once, on its first launch, unless you edited them |
 | The network | one request a day to `api.github.com` asking whether a newer version exists. A version number travels, nothing of yours does, and Settings turns it off |
 
 > [!IMPORTANT]
-> Comments are the only feature that writes to your documents. Imark keeps the
-> last ten states of a document, so `⌘Z` puts any of them back. If it ever
+> Editing and comments are the two ways Imark writes to your documents. Both
+> refuse to save if the file changed on disk since Imark read it. `⌘Z` puts the
+> last change back, and `⇧⌘Z` redoes your typing while editing. If Imark ever
 > damages a file, [open an issue](../../issues/new?template=bug_report.yml)
 > before anything else — that is the one bug worth interrupting whatever else is
 > happening.
