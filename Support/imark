@@ -1,0 +1,69 @@
+#!/bin/bash
+# The command line half of Imark.
+#
+#   imark                    bring the app up
+#   imark notes.md plan.md   open those, in the app that is already running
+#   imark notes plan.md      the notes somebody left in a file, as text
+#   imark review plan.md     open it for review and wait for the decision
+#
+# Lives inside the app bundle and is installed by symlink, so it always drives
+# the copy of Imark it shipped with — including a dev build, which is why the
+# app is found by walking up from this file rather than by name.
+#
+# Opening files is `open` and nothing more: macOS hands them to the instance
+# that is already running, and Imark brings a document already on screen
+# forward instead of opening it twice. Anything cleverer here would be a second
+# answer to a question the system already answers.
+
+set -euo pipefail
+
+SELF="$0"
+while [ -L "$SELF" ]; do
+	LINK="$(readlink "$SELF")"
+	case "$LINK" in
+		/*) SELF="$LINK" ;;
+		*) SELF="$(dirname "$SELF")/$LINK" ;;
+	esac
+done
+RESOURCES="$(cd "$(dirname "$SELF")" && pwd)"
+APP="$(cd "$RESOURCES/../.." && pwd)"
+AGENT="$RESOURCES/agent/imark.mjs"
+
+usage() {
+	cat <<'USAGE'
+usage: imark [<file.md> …]        open documents in Imark
+       imark notes <file.md>      print the notes left in a file
+       imark review <file.md>     open for review, wait for the decision
+USAGE
+}
+
+case "${1:-}" in
+	-h|--help|help) usage; exit 0 ;;
+	--version)
+		/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist"
+		exit 0
+		;;
+	notes|review|plan-hook)
+		# The same script the coding agents are given, so `imark review` from a
+		# terminal and a review asked for by an agent are one code path.
+		command -v node >/dev/null \
+			|| { echo "imark: $1 needs node — install Node.js, or use the app" >&2; exit 1; }
+		exec node "$AGENT" "$@"
+		;;
+	'')
+		exec /usr/bin/open -a "$APP"
+		;;
+	-*)
+		echo "imark: unknown option $1" >&2
+		usage >&2
+		exit 2
+		;;
+esac
+
+# Checked before opening anything: `open` reports a missing file by launching
+# the app with nothing in it, which looks like it worked.
+for file in "$@"; do
+	[ -e "$file" ] || { echo "imark: no such file: $file" >&2; exit 1; }
+done
+
+exec /usr/bin/open -a "$APP" "$@"

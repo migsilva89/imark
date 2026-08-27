@@ -66,6 +66,12 @@ enum Menu {
             keyEquivalent: ""
         )
         makeDefault.target = NSApp.delegate
+        let commandLine = menu.addItem(
+            withTitle: "Install the imark Command…",
+            action: #selector(AppDelegate.installCommandLineTool(_:)),
+            keyEquivalent: ""
+        )
+        commandLine.target = NSApp.delegate
         menu.addItem(.separator())
         let hide = menu.addItem(withTitle: "Hide Imark", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         hide.target = NSApp

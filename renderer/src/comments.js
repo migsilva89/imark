@@ -220,6 +220,47 @@ function wrapQuote(block, quote, nth) {
   return first
 }
 
+/// The piece of a block a note is really about: the list item or the table cell
+/// the quote landed in, rather than the twenty-item list or the whole table
+/// that physically follows the note in the file.
+///
+/// A note cannot be written *into* a list in the file — an HTML comment between
+/// two items splits the list in half, and blanking those lines again to render
+/// it turns a tight list loose — so it stays after the block, as it always did,
+/// and the quote is what says which item. This is the other half of that: on
+/// screen, the dot goes where the words are.
+const PIECE = 'li, td, th'
+
+/// The words of a piece, its own and not those of a list nested inside it. A
+/// list item that contains a nested list would otherwise be quoted as the whole
+/// subtree — three lines of note header for a note about one line of list.
+///
+/// Exported because main.js writes the quote and this file reads it back, and
+/// the two have to agree on what "the whole of this item" means.
+export const pieceText = (piece) => {
+  let text = ''
+  for (const node of piece.childNodes) {
+    if (node.nodeType === Node.ELEMENT_NODE && /^(UL|OL|TABLE)$/.test(node.tagName)) break
+    text += node.textContent
+  }
+  return text.trim()
+}
+
+const pieceOf = (node, block) => {
+  const piece = node?.closest?.(PIECE)
+  return piece && block.contains(piece) && piece !== block ? piece : null
+}
+
+/// How far down the holder a dot has to sit to be beside the words it belongs
+/// to. Measured rather than counted: rows and items are whatever height their
+/// content made them, and the note has to find the third one of nineteen.
+function offsetIn(holder, element) {
+  if (!element || element === holder) return 0
+  const home = holder.getBoundingClientRect()
+  const box = element.getBoundingClientRect()
+  return Math.max(0, Math.round(box.top - home.top))
+}
+
 /// The dot and the card have to be positioned against the block, and a block
 /// can be a table or a list that will not accept stray children. Wrapping is
 /// the one approach that works for every block type.
@@ -319,6 +360,19 @@ export function attachComments(root, comments) {
       if (note.colour) block.dataset.color = note.colour
     }
 
+    // A quote that is the whole of one list item or one table cell came from
+    // the `+` beside that piece: "this item", not "these words". Underlining
+    // every word of it says the wrong thing, so the piece takes the wash the
+    // same way a whole block does.
+    const piece = pieceOf(anchor, block)
+    if (piece && anchor && pieceText(piece) === note.quote.trim()) {
+      piece.classList.add('note-piece')
+      if (note.colour) piece.dataset.color = note.colour
+      for (const span of piece.querySelectorAll('.note-anchor')) {
+        span.classList.add('is-whole')
+      }
+    }
+
     const dot = document.createElement('button')
     dot.type = 'button'
     dot.className = lost ? 'note-dot orphan' : (aboutBlock ? 'note-dot block' : 'note-dot')
@@ -326,10 +380,17 @@ export function attachComments(root, comments) {
     dot.dataset.note = note.id
     if (note.colour) dot.dataset.color = note.colour
     dot.setAttribute('aria-label', lost ? 'Comment with a missing quote' : 'Comment')
-    // Two notes on one paragraph would otherwise sit exactly on top of each
-    // other and only the last one would be clickable.
-    const stacked = holder.querySelectorAll('.note-dot').length
-    if (stacked) dot.style.top = `${2 + stacked * 17}px`
+    // Down the holder to the item, row or cell the quote is in. A list of
+    // twenty items used to put every dot at the top of the list, which said a
+    // note existed somewhere in there and left you to click all of them.
+    const top = offsetIn(holder, piece ?? anchor ?? block)
+    // Two notes on the same words would otherwise sit exactly on top of each
+    // other and only the last one would be clickable. Counted per height, so a
+    // note further down the list does not push the next one off its own row.
+    const stacked = [...holder.querySelectorAll('.note-dot')]
+      .filter((other) => Math.abs(Number.parseInt(other.style.top || '2', 10) - (top + 2)) < 12)
+      .length
+    dot.style.top = `${top + 2 + stacked * 17}px`
     holder.appendChild(dot)
     holder.appendChild(buildCard(note, lost))
     attached.push({

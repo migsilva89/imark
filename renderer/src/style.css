@@ -904,6 +904,23 @@ img[data-blocked] {
   margin-left: calc(var(--step) * -3);
 }
 
+/* One item of a list, or one cell of a table, carrying a note of its own. The
+   same idea as .note-block and quieter still: it sits inside a block that may
+   already be washed, and the bar down the left has a column rule and a bullet
+   to share the space with. */
+.note-piece {
+  background: color-mix(in srgb, var(--note) 10%, transparent);
+  box-shadow: inset 2px 0 0 0 var(--note);
+  border-radius: 3px;
+}
+
+/* The words of such a note are the whole of the piece, and the wash already
+   says so. Underlining them as well draws a line under an entire table row. */
+.note-anchor.is-whole {
+  background: none;
+  border-bottom: 0;
+}
+
 /* Notes about the document itself, above everything. They have nothing in the
    page to point at, so unlike every other card these are open from the start —
    one that had to be found by clicking would never be read. */

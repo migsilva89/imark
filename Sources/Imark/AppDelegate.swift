@@ -206,12 +206,60 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// Greys out the menu item once Imark already owns .md — offering to do
-    /// something that is already done is just noise.
+    /// something that is already done is just noise. Same for the command,
+    /// which says where it went the first time and has nothing to add after.
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
         if item.action == #selector(makeDefaultHandler(_:)) {
             return !MarkdownType.imarkIsDefault
         }
+        if item.action == #selector(installCommandLineTool(_:)) {
+            return !CommandLineTool.isInstalled
+        }
         return true
+    }
+
+    /// Puts `imark` on the PATH, after saying exactly which file it is about to
+    /// write and where. It writes outside Imark's own container, which is
+    /// something to ask about rather than announce afterwards.
+    @objc func installCommandLineTool(_ sender: Any?) {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let target = CommandLineTool.destination.path
+        let shown = target.replacingOccurrences(of: home, with: "~")
+        let directory = CommandLineTool.destination.deletingLastPathComponent().path
+            .replacingOccurrences(of: home, with: "~")
+
+        let alert = NSAlert()
+        alert.messageText = "Install the imark command?"
+        alert.informativeText = [
+            "This links:",
+            "",
+            shown,
+            "",
+            "`imark notes.md` then opens a document in the copy of Imark you are "
+                + "already running, and brings it forward if it is open. Deleting "
+                + "that one link undoes it.",
+            CommandLineTool.isOnPath ? "" :
+                "\nYour shell does not look in \(directory) yet. Add it to PATH "
+                + "and open a new terminal.",
+        ].joined(separator: "\n")
+        alert.addButton(withTitle: "Install")
+        alert.addButton(withTitle: "Cancel")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+
+        do {
+            try CommandLineTool.install()
+            let done = NSAlert()
+            done.messageText = "The imark command is installed."
+            done.informativeText = CommandLineTool.isOnPath
+                ? "Try `imark notes.md` in a terminal."
+                : "It is at \(shown). Add \(directory) to your PATH to use it by name."
+            done.runModal()
+        } catch {
+            let failure = NSAlert()
+            failure.messageText = "Imark couldn't install the command."
+            failure.informativeText = (error as? LocalizedError)?.errorDescription ?? "\(error)"
+            failure.runModal()
+        }
     }
 
     @objc func makeDefaultHandler(_ sender: Any?) {

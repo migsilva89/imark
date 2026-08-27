@@ -78,6 +78,21 @@ macOS 14 or later. Imark tells you when a newer version exists — once per rele
 
 To make it the default for `.md`: launch it with no document open and click **Make Imark the default for .md**, or use the same item in the **Imark** menu. Once it is the default, both quietly disappear.
 
+### From a terminal
+
+**Imark ▸ Install the imark Command…** links `imark` into `/usr/local/bin`, or
+into `~/.local/bin` when that first one belongs to root — the alert says which,
+before it writes anything.
+
+```bash
+imark notes.md            # opens it in the copy already running
+imark notes notes.md      # the notes somebody left in it, as text
+```
+
+A document already open comes forward instead of opening twice. This is separate
+from making Imark the default for `.md` on purpose: `open notes.md` should still
+go to your editor.
+
 ## Editing
 
 The toolbar has one switch: an eye and a pencil. The eye is the app you know —
@@ -112,6 +127,12 @@ Select a phrase, press the speech bubble, write, press `↵`. The quoted words g
 underlined, a dot appears in the margin, and clicking either opens the note. Pick
 one of five colours while writing it, or change it later. The card carries **Edit**
 and **Delete**, and `⌘Z` undoes any of it — writing, editing or deleting.
+
+Without a selection there is a **+** in the margin, level with whatever the
+pointer is beside. On a list or a table it offers the **item or the cell** you
+are level with rather than the whole block — an agent's twenty-item list is
+twenty things to disagree with, not one — and the note quotes that item, so the
+file says which one it meant to anyone who reads it without the app.
 
 The note is stored **inside the `.md` file**, as an HTML comment:
 
@@ -206,6 +227,7 @@ and tells you the rest were left alone.
 | The `.md` you are reading | when you save an edit or a comment. Written to a temporary file beside it and moved into place; it refuses to save at all if the document changed on disk since Imark read it |
 | `~/.imark/pending` | while an agent is waiting on a review: which document, and what you decided. Deleted when the agent reads it |
 | `~/Library/Preferences/pt.miguelsilva.imark.plist` | your settings — theme, text size, width, the update check |
+| `/usr/local/bin/imark`, or `~/.local/bin/imark` | only if you ask for the `imark` command. One symlink into the app, named in the alert first. Deleting it undoes it |
 | `~/.claude/skills`, `~/.codex/skills`, … | only if you accept the offer to set up your coding agents, and only the files the alert names. A new version rewrites those same files once, on its first launch, unless you edited them |
 | The network | one request a day to `api.github.com` asking whether a newer version exists. A version number travels, nothing of yours does, and Settings turns it off |
 
