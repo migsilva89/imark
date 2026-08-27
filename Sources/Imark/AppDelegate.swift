@@ -238,9 +238,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             "`imark notes.md` then opens a document in the copy of Imark you are "
                 + "already running, and brings it forward if it is open. Deleting "
                 + "that one link undoes it.",
-            CommandLineTool.isOnPath ? "" :
-                "\nYour shell does not look in \(directory) yet. Add it to PATH "
-                + "and open a new terminal.",
+            CommandLineTool.mayNeedPathSetup
+                ? "\nIf your terminal cannot find it, add \(directory) to PATH "
+                    + "and open a new terminal."
+                : "",
         ].joined(separator: "\n")
         alert.addButton(withTitle: "Install")
         alert.addButton(withTitle: "Cancel")
@@ -250,9 +251,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             try CommandLineTool.install()
             let done = NSAlert()
             done.messageText = "The imark command is installed."
-            done.informativeText = CommandLineTool.isOnPath
-                ? "Try `imark notes.md` in a terminal."
-                : "It is at \(shown). Add \(directory) to your PATH to use it by name."
+            done.informativeText = CommandLineTool.mayNeedPathSetup
+                ? "Try `imark notes.md` in a terminal. If it cannot find the command, "
+                    + "add \(directory) to PATH and open a new terminal."
+                : "Try `imark notes.md` in a terminal."
             done.runModal()
         } catch {
             let failure = NSAlert()

@@ -46,22 +46,35 @@ enum CommandLineTool {
         test.map { URL(fileURLWithPath: $0) } ?? FileManager.default.homeDirectoryForCurrentUser
     }
 
-    /// Installed, and installed by us: a link that points into some other copy
-    /// of Imark is still this command, but a file of somebody's own that
-    /// happens to be called `imark` is not ours to report on or overwrite.
+    /// Installed into this copy of Imark. A link to another copy is ours to
+    /// repair, but it is not working for the app whose menu is being used now.
     static var isInstalled: Bool {
-        guard let target = try? FileManager.default
-            .destinationOfSymbolicLink(atPath: destination.path)
-        else { return false }
-        return target.hasSuffix("/Contents/Resources/imark")
+        guard let linked = linkedSource, let source else { return false }
+        return linked.standardizedFileURL == source.standardizedFileURL
     }
 
-    /// Whether the shell would find it, which is the only thing that makes an
-    /// installed command useful. `/usr/local/bin` always would; a directory
-    /// under the home directory is on the PATH only if somebody put it there.
-    static var isOnPath: Bool {
-        let path = ProcessInfo.processInfo.environment["PATH"] ?? ""
-        return path.split(separator: ":").contains { $0 == destination.deletingLastPathComponent().path }
+    /// A command under the home directory may need one line in the shell's
+    /// PATH. A GUI app does not inherit the shell's startup files, so it cannot
+    /// truthfully claim whether that line is already there; it can only give
+    /// the advice when it may be needed.
+    static var mayNeedPathSetup: Bool {
+        destination.path.hasPrefix(home.appendingPathComponent(".local/bin").path)
+    }
+
+    /// The destination of the installed link as an absolute URL, including a
+    /// relative link somebody may have made by hand.
+    private static var linkedSource: URL? {
+        guard let raw = try? FileManager.default
+            .destinationOfSymbolicLink(atPath: destination.path)
+        else { return nil }
+        if raw.hasPrefix("/") { return URL(fileURLWithPath: raw) }
+        return destination.deletingLastPathComponent().appendingPathComponent(raw)
+    }
+
+    /// A link installed by any copy of Imark is safe to repair. A regular file
+    /// or a link to another command is somebody else's and remains untouched.
+    private static var isManagedLink: Bool {
+        linkedSource?.path.hasSuffix("/Contents/Resources/imark") == true
     }
 
     enum Failure: LocalizedError {
@@ -90,8 +103,8 @@ enum CommandLineTool {
         // Replacing our own link is how an install after moving the app fixes
         // itself. Replacing anything else is taking somebody's file away
         // without asking, so it stops instead.
-        if FileManager.default.fileExists(atPath: target.path) || isInstalled {
-            guard isInstalled else { throw Failure.occupied(target.path) }
+        if FileManager.default.fileExists(atPath: target.path) || linkedSource != nil {
+            guard isManagedLink else { throw Failure.occupied(target.path) }
             try FileManager.default.removeItem(at: target)
         }
         try FileManager.default.createSymbolicLink(at: target, withDestinationURL: source)

@@ -28,6 +28,7 @@ import Foundation
             check("the first install works", false, "\(error)")
         }
         check("it says so afterwards", CommandLineTool.isInstalled)
+        check("a home install gives conditional PATH advice", CommandLineTool.mayNeedPathSetup)
         check("and it is a link, not a copy",
               (try? files.destinationOfSymbolicLink(atPath: link.path))?
                 .hasSuffix("/Contents/Resources/imark") == true)
@@ -40,6 +41,22 @@ import Foundation
             check("installing again is not an error", CommandLineTool.isInstalled)
         } catch {
             check("installing again is not an error", false, "\(error)")
+        }
+
+        // Moving Imark must not leave a dead command and a greyed-out repair
+        // command. A link into an older copy is ours to replace, but it is not
+        // reported as installed for this copy.
+        try? files.removeItem(at: link)
+        let old = home.appendingPathComponent("Old Imark.app/Contents/Resources/imark")
+        try? files.createDirectory(at: old.deletingLastPathComponent(), withIntermediateDirectories: true)
+        files.createFile(atPath: old.path, contents: Data("#!/bin/sh\n".utf8))
+        try? files.createSymbolicLink(at: link, withDestinationURL: old)
+        check("a link to an older copy needs repair", !CommandLineTool.isInstalled)
+        do {
+            try CommandLineTool.install()
+            check("installing repairs a link to an older copy", CommandLineTool.isInstalled)
+        } catch {
+            check("installing repairs a link to an older copy", false, "\(error)")
         }
 
         // Somebody else's imark is not ours to delete.
