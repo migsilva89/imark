@@ -31,6 +31,8 @@ check "the archive is verified before extraction" sh -c \
 	"test \"\$(/usr/libexec/PlistBuddy -c 'Print :SUVerifyUpdateBeforeExtraction' '$INFO')\" = true"
 check "the feed itself must also be signed" sh -c \
 	"test \"\$(/usr/libexec/PlistBuddy -c 'Print :SURequireSignedFeed' '$INFO')\" = true"
+check "no system profile is sent" sh -c \
+	"test \"\$(/usr/libexec/PlistBuddy -c 'Print :SUSendProfileInfo' '$INFO')\" = false"
 
 echo
 if [ "$failures" -eq 0 ]; then echo "all good"; else echo "$failures failing"; fi
