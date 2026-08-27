@@ -18,6 +18,7 @@ import {
   extractComments,
   installCommentHandlers,
   isReviewing,
+  pieceText,
   restoreNoteState,
   setReviewing as applyReviewing,
   stepNote,
@@ -926,6 +927,19 @@ function selectionInfo() {
   }
 }
 
+/// Which copy of these words the piece is, counted the same way a selection is
+/// counted, because the note is read back by looking for the nth occurrence of
+/// the quote in the block. Two identical rows in a table are not rare.
+function occurrenceOfPiece(block, piece, quote) {
+  const range = document.createRange()
+  try {
+    range.setStartBefore(piece)
+  } catch {
+    return 1
+  }
+  return countBefore(block, range, quote)
+}
+
 /// How many times the selected text already appeared in this block before the
 /// point where the selection starts, plus one.
 function countBefore(block, range, text) {
@@ -953,6 +967,7 @@ function countBefore(block, range, text) {
 /// one it is, and it can never come loose the way a quote can.
 let plusButton = null
 let plusTarget = null
+let plusBlock = null
 /// Hiding is delayed, because the way to the button leads out of the text: the
 /// pointer crosses the margin, which belongs to no block, and hiding on the
 /// first frame outside meant the button vanished exactly as you reached for it.
@@ -993,6 +1008,32 @@ const PLUS_REACH = 120
 /// And how much of each edge it never touches, because the rails are there.
 const RAIL_GUTTER = 56
 
+/// A list item or a table cell: the piece of a block somebody points at when
+/// they point at a list or a table. Agents write long lists, and a note on the
+/// list as a whole leaves the reader — human or agent — to work out which of
+/// nineteen items it meant.
+const PIECE = 'li, td, th'
+
+/// The piece of `block` under `node`, if any. The innermost one, so a list
+/// inside a list item answers with the item you are actually on.
+const pieceIn = (block, node) => {
+  const piece = node?.closest?.(PIECE)
+  return piece && block.contains(piece) ? piece : null
+}
+
+/// Out in the margin there is nothing under the pointer to ask, so the question
+/// goes to the text at the same height instead.
+///
+/// Only a list answers it. Items are stacked, so the one level with the pointer
+/// is the one meant — while a table row has three or four cells at that height
+/// and answering with the first would be a guess dressed up as an offer. Beside
+/// a table the margin still offers the table, and a cell has to be pointed at.
+function itemAtHeight(block, clientY) {
+  const box = block.getBoundingClientRect()
+  const item = document.elementFromPoint(box.left + 8, clientY)?.closest?.('li')
+  return item && block.contains(item) ? item : null
+}
+
 const topLevelBlock = (node) => {
   const root = content()
   let block = node
@@ -1008,19 +1049,25 @@ const topLevelBlock = (node) => {
 function hidePlus() {
   plusTarget?.classList.remove('block-target', 'block-armed')
   plusTarget = null
+  plusBlock = null
   if (plusButton) plusButton.style.display = 'none'
 }
 
-function showPlus(block) {
+/// `target` is what lights up and what the note will be about — a whole block,
+/// or one item or cell inside it. `block` is the top-level element it lives in,
+/// which is where the note goes in the file: an HTML comment written between
+/// two list items or two table rows would break the list or the table in half.
+function showPlus(target, block) {
   if (!plusButton) return
-  if (plusTarget === block) return
+  plusBlock = block
+  if (plusTarget === target) return
   plusTarget?.classList.remove('block-target', 'block-armed')
-  plusTarget = block
+  plusTarget = target
   // Lit as soon as the button appears, not only once the pointer reaches it.
   // Waiting meant the highlight never showed at all if you never got there.
-  block.classList.add('block-target')
+  target.classList.add('block-target')
 
-  const rect = block.getBoundingClientRect()
+  const rect = target.getBoundingClientRect()
   plusButton.style.display = 'flex'
   plusButton.style.top = `${rect.top + 1}px`
   plusButton.style.left = `${Math.max(4, rect.left - 34)}px`
@@ -1045,20 +1092,28 @@ function setUpBlockPlus() {
   })
 
   plusButton.addEventListener('click', () => {
-    const block = plusTarget
+    const target = plusTarget
+    const block = plusBlock ?? plusTarget
     const lines = lineRange(block)
-    if (!block || !lines) return
-    const rect = block.getBoundingClientRect()
-    block.classList.add('block-target')
-    // The same message a selection sends, with no text. Everything downstream
-    // already carries the quote through as a string; empty means "the block".
+    if (!target || !block || !lines) return
+    const rect = target.getBoundingClientRect()
+    target.classList.add('block-target')
+    // On a whole block: no text. Everything downstream already carries the
+    // quote through as a string, and empty means "the block".
+    //
+    // On one item or one cell, the piece's own words are the quote. The note
+    // still lands after the block in the file, so its words are the only thing
+    // that can say which item it was about — to the renderer, and to whoever
+    // reads the file without ever opening the app.
+    const piece = target === block ? null : target
+    const quote = piece ? pieceText(piece) : ''
     bridge({
       type: 'selection',
-      text: '',
+      text: quote,
       rect: { x: rect.left, y: rect.top, width: rect.width, height: Math.min(rect.height, 24) },
-      inline: lines,
+      inline: lineRange(target.closest('[data-line]')) ?? lines,
       block: lines,
-      occurrence: 1,
+      occurrence: piece ? occurrenceOfPiece(block, piece, quote) : 1,
     })
   })
 
@@ -1078,7 +1133,10 @@ function setUpBlockPlus() {
     const block = onText ?? blockAtHeight(event.clientX, event.clientY)
     if (!block || !lineRange(block)) return scheduleHide()
     cancelHide()
-    showPlus(block)
+    // Inside a list or a table the offer is for the item or the cell, whether
+    // the pointer is on the words or out in the margin beside them.
+    const piece = (onText && pieceIn(block, event.target)) ?? itemAtHeight(block, event.clientY)
+    showPlus(piece ?? block, block)
   })
 
   // Fixed positioning against a rect taken once — scrolling moves the block out

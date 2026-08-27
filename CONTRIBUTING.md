@@ -25,6 +25,7 @@ node Support/test-notes.mjs
 node Support/test-export.mjs
 node Support/test-math.mjs
 swift Support/test-plus.swift
+swift Support/test-pieces.swift
 ```
 
 The rest of the suites, the ones a release runs:
@@ -33,6 +34,7 @@ The rest of the suites, the ones a release runs:
 swiftc -parse-as-library Sources/Imark/Comments.swift Sources/Imark/NoteColour.swift \
   Support/test-comments.swift -o /tmp/imark-test && /tmp/imark-test
 Support/test-setup.sh
+Support/test-cli.sh
 ```
 
 ## Where things are

@@ -103,6 +103,12 @@ else
 	echo "warning: no icon — run 'swift Support/make-icon.swift'" >&2
 fi
 
+# The shell command, beside the resources it drives. Installed by symlink from
+# the app rather than copied out, so it can never be a version behind the app it
+# opens documents in.
+cp "$ROOT/Support/imark" "$APP/Contents/Resources/imark"
+chmod +x "$APP/Contents/Resources/imark"
+
 # The agent integration travels inside the app: the script that does the work,
 # and the skill and commands that point a coding agent at it. One source — the
 # same files the plugin ships — so the two can never drift apart, and the paths

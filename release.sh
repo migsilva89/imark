@@ -84,6 +84,7 @@ if [ "${1:-}" != "--force" ]; then
 		-o /tmp/imark-release-update >/dev/null 2>&1 \
 		&& /tmp/imark-release-update >/dev/null || die "the update comparison tests failed"
 	swift Support/test-plus.swift >/dev/null 2>&1 || die "the margin button tests failed"
+	swift Support/test-pieces.swift >/dev/null 2>&1 || die "the list and table note tests failed"
 	swift Support/test-front-matter.swift >/dev/null 2>&1 || die "the front matter tests failed"
 	Support/test-review.sh >/dev/null 2>&1 || die "the review round trip tests failed"
 	# test-setup.sh needs an assembled app, so it runs after the build instead.
@@ -106,6 +107,8 @@ if [ "${1:-}" != "--force" ]; then
 	step "installer checks"
 	IMARK_APP="$APP" Support/test-setup.sh >/dev/null 2>&1 \
 		|| die "the agent setup tests failed"
+	IMARK_APP="$APP" Support/test-cli.sh >/dev/null 2>&1 \
+		|| die "the command line tests failed"
 	echo "setup ok"
 fi
 
