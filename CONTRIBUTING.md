@@ -16,6 +16,7 @@ Run the suites. `./release.sh` refuses to build if any of them fail, so a change
 that breaks one cannot ship anyway.
 
 ```bash
+(cd renderer && node build.mjs)
 Support/test-review.sh
 swift build
 TEST_BIN="$(swift build --show-bin-path)"

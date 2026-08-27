@@ -61,6 +61,11 @@ if [ "${1:-}" != "--force" ]; then
 
 	# The suites, because a signed and notarised broken build is worse than an
 	# unsigned one: it carries somebody's name and opens without a warning.
+	# The web-view suites exercise the generated bundle, not renderer/src. Build
+	# it first so a clean checkout cannot test whatever Resources/ happened to
+	# contain from an older branch.
+	(cd renderer && node build.mjs) >/dev/null 2>&1 \
+		|| die "the renderer failed to build"
 	swiftc -parse-as-library Sources/Imark/Comments.swift Sources/Imark/NoteColour.swift \
 		Support/test-comments.swift -o /tmp/imark-release-test >/dev/null 2>&1 \
 		&& /tmp/imark-release-test >/dev/null || die "the comment tests failed"
