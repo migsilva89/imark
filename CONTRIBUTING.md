@@ -17,7 +17,10 @@ that breaks one cannot ship anyway.
 
 ```bash
 Support/test-review.sh
-swiftc -parse-as-library -I .build/debug/Modules \
+swift build
+TEST_BIN="$(swift build --show-bin-path)"
+swiftc -parse-as-library -I "$TEST_BIN/Modules" -F "$TEST_BIN" \
+  -Xlinker -rpath -Xlinker "$TEST_BIN" \
   $(find Sources/Imark -name '*.swift' ! -name main.swift) \
   $(find Sources/ImarkRender -name '*.swift') \
   Support/test-editor.swift -o /tmp/imark-test-editor && /tmp/imark-test-editor
@@ -35,6 +38,8 @@ swiftc -parse-as-library Sources/Imark/Comments.swift Sources/Imark/NoteColour.s
   Support/test-comments.swift -o /tmp/imark-test && /tmp/imark-test
 Support/test-setup.sh
 Support/test-cli.sh
+Support/test-update.sh
+Support/test-tap.sh
 ```
 
 ## Where things are

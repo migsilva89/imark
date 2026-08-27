@@ -14,8 +14,8 @@
 <p align="center">
   <img src="https://img.shields.io/badge/macOS-14%2B-blue?style=flat-square" alt="macOS 14 or later">
   <img src="https://img.shields.io/badge/Swift-6-orange?style=flat-square" alt="Swift 6">
-  <img src="https://img.shields.io/badge/network-update%20check%20only-brightgreen?style=flat-square" alt="Network: update check only, can be turned off">
-  <img src="https://img.shields.io/badge/size-13%20MB-lightgrey?style=flat-square" alt="13 MB">
+  <img src="https://img.shields.io/badge/network-updates%20only-brightgreen?style=flat-square" alt="Network: update checks and downloads only, can be turned off">
+  <img src="https://img.shields.io/badge/size-7%20MB-lightgrey?style=flat-square" alt="7 MB download">
   <img src="https://img.shields.io/badge/licence-MIT-blue?style=flat-square" alt="MIT licence">
 </p>
 
@@ -74,7 +74,9 @@ brew install --cask migsilva89/imark/imark
 
 Or download the [latest release](../../releases/latest) and drag `Imark.app` into `/Applications`. The disk image is signed and notarised, so it opens without a Gatekeeper warning.
 
-macOS 14 or later. Imark tells you when a newer version exists — once per release, and only if you leave the check on in Settings.
+macOS 14 or later. Imark checks once a day when you leave the option on in
+Settings. When a new version exists, click **Install and Relaunch** — the app
+downloads it, verifies both signatures, replaces itself and opens again.
 
 To make it the default for `.md`: launch it with no document open and click **Make Imark the default for .md**, or use the same item in the **Imark** menu. Once it is the default, both quietly disappear.
 
@@ -229,7 +231,7 @@ and tells you the rest were left alone.
 | `~/Library/Preferences/pt.miguelsilva.imark.plist` | your settings — theme, text size, width, the update check |
 | `/usr/local/bin/imark`, or `~/.local/bin/imark` | only if you ask for the `imark` command. One symlink into the app, named in the alert first. Deleting it undoes it |
 | `~/.claude/skills`, `~/.codex/skills`, … | only if you accept the offer to set up your coding agents, and only the files the alert names. A new version rewrites those same files once, on its first launch, unless you edited them |
-| The network | one request a day to `api.github.com` asking whether a newer version exists. A version number travels, nothing of yours does, and Settings turns it off |
+| The network | one request a day to GitHub for the signed update feed. If you click **Install and Relaunch**, Imark downloads the signed and notarised disk image from the same release. No document or identifier is sent, and Settings turns the automatic check off |
 
 > [!IMPORTANT]
 > Editing and comments are the two ways Imark writes to your documents. Both

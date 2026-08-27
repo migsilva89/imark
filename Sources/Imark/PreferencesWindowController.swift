@@ -192,14 +192,11 @@ final class PreferencesWindowController: NSWindowController, NSWindowDelegate {
         menuBar.target = self
         menuBar.action = #selector(menuBarChanged)
 
-        updates.title = "Check for new versions once a day"
+        updates.title = "Check for updates automatically"
         updates.setButtonType(.switch)
         updates.target = self
         updates.action = #selector(updatesChanged)
-        // The claim on the box is the whole privacy story, so it is written
-        // where the switch is: one request to GitHub, nothing of yours in it.
-        updates.toolTip = "Asks github.com for the latest release number. "
-            + "No documents, no identifiers — and off means zero network."
+        updates.toolTip = "Checks GitHub once a day. No documents are sent."
 
         shortcuts.title = "Keyboard Shortcuts…"
         shortcuts.bezelStyle = .rounded
@@ -277,7 +274,7 @@ final class PreferencesWindowController: NSWindowController, NSWindowDelegate {
             editor.selectItem(at: index)
         }
         menuBar.state = Settings.showInMenuBar ? .on : .off
-        updates.state = Settings.checksForUpdates ? .on : .off
+        updates.state = Updates.automaticallyChecksForUpdates ? .on : .off
         // One or the other, never a dead button: there is either something to
         // press or a fact to state.
         let owns = MarkdownType.imarkIsDefault
@@ -336,7 +333,7 @@ final class PreferencesWindowController: NSWindowController, NSWindowDelegate {
     }
 
     @objc private func updatesChanged() {
-        Settings.checksForUpdates = updates.state == .on
+        Updates.automaticallyChecksForUpdates = updates.state == .on
     }
 
     @objc private func shortcutsPressed() { ShortcutsPanel.toggle() }

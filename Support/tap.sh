@@ -28,20 +28,26 @@ command -v gh >/dev/null || die "gh is not installed — brew install gh"
 
 # Through the API rather than raw.githubusercontent, which serves a cached copy
 # for a few minutes and would report the old version right after a push.
+cask_text() {
+	gh api "repos/$TAP/contents/$CASK" -H "Accept: application/vnd.github.raw"
+}
+
 cask_version() {
-	gh api "repos/$TAP/contents/$CASK" -H "Accept: application/vnd.github.raw" \
-		| sed -n 's/^ *version "\(.*\)"/\1/p'
+	cask_text | sed -n 's/^ *version "\(.*\)"/\1/p'
 }
 
 # ------------------------------------------------------------------- check
 
 if [ "${1:-}" = "--check" ]; then
 	HERE="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Support/Imark-Info.plist)"
-	THERE="$(cask_version)"
-	if [ "$HERE" = "$THERE" ]; then
+	TEXT="$(cask_text)"
+	THERE="$(printf '%s\n' "$TEXT" | sed -n 's/^ *version "\(.*\)"/\1/p')"
+	if [ "$HERE" = "$THERE" ] \
+		&& printf '%s\n' "$TEXT" | grep -q '^  auto_updates true$' \
+		&& printf '%s\n' "$TEXT" | grep -q '^  binary "#{appdir}/Imark.app/Contents/Resources/imark"$'; then
 		echo "Homebrew installs $THERE, same as this tree"
 	else
-		printf '\033[1;33m! Homebrew installs %s, this tree is %s — run Support/tap.sh\033[0m\n' \
+		printf '\033[1;33m! Homebrew is incomplete or installs %s; this tree is %s — run Support/tap.sh\033[0m\n' \
 			"$THERE" "$HERE"
 		exit 1
 	fi
@@ -71,19 +77,10 @@ echo "$DMG · $(du -h "$TMP/$DMG" | cut -f1) · $SHA"
 step "the cask"
 git clone --quiet --depth 1 "https://github.com/$TAP.git" "$TMP/tap"
 
-# Only the two lines that change: a cask is Ruby, and everything else in it —
-# the zap list, the minimum macOS — is hand-written and stays as it was.
-node -e '
-	const fs = require("fs")
-	const [file, version, sha] = process.argv.slice(1)
-	let text = fs.readFileSync(file, "utf8")
-	for (const [key, value] of [["version", version], ["sha256", sha]]) {
-		const pattern = new RegExp(`(^\\s*${key} ")[^"]*(")`, "m")
-		if (!pattern.test(text)) { console.error(`no ${key} line in the cask`); process.exit(1) }
-		text = text.replace(pattern, `$1${value}$2`)
-	}
-	fs.writeFileSync(file, text)
-' "$TMP/tap/$CASK" "$VERSION" "$SHA"
+# The version and checksum change every time. The other two declarations are
+# added once: Homebrew links the bundled command into its bin directory, and
+# knows that subsequent updates can be installed from inside Imark.
+node Support/update-cask.mjs "$TMP/tap/$CASK" "$VERSION" "$SHA"
 
 if git -C "$TMP/tap" diff --quiet; then
 	echo "already $VERSION — nothing to push"
