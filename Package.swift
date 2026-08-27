@@ -6,6 +6,11 @@ import PackageDescription
 let package = Package(
     name: "Imark",
     platforms: [.macOS(.v14)],
+    dependencies: [
+        // Pinned because this framework installs executable code. Updating it
+        // is a deliberate review, not something a release build decides.
+        .package(url: "https://github.com/sparkle-project/Sparkle", exact: "2.9.6"),
+    ],
     targets: [
         .target(
             name: "ImarkRender",
@@ -14,9 +19,17 @@ let package = Package(
         ),
         .executableTarget(
             name: "Imark",
-            dependencies: ["ImarkRender"],
+            dependencies: [
+                "ImarkRender",
+                .product(name: "Sparkle", package: "Sparkle"),
+            ],
             path: "Sources/Imark",
-            swiftSettings: [.swiftLanguageMode(.v5)]
+            swiftSettings: [.swiftLanguageMode(.v5)],
+            // The executable sits in Contents/MacOS; Sparkle is embedded in
+            // the standard sibling Frameworks directory by build.sh.
+            linkerSettings: [.unsafeFlags([
+                "-Xlinker", "-rpath", "-Xlinker", "@loader_path/../Frameworks",
+            ])]
         ),
         .executableTarget(
             name: "ImarkQuickLook",

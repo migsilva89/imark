@@ -45,6 +45,22 @@
 	<true/>
 	<key>NSHumanReadableCopyright</key>
 	<string>Imark</string>
+	<key>SUAllowsAutomaticUpdates</key>
+	<false/>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUFeedURL</key>
+	<string>https://github.com/migsilva89/imark/releases/latest/download/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>kasuFZl5OUGi87Nim7zekUU40UPkty9HiSYiD+O6OiA=</string>
+	<key>SURequireSignedFeed</key>
+	<true/>
+	<key>SUScheduledCheckInterval</key>
+	<integer>86400</integer>
+	<key>SUSendProfileInfo</key>
+	<false/>
+	<key>SUVerifyUpdateBeforeExtraction</key>
+	<true/>
 	<key>UTExportedTypeDeclarations</key>
 	<array>
 		<dict>

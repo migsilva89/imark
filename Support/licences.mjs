@@ -55,9 +55,15 @@ const LICENCE_FILES = ['LICENSE', 'LICENSE.md', 'LICENSE.txt', 'LICENCE', 'COPYI
 function licenceText(dir) {
   for (const name of LICENCE_FILES) {
     const full = path.join(dir, name)
-    if (fs.existsSync(full)) return fs.readFileSync(full, 'utf8').trim()
+    if (fs.existsSync(full)) return cleanText(fs.readFileSync(full, 'utf8'))
   }
   return ''
+}
+
+// Third-party notices sometimes carry spaces at line ends. They have no legal
+// meaning and make the generated files fail the repository's whitespace check.
+function cleanText(text) {
+  return text.trim().replace(/[ \t]+$/gm, '')
 }
 
 const found = new Map()
@@ -76,6 +82,23 @@ for (const { dir, manifest } of packages(modules)) {
       text: licenceText(dir),
     })
   }
+}
+
+// Sparkle arrives as a binary Swift package rather than through node_modules,
+// but its notice has exactly the same obligation to travel with the app. Read
+// the version SwiftPM resolved and the licence bundled beside the artifact.
+const resolvedFile = path.join(root, 'Package.resolved')
+const sparkleLicence = path.join(root, '.build', 'artifacts', 'sparkle', 'Sparkle', 'LICENSE')
+if (fs.existsSync(resolvedFile) && fs.existsSync(sparkleLicence)) {
+  const pins = JSON.parse(fs.readFileSync(resolvedFile, 'utf8')).pins ?? []
+  const sparkle = pins.find((pin) => pin.identity === 'sparkle')
+  found.set('Sparkle', {
+    name: 'Sparkle',
+    version: sparkle?.state?.version ?? '',
+    licence: 'MIT and permissive bundled licences',
+    url: 'https://github.com/sparkle-project/Sparkle',
+    text: cleanText(fs.readFileSync(sparkleLicence, 'utf8')),
+  })
 }
 
 const list = [...found.values()].sort((a, b) => a.name.localeCompare(b.name))

@@ -23,10 +23,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // reading the skill at any time, so the files are not left stale while a
         // timer runs; the sentence about it can wait for the window.
         refreshAgentFiles()
-        // Well after launch: an update dialog that beats the document to the
+        // Well after launch: an update window that beats the document to the
         // screen makes the update feel more important than the reading.
         DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-            Updates.checkQuietly()
+            Updates.start()
         }
     }
 
@@ -107,7 +107,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         alert.runModal()
     }
 
-    @objc func checkForUpdates(_ sender: Any?) { Updates.checkNow() }
+    @MainActor @objc func checkForUpdates(_ sender: Any?) { Updates.checkNow() }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         if !flag { showWelcomeIfEmpty() }

@@ -58,9 +58,6 @@ fi
 
 step "renderer (esbuild)"
 (cd "$ROOT/renderer" && node build.mjs)
-# Generated from what esbuild actually bundled, so the notices cannot drift
-# from the binary they have to travel with.
-node "$ROOT/Support/licences.mjs"
 
 # ------------------------------------------------------------------ swift
 
@@ -68,15 +65,26 @@ step "swift build ($CONFIG)"
 swift build -c "$CONFIG" --arch arm64
 BIN="$(swift build -c "$CONFIG" --arch arm64 --show-bin-path)"
 
+# Generated after both builds, from what actually ships: the JavaScript bundle
+# and Sparkle's resolved binary framework.
+node "$ROOT/Support/licences.mjs"
+
 # --------------------------------------------------------------- assemble
 
 step "assemble $APP_NAME.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" \
          "$APP/Contents/Resources" \
+         "$APP/Contents/Frameworks" \
          "$APP/Contents/PlugIns/ImarkQuickLook.appex/Contents/MacOS"
 
 cp "$BIN/Imark" "$APP/Contents/MacOS/Imark"
+SPARKLE="$APP/Contents/Frameworks/Sparkle.framework"
+ditto "$BIN/Sparkle.framework" "$SPARKLE"
+# Imark itself is not sandboxed. Sparkle's XPC services exist only to cross a
+# sandbox boundary, so keeping them would add two executables and two signatures
+# that can never be used here.
+rm -rf "$SPARKLE/Versions/B/XPCServices" "$SPARKLE/XPCServices"
 cp "$ROOT/Support/Imark-Info.plist" "$APP/Contents/Info.plist"
 if [ "$DEV" -eq 1 ]; then
 	# Renamed and re-identified in place: two bundles with the same id would
@@ -171,6 +179,14 @@ else
 	EXTRA="--options=runtime"
 fi
 
+# shellcheck disable=SC2086
+codesign --force --sign "$SIGN_IDENTITY" $TIMESTAMP $EXTRA \
+	"$SPARKLE/Versions/B/Autoupdate" >/dev/null 2>&1
+# shellcheck disable=SC2086
+codesign --force --sign "$SIGN_IDENTITY" $TIMESTAMP $EXTRA \
+	"$SPARKLE/Versions/B/Updater.app" >/dev/null 2>&1
+# shellcheck disable=SC2086
+codesign --force --sign "$SIGN_IDENTITY" $TIMESTAMP $EXTRA "$SPARKLE" >/dev/null 2>&1
 # shellcheck disable=SC2086
 codesign --force --sign "$SIGN_IDENTITY" $TIMESTAMP $EXTRA \
 	--entitlements "$ROOT/Support/QuickLook.entitlements" "$APPEX" >/dev/null 2>&1

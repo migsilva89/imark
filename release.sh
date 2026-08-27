@@ -27,6 +27,7 @@ VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Suppor
 APP="$ROOT/dist/Imark.app"
 STAGE="$ROOT/dist/dmg"
 DMG="$ROOT/dist/Imark-$VERSION.dmg"
+APPCAST="$ROOT/dist/appcast.xml"
 
 step() { printf '\n\033[1;35m▸ %s\033[0m\n' "$1"; }
 die() { printf '\n\033[1;31m✗ %s\033[0m\n' "$1" >&2; exit 1; }
@@ -67,22 +68,21 @@ if [ "${1:-}" != "--force" ]; then
 	node Support/test-notes.mjs >/dev/null 2>&1 || die "the note anchoring tests failed"
 	node Support/test-invocation.mjs >/dev/null 2>&1 || die "the plugin invocation tests failed"
 	node Support/test-math.mjs >/dev/null 2>&1 || die "the math tests failed"
-	swift build >/dev/null 2>&1 \
-		&& swiftc -parse-as-library -I .build/debug/Modules \
+	Support/test-tap.sh >/dev/null 2>&1 || die "the Homebrew cask tests failed"
+	swift build >/dev/null 2>&1
+	TEST_BIN="$(swift build --show-bin-path)"
+	swiftc -parse-as-library -I "$TEST_BIN/Modules" -F "$TEST_BIN" \
+			-Xlinker -rpath -Xlinker "$TEST_BIN" \
 			$(find Sources/Imark -name '*.swift' ! -name main.swift) \
 			$(find Sources/ImarkRender -name '*.swift') \
 			Support/test-undo.swift -o /tmp/imark-release-undo >/dev/null 2>&1 \
 		&& /tmp/imark-release-undo >/dev/null || die "the undo tests failed"
-	swift build >/dev/null 2>&1 \
-		&& swiftc -parse-as-library -I .build/debug/Modules \
+	swiftc -parse-as-library -I "$TEST_BIN/Modules" -F "$TEST_BIN" \
+			-Xlinker -rpath -Xlinker "$TEST_BIN" \
 			$(find Sources/Imark -name '*.swift' ! -name main.swift) \
 			$(find Sources/ImarkRender -name '*.swift') \
 			Support/test-editor.swift -o /tmp/imark-release-editor >/dev/null 2>&1 \
 		&& /tmp/imark-release-editor >/dev/null || die "the editor tests failed"
-	swiftc -parse-as-library Sources/Imark/Updates.swift Sources/Imark/Settings.swift \
-		Sources/Imark/NoteColour.swift Support/test-update.swift \
-		-o /tmp/imark-release-update >/dev/null 2>&1 \
-		&& /tmp/imark-release-update >/dev/null || die "the update comparison tests failed"
 	swift Support/test-plus.swift >/dev/null 2>&1 || die "the margin button tests failed"
 	swift Support/test-pieces.swift >/dev/null 2>&1 || die "the list and table note tests failed"
 	swift Support/test-front-matter.swift >/dev/null 2>&1 || die "the front matter tests failed"
@@ -109,6 +109,8 @@ if [ "${1:-}" != "--force" ]; then
 		|| die "the agent setup tests failed"
 	IMARK_APP="$APP" Support/test-cli.sh >/dev/null 2>&1 \
 		|| die "the command line tests failed"
+	IMARK_APP="$APP" Support/test-update.sh >/dev/null 2>&1 \
+		|| die "the update bundle tests failed"
 	echo "setup ok"
 fi
 
@@ -116,6 +118,7 @@ fi
 
 step "disk image"
 rm -rf "$STAGE" "$DMG"
+rm -f "$APPCAST"
 mkdir -p "$STAGE"
 cp -R "$APP" "$STAGE/"
 # The symlink is the whole installer: drag the app onto it and it is installed.
@@ -151,6 +154,9 @@ else
 		xcrun notarytool submit "$DMG" --keychain-profile "$NOTARY_PROFILE" --wait
 		xcrun stapler staple "$DMG"
 		xcrun stapler validate "$DMG"
+
+		step "update feed"
+		Support/appcast.sh "$DMG"
 	fi
 fi
 
@@ -162,9 +168,17 @@ printf '\033[1;32m✓ %s (%s)\033[0m\n' "$DMG" "$(du -h "$DMG" | cut -f1)"
 # file is written — which is the one way somebody downloads an old Imark while
 # being told it is the new one. The site is not on this list: imark-site reads
 # the releases here twice an hour and rebuilds itself when the number moves.
-cat <<-EOF
+if [ -f "$APPCAST" ]; then
+	cat <<-EOF
 
 	then, to publish:
-	  gh release create v$VERSION "$DMG" --title "Imark $VERSION" --notes "…"
+	  gh release create v$VERSION "$DMG" "$APPCAST" --title "Imark $VERSION" --notes "…"
 	  Support/tap.sh          point Homebrew at it
-EOF
+	EOF
+else
+	cat <<-EOF
+
+	this build is for local testing. A signed and notarised release also writes
+	$APPCAST, which must be published beside the disk image.
+	EOF
+fi
