@@ -83,7 +83,12 @@ somebody's name and opens without a warning. `--force` skips the gate and is for
 when you know exactly why.
 
 It leaves `dist/Imark-<version>.dmg`, signed, notarised and stapled, plus
-`dist/appcast.xml`, the signed feed that tells installed copies about it.
+`dist/appcast.xml`, the signed feed that tells installed copies about it, plus
+`dist/Imark-<version>-update.dmg` — the same image, byte for byte, under the
+name the feed points at. Two names for one build is the only way to read the
+download counters apart: GitHub counts per asset, so the plain name is people
+installing Imark for the first time and the `-update` one is copies updating
+themselves.
 Notarisation is Apple looking at the binary and takes a few minutes.
 
 Either variable can be left out. Without `IMARK_NOTARY_PROFILE` you get a signed
@@ -107,15 +112,20 @@ else.
 
 ## Publishing
 
-Tag the commit and attach both files to the same GitHub release. The feed has a
-stable `releases/latest/download/appcast.xml` address, so the app follows the
-new release without a second server or repository to update:
+Tag the commit and attach all three files to the same GitHub release. The feed
+has a stable `releases/latest/download/appcast.xml` address, so the app follows
+the new release without a second server or repository to update:
 
 ```bash
 git tag v0.1.0 && git push origin v0.1.0
-gh release create v0.1.0 dist/Imark-0.1.0.dmg dist/appcast.xml \
-  --title "Imark 0.1.0" --notes "…"
+gh release create v0.1.0 dist/Imark-0.1.0.dmg dist/Imark-0.1.0-update.dmg \
+  dist/appcast.xml --title "Imark 0.1.0" --notes "…"
 ```
+
+Leaving the `-update` image out publishes a feed that points at an asset which
+is not there, and every installed copy fails its update with a 404. The site
+and Homebrew both name the plain image explicitly, so neither is confused by
+the second one.
 
 GitHub does not serve release assets from a private repository, so the repo has
 to be public before the download link works for anyone else.
