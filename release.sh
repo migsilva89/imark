@@ -28,6 +28,7 @@ APP="$ROOT/dist/Imark.app"
 STAGE="$ROOT/dist/dmg"
 DMG="$ROOT/dist/Imark-$VERSION.dmg"
 APPCAST="$ROOT/dist/appcast.xml"
+UPDATE_DMG="$ROOT/dist/Imark-$VERSION-update.dmg"
 
 step() { printf '\n\033[1;35m▸ %s\033[0m\n' "$1"; }
 die() { printf '\n\033[1;31m✗ %s\033[0m\n' "$1" >&2; exit 1; }
@@ -177,8 +178,13 @@ if [ -f "$APPCAST" ]; then
 	cat <<-EOF
 
 	then, to publish:
-	  gh release create v$VERSION "$DMG" "$APPCAST" --title "Imark $VERSION" --notes "…"
+	  gh release create v$VERSION "$DMG" "$UPDATE_DMG" "$APPCAST" \
+	    --title "Imark $VERSION" --notes "…"
 	  Support/tap.sh          point Homebrew at it
+
+	$(basename "$UPDATE_DMG") is the same image under a second name: the feed
+	points installed copies at it, so GitHub's per-asset counter separates
+	updates from first installs. Publish both or the updater 404s.
 	EOF
 else
 	cat <<-EOF
