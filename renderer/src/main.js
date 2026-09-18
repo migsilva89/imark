@@ -738,7 +738,7 @@ function addCopyButtons(root) {
     const button = document.createElement('button')
     button.className = 'copy-btn'
     button.type = 'button'
-    button.textContent = 'Copiar'
+    button.textContent = 'Copy'
     button.addEventListener('click', async () => {
       // A diff is one `code` per row, so the first one alone would copy a
       // single line and look like it had worked.
@@ -747,12 +747,12 @@ function addCopyButtons(root) {
         : wrap.querySelector('code')?.textContent ?? ''
       try {
         await navigator.clipboard.writeText(code)
-        button.textContent = 'Copiado'
+        button.textContent = 'Copied'
       } catch {
-        button.textContent = 'Falhou'
+        button.textContent = 'Failed'
       }
       setTimeout(() => {
-        button.textContent = 'Copiar'
+        button.textContent = 'Copy'
       }, 1400)
     })
     wrap.appendChild(button)
