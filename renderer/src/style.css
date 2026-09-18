@@ -687,7 +687,6 @@ img[data-blocked] {
   font-size: 14px;
 }
 
-:root[data-preview='true'] .copy-btn { display: none; }
 :root[data-preview='true'] a { pointer-events: none; }
 :root[data-preview='true'] .fm-title { font-size: 26px; }
 :root[data-preview='true'] h1 { font-size: 26px; }

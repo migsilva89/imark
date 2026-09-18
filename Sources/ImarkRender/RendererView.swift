@@ -194,7 +194,8 @@ public final class RendererView: NSView {
     }
 
     /// Quick Look shows the same document in a much smaller panel: tighter
-    /// margins, no copy buttons, nothing clickable.
+    /// margins, links not clickable. The copy button on code blocks stays:
+    /// the panel is where code gets copied from most.
     public func setPreviewMode() {
         previewMode = true
         setRail("left")
