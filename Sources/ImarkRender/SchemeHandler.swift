@@ -53,7 +53,15 @@ public final class SchemeHandler: NSObject, WKURLSchemeHandler {
             }
             target = candidate
         case "file":
-            target = URL(fileURLWithPath: path).standardizedFileURL
+            // Images only. They are the one thing a document loads from beside
+            // itself — a link to a file is a click, handled in Swift, and never
+            // a load — while a page able to load any file on the disk is a page
+            // whose `script-src imark:` reaches any file on the disk.
+            let candidate = URL(fileURLWithPath: path).standardizedFileURL
+            guard Self.isImage(candidate) else {
+                return task.didFailWithError(URLError(.noPermissionsToReadFile))
+            }
+            target = candidate
         default:
             return task.didFailWithError(URLError(.unsupportedURL))
         }
@@ -81,6 +89,11 @@ public final class SchemeHandler: NSObject, WKURLSchemeHandler {
     public static func isPage(_ url: URL?) -> Bool {
         guard let url else { return false }
         return url.scheme == scheme && url.host == "app" && url.path == "/index.html"
+    }
+
+    /// Decided by the extension, the same way the MIME type sent back is.
+    static func isImage(_ url: URL) -> Bool {
+        UTType(filenameExtension: url.pathExtension)?.conforms(to: .image) == true
     }
 
     private static func mimeType(for url: URL) -> String {
