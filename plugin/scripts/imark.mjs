@@ -416,9 +416,14 @@ function pendingDir() {
     || path.join(os.homedir(), '.imark', 'pending')
   fs.mkdirSync(dir, { recursive: true })
   // A crashed script leaves its request behind. Anything old enough that
-  // nobody can still be waiting on it is litter, not state.
+  // nobody can still be waiting on it is litter, not state — but only litter
+  // of ours, named the way requestReview and writeEphemeral name things.
+  // IMARK_PENDING_DIR can point anywhere, and a sweep that took every old file
+  // it found would take whatever else lives there.
+  const ours = /^[0-9a-f]{12}(\.json|\.decision\.json|\.md)$/
   const cutoff = Date.now() - 2 * 24 * 60 * 60 * 1000
   for (const name of fs.readdirSync(dir)) {
+    if (!ours.test(name)) continue
     const file = path.join(dir, name)
     try { if (fs.statSync(file).mtimeMs < cutoff) fs.rmSync(file) } catch { /* raced */ }
   }

@@ -270,6 +270,31 @@ out="$(sweeps)"
 refute "the corpse for this document is gone"   "$out" "PENDING: 0000deadbeef.json"
 check "another document's review is untouched"  "$out" "PENDING: 0000cafe0000.json"
 
+# Old leftovers go, and only ours: IMARK_PENDING_DIR can point at a folder that
+# holds other things.
+litter() {
+  local dir; dir="$(mktemp -d)"
+  cd "$dir"
+  export IMARK_PENDING_DIR="$dir/pending"
+  mkdir -p "$IMARK_PENDING_DIR"
+  printf '# Plan\n' > SPEC.md
+  for name in 0000deadbeef.json 0000deadbeef.decision.json 0000deadbeef.md notes.txt; do
+    echo old > "$IMARK_PENDING_DIR/$name"
+    touch -t 202601010000 "$IMARK_PENDING_DIR/$name"
+  done
+  IMARK_TEST_NO_OPEN=1 node "$OLDPWD/plugin/scripts/imark.mjs" review SPEC.md > out.txt 2>&1 &
+  local pid=$!
+  sleep 1
+  ls "$IMARK_PENDING_DIR" | sed 's/^/PENDING: /'
+  kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null
+  unset IMARK_PENDING_DIR; cd "$OLDPWD"; rm -rf "$dir"
+}
+out="$(litter)"
+refute "an old request of ours is swept"          "$out" "PENDING: 0000deadbeef.json"
+refute "with its decision"                        "$out" "PENDING: 0000deadbeef.decision.json"
+refute "and its stand-in document"                "$out" "PENDING: 0000deadbeef.md"
+check "an old file that is not ours stays"        "$out" "PENDING: notes.txt"
+
 echo "▸ the plan-mode hook"
 
 hook() {   # hook <on|off> <decision> → prints the JSON Claude Code reads
