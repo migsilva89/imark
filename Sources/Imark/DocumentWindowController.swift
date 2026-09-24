@@ -324,7 +324,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
             if !dead.isEmpty { content.renderer.markMissingWikiLinks(dead) }
 
         case .openExternal(let target):
-            NSWorkspace.shared.open(target)
+            openExternal(target)
 
         case .openLocal(let path, let anchor):
             let target = URL(fileURLWithPath: path)
@@ -381,6 +381,47 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
 
         case .ready, .rendered, .find:
             break
+        }
+    }
+
+    /// A link out of the document. Opening one used to be `NSWorkspace.open`
+    /// on whatever the href said, and the page passes on every scheme but its
+    /// own — so a link could start an app, or run a program sitting on the disk,
+    /// in one click. See `LinkRouter.external` for what goes straight through.
+    private func openExternal(_ target: URL) {
+        switch LinkRouter.external(target) {
+        case .open:
+            NSWorkspace.shared.open(target)
+        case .local(let path):
+            // Spelled as file:// rather than as a path, and still a file on this
+            // Mac: a document opens here, anything else is shown in the Finder.
+            guard !path.isEmpty else { return NSSound.beep() }
+            let anchor = target.fragment ?? ""
+            handle(.openLocal(path: path, anchor: anchor.isEmpty ? nil : anchor))
+        case .ask:
+            // Nothing on this Mac answers to it, so there is nothing to ask.
+            guard let app = NSWorkspace.shared.urlForApplication(toOpen: target) else {
+                return NSSound.beep()
+            }
+            confirmOpening(target, with: app)
+        }
+    }
+
+    private func confirmOpening(_ target: URL, with app: URL) {
+        guard let window else { return NSSound.beep() }
+        let alert = NSAlert()
+        alert.messageText = "Open this link in \(FileManager.default.displayName(atPath: app.path))?"
+        alert.informativeText = target.absoluteString
+            + "\n\nThe link comes from the document, and opening it hands it to another app."
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Open")
+        alert.addButton(withTitle: "Cancel")
+        // Return is not the way to agree to something a document asked for.
+        alert.buttons[0].keyEquivalent = ""
+        alert.buttons[1].keyEquivalent = "\r"
+        alert.beginSheetModal(for: window) { response in
+            guard response == .alertFirstButtonReturn else { return }
+            NSWorkspace.shared.open(target)
         }
     }
 

@@ -36,6 +36,26 @@ enum LinkRouter {
         return fuzzy
     }
 
+    /// What a link out of the document may do on its own.
+    ///
+    /// The web and mail are what links are for, and go straight through. A
+    /// `file:` link is a file on this Mac, and gets what a relative link gets.
+    /// Every other scheme hands the link to some other app — and the document is
+    /// somebody else's writing, so the reader decides, not the document.
+    enum External: Equatable {
+        case open
+        case local(path: String)
+        case ask
+    }
+
+    static func external(_ url: URL) -> External {
+        switch url.scheme?.lowercased() {
+        case "http", "https", "mailto": return .open
+        case "file": return .local(path: url.path)
+        default: return .ask
+        }
+    }
+
     private static func names(for target: String) -> [String] {
         if !URL(fileURLWithPath: target).pathExtension.isEmpty { return [target] }
         return MarkdownType.extensions.map { "\(target).\($0)" }
