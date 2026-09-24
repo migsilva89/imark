@@ -1,7 +1,7 @@
 ---
 description: Read the Imark comments out of a markdown file
 argument-hint: "<file.md>"
-allowed-tools: Bash(node:*)
+allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/imark.mjs" notes *)
 ---
 
 Read the notes the user left inside a markdown file with Imark.

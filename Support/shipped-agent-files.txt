@@ -32,3 +32,7 @@ fff991c12c6598dc9517600672bff649310296e7d953f78465ea72a86a463419  commands/imark
 
 # v0.2.3
 506f016829d1de7c619f8d5eee651f6053fe67d901ef25324051e9fc18270f01  commands/imark-review.md
+
+# after v0.6.2: each command pre-approves its own script, not every node command
+7e53fbcc2ad26eb02682e16fb523452376f8a312fe366e1e2aeaac06c62d0d10  commands/imark-review.md
+64ac28852bd6f32442c981d0eb2aa39080f06a3171e40bd970a28d02023e1611  commands/imark-notes.md

@@ -1,7 +1,7 @@
 ---
 description: Open a markdown document in Imark for review and wait for the reviewer's notes
 argument-hint: "<file.md> [--no-wait]"
-allowed-tools: Bash(node:*)
+allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/imark.mjs" review *)
 ---
 
 Open a document in Imark for the user to review, and wait for their decision.
