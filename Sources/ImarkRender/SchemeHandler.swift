@@ -75,6 +75,14 @@ public final class SchemeHandler: NSObject, WKURLSchemeHandler {
 
     public func webView(_ webView: WKWebView, stop task: WKURLSchemeTask) {}
 
+    /// The renderer's own page, which is the only thing the web view is ever
+    /// allowed to show. A fragment is still the page; any other path under
+    /// `app` is one of its resources, not something to navigate to.
+    public static func isPage(_ url: URL?) -> Bool {
+        guard let url else { return false }
+        return url.scheme == scheme && url.host == "app" && url.path == "/index.html"
+    }
+
     private static func mimeType(for url: URL) -> String {
         if let type = UTType(filenameExtension: url.pathExtension),
            let mime = type.preferredMIMEType {

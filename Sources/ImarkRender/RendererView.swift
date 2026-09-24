@@ -335,6 +335,15 @@ public final class RendererView: NSView {
             _ controller: WKUserContentController,
             didReceive message: WKScriptMessage
         ) {
+            // Only the renderer's own page speaks for the renderer. The navigation
+            // policy below is what keeps anything else from loading, and this is
+            // the second lock on the same door: a message from any other page
+            // would be somebody else's HTML opening links and deleting notes.
+            let origin = message.frameInfo.securityOrigin
+            guard message.frameInfo.isMainFrame,
+                  origin.protocol == SchemeHandler.scheme, origin.host == "app"
+            else { return }
+
             guard let owner, let body = message.body as? [String: Any],
                   let type = body["type"] as? String else { return }
 
@@ -489,6 +498,25 @@ private final class PageView: WKWebView {
 // MARK: - Navigation
 
 extension RendererView: WKNavigationDelegate {
+    /// The web view shows the renderer and nothing else, ever.
+    ///
+    /// A document is somebody else's HTML, and HTML has ways to leave the page
+    /// that no click handler sees — a form, an image map, some elements even
+    /// without being clicked. Whatever loaded in the page's place would inherit
+    /// the bridge, and with it every document rendered in this view afterwards,
+    /// since `render` hands the text to whatever page is there. The content
+    /// security policy has no directive for navigation, so the rule lives here.
+    ///
+    /// Links still work: the page catches them and sends them over the bridge,
+    /// where the app decides what a link is allowed to open.
+    public func webView(
+        _ webView: WKWebView,
+        decidePolicyFor navigationAction: WKNavigationAction,
+        decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
+    ) {
+        decisionHandler(SchemeHandler.isPage(navigationAction.request.url) ? .allow : .cancel)
+    }
+
     /// If WebKit dies the page goes blank and silent; reloading is the only
     /// useful response, and it beats leaving the user staring at nothing.
     public func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {

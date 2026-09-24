@@ -3,10 +3,13 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <!-- Nothing may be loaded from the network; the scheme handler serves both. -->
+    <!-- Nothing may be loaded from the network; the scheme handler serves both.
+         form-action and base-uri do not fall back to default-src, so they are
+         closed by name: a document's HTML has no business sending a form or
+         moving the base every relative URL resolves against. -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'none'; img-src imark: data:; style-src 'unsafe-inline' imark:; font-src data: imark:; script-src imark:;"
+      content="default-src 'none'; img-src imark: data:; style-src 'unsafe-inline' imark:; font-src data: imark:; script-src imark:; form-action 'none'; base-uri 'none';"
     />
     <link rel="stylesheet" href="imark://app/bundle.css" />
     <title>Imark</title>
