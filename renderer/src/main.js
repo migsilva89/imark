@@ -309,27 +309,118 @@ function mermaidTheme() {
   }
 }
 
-async function renderMermaid(root, theme) {
-  const blocks = root.querySelectorAll('.mermaid-block')
-  if (!blocks.length) return
+// Every diagram drawn so far, by palette and source. Mermaid is by far the
+// slowest part of a render — eight small diagrams in a long document took a
+// second and a half, all of its markdown about a tenth of a second — and all
+// of it was done again for a step Back, for a document opened a second time,
+// for every save of a file being followed and for every change in Settings,
+// which sends the palette again. A diagram that changed is a different key,
+// so nothing here goes stale. A drawing is 20 to 50 KB of text, so keeping a
+// hundred costs a few megabytes; past that the oldest are let go.
+const drawnDiagrams = new Map()
+const DIAGRAMS_KEPT = 100
+
+// Which drawing each block on the page is showing, by the same key. Every
+// change in Settings sends the palette again, the one already on the page, and
+// putting the same drawings back in made WebKit lay the whole document out
+// again: 230 ms of the 400 that a step of the text size took on a long one.
+const showing = new WeakMap()
+
+function remember(key, svg) {
+  // Put back at the end, so the diagrams in use are the last to go.
+  drawnDiagrams.delete(key)
+  drawnDiagrams.set(key, svg)
+  if (drawnDiagrams.size > DIAGRAMS_KEPT) drawnDiagrams.delete(drawnDiagrams.keys().next().value)
+}
+
+// Puts in every diagram in `root` already drawn in the current palette, and
+// hands the rest to `drawDiagrams`. A render calls it before anything measures
+// the page, so a document seen before is laid out once with its diagrams in
+// it, and not a second time when they arrive.
+function placeDrawnDiagrams(root) {
+  const themeVariables = mermaidTheme()
+  const palette = JSON.stringify(themeVariables)
+  const blocks = [...root.querySelectorAll('.mermaid-block')].map((block) => {
+    const source = decodeURIComponent(block.dataset.graph || '')
+    return { block, source, key: `${palette}\n${source}` }
+  })
+  // Once per page: an SVG styles itself by its own id, and the same diagram
+  // placed twice would put two of that id in one document. Blocks already
+  // showing their drawing are counted first, wherever they sit: counted on the
+  // way down, one lower on the page was missed, and a palette that came back
+  // while it was being drawn in another gave its drawing to a block above too.
+  const placed = new Set(blocks.filter(({ block, key }) => showing.get(block) === key).map(({ key }) => key))
+  const undrawn = []
+  for (const { block, source, key } of blocks) {
+    if (showing.get(block) === key) continue
+    const svg = drawnDiagrams.get(key)
+    if (svg === undefined || placed.has(key)) {
+      undrawn.push({ block, source, key })
+      continue
+    }
+    placed.add(key)
+    remember(key, svg)
+    block.innerHTML = svg
+    block.classList.add('is-rendered')
+    showing.set(block, key)
+  }
+  return { themeVariables, undrawn }
+}
+
+let drawing = 0
+let latestDrawing = Promise.resolve()
+
+function drawDiagrams(diagrams) {
+  // Counted even with nothing to draw: a document whose diagrams all came back
+  // still takes the page from one whose diagrams are being drawn.
+  latestDrawing = drawEach(diagrams, ++drawing)
+  return latestDrawing
+}
+
+// Waits for the drawing that has the page, whichever it is by then. A change
+// in Settings while a render waits on its own drawing draws everything again in
+// the new palette, and the render went on as soon as its own gave up: it put
+// the page back where it was against a page still missing its diagrams, and
+// said it was done before they were in.
+async function diagramsDrawn() {
+  let latest
+  while (latest !== latestDrawing) {
+    latest = latestDrawing
+    await latest
+  }
+}
+
+async function drawEach({ themeVariables, undrawn }, token) {
+  if (!undrawn.length) return
   mermaid.initialize({
     startOnLoad: false,
     theme: 'base',
-    themeVariables: mermaidTheme(),
+    themeVariables,
     securityLevel: 'strict',
     fontFamily: 'inherit',
   })
-  for (const block of blocks) {
-    const source = decodeURIComponent(block.dataset.graph || '')
+  for (const { block, source, key } of undrawn) {
     try {
       const { svg } = await mermaid.render(`mermaid-${mermaidSeq++}`, source)
+      // Another document, or this one in another palette, has started
+      // drawing since, and has the page now. Mermaid's settings are global and
+      // that drawing has just changed them, so this SVG may be half in the
+      // wrong colours — and kept, it would come back in them every time.
+      if (token !== drawing) return
       block.innerHTML = svg
       block.classList.add('is-rendered')
+      showing.set(block, key)
+      remember(key, svg)
     } catch (error) {
+      if (token !== drawing) return
       block.classList.add('is-error')
       block.innerHTML = `<div class="diagram-error"><strong>Invalid diagram</strong><pre>${escapeHtml(
         error?.message ?? error,
       )}</pre></div>`
+      // Shown as well, or every change in Settings parsed it again and put in a
+      // new error box. Not kept: a new render parses it once more, which costs
+      // nothing like a drawing.
+      showing.set(block, key)
     }
   }
 }
@@ -802,6 +893,7 @@ async function render({ markdown, path, theme, preview, rail, frontMatter, comme
     ? renderFrontMatter(data) + md.render(clean)
     : `${renderFrontMatter(data)}<p class="empty">This file is empty</p>`
   if (token !== renderToken) return
+  const diagrams = placeDrawnDiagrams(root)
 
   const notes = attachComments(root, comments)
   restoreNoteState()
@@ -817,7 +909,8 @@ async function render({ markdown, path, theme, preview, rail, frontMatter, comme
   // After the outline rail, never before: the marks are placed against its
   // ticks, and ticks that do not exist yet put every note at the top.
   buildNoteRail()
-  await renderMermaid(root, theme)
+  drawDiagrams(diagrams)
+  await diagramsDrawn()
   if (token !== renderToken) return
 
   const words = root.textContent.trim().split(/\s+/).filter(Boolean).length
@@ -1335,7 +1428,7 @@ window.imark = {
   setTheme(theme) {
     document.documentElement.dataset.theme = theme
     const blocks = document.querySelectorAll('.mermaid-block')
-    if (blocks.length) renderMermaid(content(), theme)
+    if (blocks.length) drawDiagrams(placeDrawnDiagrams(content()))
   },
   setWidth(width) {
     keepingPlace(() => {
