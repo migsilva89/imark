@@ -1,4 +1,5 @@
-// ⌘C while the row of actions is up over a selection, through a real window.
+// The keyboard while the row of actions is up over a selection, through a real
+// window.
 //
 //   TEST_BIN="$(swift build --show-bin-path)"
 //   mkdir -p /tmp/imark-test-selection && swiftc -parse-as-library \
@@ -15,9 +16,11 @@
 // The row leaves copying to ⌘C, and with Keyboard navigation turned on ⌘C beeped:
 // the popover handed the document window's focus to its first button, the web
 // view dropped out of the responder chain, and nothing was left to answer
-// `copy:`. The selection is made in the page, the row comes up the way it does
-// for a hand, and `copy:` goes up the chain from the window's first responder,
-// the way the Copy menu item sends it.
+// `copy:`. Now the page keeps the keyboard, and Tab or an arrow takes it into the
+// row. The selection is made in the page, the row comes up the way it does for a
+// hand, keys go through the application the way the window server hands them
+// over, and `copy:` goes up the chain from the window's first responder, the way
+// the Copy menu item sends it.
 
 import AppKit
 import WebKit
@@ -72,13 +75,14 @@ enum SelectionTest {
 
         // What decides whether a button can take the keyboard at all. It is read
         // from the system and cannot be set for one process, so with it off the
-        // cases pass with or without the fix.
+        // copying cases pass with or without the fix.
         if !app.isFullKeyboardAccessEnabled {
             print("note: Keyboard navigation is off in System Settings › Keyboard, and the bug needs it on")
         }
 
         try copyingWithTheRowUp(commenting: true)
         try copyingWithTheRowUp(commenting: false)
+        try theRowTakesTheKeyboardWhenAskedFor()
 
         try? FileManager.default.removeItem(at: folder)
         print(failures == 0 ? "\nall good" : "\n\(failures) failing")
@@ -144,13 +148,39 @@ enum SelectionTest {
     }
 
     static func row(besides document: NSWindow) -> [NSButton] {
+        popover(besides: document, holding: "Translate")
+    }
+
+    static func popover(besides document: NSWindow, holding tip: String) -> [NSButton] {
         for window in NSApp.windows where window !== document && window.isVisible {
             guard let content = window.contentView else { continue }
             let found = buttons(in: content)
-            if found.contains(where: { $0.toolTip == "Translate" }) { return found }
+            if found.contains(where: { $0.toolTip == tip || $0.title == tip }) { return found }
         }
         return []
     }
+
+    /// A key, through the application: that is where the row listens, before
+    /// the window or the page gets it.
+    static func press(_ key: UInt16, _ characters: String, _ modifiers: NSEvent.ModifierFlags = [],
+                      in window: NSWindow) {
+        let event = NSEvent.keyEvent(
+            with: .keyDown, location: .zero, modifierFlags: modifiers,
+            timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
+            context: nil, characters: characters, charactersIgnoringModifiers: characters,
+            isARepeat: false, keyCode: key
+        )!
+        NSApp.sendEvent(event)
+        spin(0.1)
+    }
+
+    static let tab: (UInt16, String) = (48, "\t")
+    static let backTab: (UInt16, String) = (48, "\u{19}")
+    static let right: (UInt16, String) = (124, "\u{F703}")
+    static let left: (UInt16, String) = (123, "\u{F702}")
+    static let space: (UInt16, String) = (49, " ")
+    static let escape: (UInt16, String) = (53, "\u{1B}")
+    static let arrows: NSEvent.ModifierFlags = [.numericPad, .function]
 
     static func holder(of window: NSWindow) -> String {
         guard let responder = window.firstResponder else { return "nothing" }
@@ -212,5 +242,76 @@ enum SelectionTest {
         check("something in the chain answers copy:", copy.handled)
         check("⌘C puts the words on the pasteboard", copy.copied.contains("Some words worth copying"),
               "pasteboard \(copy.copied.debugDescription)")
+    }
+
+    static func theRowTakesTheKeyboardWhenAskedFor() throws {
+        print("▸ Tab or an arrow takes the keyboard into the row")
+        defer { UserDefaults.standard.removeVolatileDomain(forName: UserDefaults.argumentDomain) }
+        guard let opened = try open(commenting: true) else { return }
+        defer { opened.controller.close() }
+        let window = opened.window
+
+        select(paragraph: 0, in: opened)
+        check("the row is up", !row(besides: window).isEmpty)
+
+        guard NSApp.isFullKeyboardAccessEnabled else {
+            press(tab.0, tab.1, in: window)
+            check("with Keyboard navigation off, Tab stays with the page", window.firstResponder === opened.page,
+                  "it went to \(holder(of: window))")
+            return print("skipped: the rest needs Keyboard navigation on in System Settings › Keyboard")
+        }
+
+        press(tab.0, tab.1, in: window)
+        check("Tab puts it on the first button", holder(of: window) == "the Comment button",
+              "it went to \(holder(of: window))")
+        press(right.0, right.1, arrows, in: window)
+        check("→ moves to the next", holder(of: window) == "the Translate button", holder(of: window))
+        press(tab.0, tab.1, in: window)
+        check("so does Tab", holder(of: window).hasPrefix("the Search"), holder(of: window))
+        press(right.0, right.1, arrows, in: window)
+        check("and goes round from the last", holder(of: window) == "the Comment button", holder(of: window))
+        press(left.0, left.1, arrows, in: window)
+        check("← goes back round", holder(of: window).hasPrefix("the Search"), holder(of: window))
+        press(backTab.0, backTab.1, .shift, in: window)
+        check("so does ⇧Tab", holder(of: window) == "the Translate button", holder(of: window))
+
+        press(8, "c", .command, in: window)
+        check("⌘C gives the keyboard back to the page", window.firstResponder === opened.page,
+              "it is on \(holder(of: window))")
+        check("and leaves the row up", !row(besides: window).isEmpty)
+        let copy = copyFromFirstResponder(of: window)
+        check("so the Copy item finds the page", copy.copied.contains("Some words worth copying"),
+              "pasteboard \(copy.copied.debugDescription)")
+
+        press(left.0, left.1, arrows, in: window)
+        check("← from the page puts it on the last button", holder(of: window).hasPrefix("the Search"),
+              holder(of: window))
+        press(escape.0, escape.1, in: window)
+        check("Escape closes the row", row(besides: window).isEmpty)
+        check("and gives the keyboard back to the page", window.firstResponder === opened.page,
+              "it is on \(holder(of: window))")
+
+        select(paragraph: 1, in: opened)
+        press(tab.0, tab.1, in: window)
+        opened.page.evaluateJavaScript("getSelection().removeAllRanges()")
+        waitFor(3) { row(besides: window).isEmpty }
+        check("clearing the selection closes the row", row(besides: window).isEmpty)
+        check("and the keyboard goes back to the page", window.firstResponder === opened.page,
+              "it is on \(holder(of: window))")
+
+        select(paragraph: 0, in: opened)
+        press(tab.0, tab.1, in: window)
+        press(space.0, space.1, in: window)
+        spin(0.2)
+        check("Space presses the button it is on", !popover(besides: window, holding: "Cancel").isEmpty)
+        check("and the composer has the keyboard", window.firstResponder is NSTextView,
+              "it is on \(holder(of: window))")
+        if let composer = window.firstResponder as? NSTextView {
+            composer.doCommand(by: #selector(NSResponder.cancelOperation(_:)))
+            spin(0.2)
+        }
+        check("closing the composer closes the popover", popover(besides: window, holding: "Cancel").isEmpty)
+        check("and gives the keyboard back to the page", window.firstResponder === opened.page,
+              "it is on \(holder(of: window))")
     }
 }
