@@ -94,10 +94,19 @@ if [ "${1:-}" != "--force" ]; then
 			$(find Sources/ImarkRender -name '*.swift') \
 			Support/test-editor.swift -o /tmp/imark-release-editor >/dev/null 2>&1 \
 		&& /tmp/imark-release-editor >/dev/null || die "the editor tests failed"
+	# In a folder of its own: it puts the renderer beside itself to serve it.
+	mkdir -p /tmp/imark-release-history
+	swiftc -parse-as-library -I "$TEST_BIN/Modules" -F "$TEST_BIN" \
+			-Xlinker -rpath -Xlinker "$TEST_BIN" \
+			$(find Sources/Imark -name '*.swift' ! -name main.swift) \
+			$(find Sources/ImarkRender -name '*.swift') \
+			Support/test-history.swift -o /tmp/imark-release-history/run >/dev/null 2>&1 \
+		&& /tmp/imark-release-history/run >/dev/null || die "the back and forward tests failed"
 	swift Support/test-plus.swift >/dev/null 2>&1 || die "the margin button tests failed"
 	swift Support/test-text-size.swift >/dev/null 2>&1 || die "the text size tests failed"
 	swift Support/test-pieces.swift >/dev/null 2>&1 || die "the list and table note tests failed"
 	swift Support/test-front-matter.swift >/dev/null 2>&1 || die "the front matter tests failed"
+	swift Support/test-anchors.swift >/dev/null 2>&1 || die "the heading link tests failed"
 	Support/test-review.sh >/dev/null 2>&1 || die "the review round trip tests failed"
 	swiftc -parse-as-library -I "$TEST_BIN" -I "$TEST_BIN/Modules" -F "$TEST_BIN" \
 			-Xlinker -rpath -Xlinker "$TEST_BIN" \

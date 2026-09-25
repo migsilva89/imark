@@ -10,8 +10,16 @@ public enum RendererMessage {
     case meta(words: Int, minutes: Int)
     case find(count: Int, index: Int)
     case wikilinks([String])
+    /// A link inside the page was followed, or a heading picked in the outline.
+    /// `from` is where the page was, which is where Back goes; `to` is where it
+    /// is gliding, which it has not reported yet.
+    case jumped(from: Double, to: Double)
+    /// Where the page has scrolled to, once a frame while it moves.
+    case scrolled(to: Double)
     case openWiki(String)
-    case openLocal(String)
+    /// A link to a file beside the document, and the heading in it the link
+    /// named, if it named one — still percent-encoded, as the href had it.
+    case openLocal(path: String, anchor: String?)
     case openExternal(URL)
     case selection(Selection)
     case selectionCleared
@@ -78,7 +86,7 @@ public struct TocEntry: Identifiable, Equatable {
 public final class RendererView: NSView {
     private let webView: WKWebView
     private var isReady = false
-    private var pending: (markdown: String, path: String)?
+    private var pending: (markdown: String, path: String, scroll: Double?, anchor: String?)?
 
     public var onMessage: ((RendererMessage) -> Void)?
 
@@ -135,14 +143,20 @@ public final class RendererView: NSView {
 
     // MARK: - Driving the page
 
-    public func render(markdown: String, path: String) {
+    /// `scroll` is where the page lands: the top for a document just opened, or
+    /// where the reader left it for a step Back. Nil keeps the place, which is
+    /// what a reload wants. `anchor` is a heading to land on instead, when the
+    /// document has it.
+    public func render(markdown: String, path: String, scroll: Double? = nil, anchor: String? = nil) {
         guard isReady else {
-            pending = (markdown, path)
+            pending = (markdown, path, scroll, anchor)
             return
         }
         call("window.imark.render", [
             "markdown": markdown,
             "path": path,
+            "scroll": scroll.map { $0 as Any } ?? NSNull(),
+            "anchor": anchor ?? "",
             "theme": palette,
             // Carried in the payload rather than sent separately: a standalone
             // call lands before the page is ready and is silently dropped.
@@ -159,6 +173,11 @@ public final class RendererView: NSView {
 
     public func scrollTo(anchor: String) {
         call("window.imark.scrollToAnchor", anchor)
+    }
+
+    /// Back and Forward inside one document: a place, not a heading.
+    public func scrollTo(offset: Double) {
+        call("window.imark.scrollToOffset", offset)
     }
 
     public func markMissingWikiLinks(_ targets: [String]) {
@@ -327,7 +346,10 @@ public final class RendererView: NSView {
                 owner.drainQueue()
                 if let pending = owner.pending {
                     owner.pending = nil
-                    owner.render(markdown: pending.markdown, path: pending.path)
+                    owner.render(
+                        markdown: pending.markdown, path: pending.path,
+                        scroll: pending.scroll, anchor: pending.anchor
+                    )
                 }
                 owner.onMessage?(.ready)
 
@@ -422,11 +444,22 @@ public final class RendererView: NSView {
             case "wikilinks":
                 owner.onMessage?(.wikilinks(body["targets"] as? [String] ?? []))
 
+            case "jump":
+                if let from = body["from"] as? Double, let to = body["to"] as? Double {
+                    owner.onMessage?(.jumped(from: from, to: to))
+                }
+
+            case "scrolled":
+                if let y = body["y"] as? Double { owner.onMessage?(.scrolled(to: y)) }
+
             case "openWiki":
                 if let target = body["target"] as? String { owner.onMessage?(.openWiki(target)) }
 
             case "openLocal":
-                if let path = body["path"] as? String { owner.onMessage?(.openLocal(path)) }
+                if let path = body["path"] as? String {
+                    let anchor = body["anchor"] as? String ?? ""
+                    owner.onMessage?(.openLocal(path: path, anchor: anchor.isEmpty ? nil : anchor))
+                }
 
             case "openExternal":
                 if let raw = body["url"] as? String, let url = URL(string: raw) {

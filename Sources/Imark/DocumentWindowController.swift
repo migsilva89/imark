@@ -41,8 +41,22 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     private(set) var reviewingComments = false
 
     private var watcher: FileWatcher?
-    private var back: [URL] = []
-    private var forward: [URL] = []
+
+    /// A step of history: a document, and how far down it the reader was. The
+    /// offset is what makes a jump inside one file a step as much as a link to
+    /// another — and what brings Back to the paragraph you left, not the top.
+    private struct Place {
+        let url: URL
+        let offset: Double
+    }
+
+    private var back: [Place] = []
+    private var forward: [Place] = []
+    /// Where the page is, as the renderer last reported it. Kept
+    /// here because leaving is decided on this side, and the page cannot be
+    /// asked synchronously on the way out.
+    private var scrollOffset: Double = 0
+    private var here: Place { Place(url: url, offset: scrollOffset) }
 
     /// Documents past this size would lock the web view up; render a prefix and
     /// say so instead of beachballing.
@@ -160,7 +174,10 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
 
     // MARK: - Loading
 
-    func show(_ target: URL, pushingHistory: Bool) {
+    /// `offset` is where the page lands: the top for a document being opened,
+    /// where the reader left it for a step Back or Forward. `anchor` is the
+    /// heading a link to the document named, which wins when it is there.
+    func show(_ target: URL, pushingHistory: Bool, at offset: Double = 0, anchor: String? = nil) {
         // Another document in the same window means this one is being put down.
         guard mayLeaveDocument() else { return }
         // It goes down reading: an editor left open on a file you are no longer
@@ -172,17 +189,18 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
             applyEditMode()
         }
         if pushingHistory {
-            back.append(url)
+            back.append(here)
             forward.removeAll()
         }
         url = target
+        scrollOffset = offset
         window?.title = target.lastPathComponent
         window?.representedURL = target
         content.setStatus(path: target)
         // One document's folded sections should not carry over to the next.
         sidebar.resetOutlineState()
         refreshSiblings()
-        load()
+        load(landingAt: offset, anchor: anchor)
 
         watcher = FileWatcher(url: target) { [weak self] event in
             guard let self else { return }
@@ -207,7 +225,8 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
-    private func load() {
+    /// `offset` nil keeps the place on the page, which is what a reload wants.
+    private func load(landingAt offset: Double? = nil, anchor: String? = nil) {
         // Asked again from disk: a different document, or the same one after an
         // edit, may have stopped being a review — and the toolbar is built from
         // the answer.
@@ -241,7 +260,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         // Only when there is nothing unsaved: the caller checked that before
         // reloading at all, and this is the second lock on the same door.
         if editMode, !content.editor.isDirty { content.editor.load(source) }
-        content.renderer.render(markdown: text, path: url.path)
+        content.renderer.render(markdown: text, path: url.path, scroll: offset, anchor: anchor)
     }
 
     private func showVanished() {
@@ -286,6 +305,20 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         case .meta(let words, let minutes):
             content.setStatus(words: words, minutes: minutes)
 
+        case .jumped(let from, let to):
+            // The outline still scrolls the page while the editor is on top of
+            // it, and a move nobody could see is not one to go Back through.
+            guard !editMode else { break }
+            back.append(Place(url: url, offset: from))
+            forward.removeAll()
+            // Where the page is going. Its own report of that comes with the
+            // next frame, and a Back pressed first has to leave the heading for
+            // Forward, not the place the link was followed from.
+            scrollOffset = to
+
+        case .scrolled(let offset):
+            scrollOffset = offset
+
         case .wikilinks(let targets):
             let dead = targets.filter { LinkRouter.resolveWiki($0, from: url) == nil }
             if !dead.isEmpty { content.renderer.markMissingWikiLinks(dead) }
@@ -293,10 +326,16 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         case .openExternal(let target):
             NSWorkspace.shared.open(target)
 
-        case .openLocal(let path):
+        case .openLocal(let path, let anchor):
             let target = URL(fileURLWithPath: path)
             if MarkdownType.matches(target), FileManager.default.fileExists(atPath: path) {
-                show(target, pushingHistory: true)
+                // A heading in the document already open is a jump inside it,
+                // not another visit: no reload, and Back is the place it left.
+                if let anchor, target.standardizedFileURL == url.standardizedFileURL {
+                    content.renderer.scrollTo(anchor: anchor)
+                } else {
+                    show(target, pushingHistory: true, anchor: anchor)
+                }
             } else {
                 NSWorkspace.shared.activateFileViewerSelecting([target])
             }
@@ -670,21 +709,36 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
 
     @objc func reloadDocument(_ sender: Any?) { load() }
 
-    @objc func goBack(_ sender: Any?) {
+    /// ⌘[. Not `goBack(_:)`: the web view has focus nearly all the time and
+    /// answers that one itself, with a history of its own that is always empty
+    /// — so the key did nothing and the menu item stayed grey.
+    @objc func goBackInHistory(_ sender: Any?) {
         // Asked before the stacks are touched: `show` can be called off by the
         // unsaved-text question, and an entry taken off for a move that never
         // happened is a step of history nobody can get back to.
         guard mayLeaveDocument() else { return }
         guard let previous = back.popLast() else { return NSSound.beep() }
-        forward.append(url)
-        show(previous, pushingHistory: false)
+        forward.append(here)
+        visit(previous)
     }
 
-    @objc func goForward(_ sender: Any?) {
+    /// ⌘]. Named apart from the web view's own for the same reason as Back.
+    @objc func goForwardInHistory(_ sender: Any?) {
         guard mayLeaveDocument() else { return }
         guard let next = forward.popLast() else { return NSSound.beep() }
-        back.append(url)
-        show(next, pushingHistory: false)
+        back.append(here)
+        visit(next)
+    }
+
+    /// A place in the document on screen is a scroll, not a reload: the page
+    /// is already there. Unless the editor is up — Back puts it down on the way
+    /// to any place, the same as it does for another file.
+    private func visit(_ place: Place) {
+        guard place.url == url, !editMode else {
+            return show(place.url, pushingHistory: false, at: place.offset)
+        }
+        scrollOffset = place.offset
+        content.renderer.scrollTo(offset: place.offset)
     }
 
     @objc func toggleSidebar(_ sender: Any?) {
@@ -740,6 +794,10 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         case #selector(toggleEditMode(_:)):
             item.state = editMode ? .on : .off
             return true
+        case #selector(goBackInHistory(_:)):
+            return !back.isEmpty
+        case #selector(goForwardInHistory(_:)):
+            return !forward.isEmpty
         case #selector(redoTyping(_:)):
             return editMode && content.editor.canRedo
         case #selector(saveDocument(_:)), #selector(revertDocument(_:)):

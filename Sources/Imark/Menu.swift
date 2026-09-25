@@ -179,8 +179,16 @@ enum Menu {
         )
 
         menu.addItem(.separator())
-        menu.addItem(withTitle: "Back", action: #selector(DocumentWindowController.goBack(_:)), keyEquivalent: "[")
-        menu.addItem(withTitle: "Forward", action: #selector(DocumentWindowController.goForward(_:)), keyEquivalent: "]")
+        menu.addItem(
+            withTitle: "Back",
+            action: #selector(DocumentWindowController.goBackInHistory(_:)),
+            keyEquivalent: "["
+        )
+        menu.addItem(
+            withTitle: "Forward",
+            action: #selector(DocumentWindowController.goForwardInHistory(_:)),
+            keyEquivalent: "]"
+        )
         menu.addItem(.separator())
         menu.addItem(withTitle: "Reload", action: #selector(DocumentWindowController.reloadDocument(_:)), keyEquivalent: "r")
         menu.addItem(.separator())

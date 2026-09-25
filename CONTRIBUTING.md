@@ -25,12 +25,18 @@ swiftc -parse-as-library -I "$TEST_BIN" -I "$TEST_BIN/Modules" -F "$TEST_BIN" \
   $(find Sources/Imark -name '*.swift' ! -name main.swift) \
   $(find Sources/ImarkRender -name '*.swift') \
   Support/test-editor.swift -o /tmp/imark-test-editor && /tmp/imark-test-editor
+mkdir -p /tmp/imark-test-history && swiftc -parse-as-library -I "$TEST_BIN/Modules" \
+  -F "$TEST_BIN" -Xlinker -rpath -Xlinker "$TEST_BIN" \
+  $(find Sources/Imark -name '*.swift' ! -name main.swift) \
+  $(find Sources/ImarkRender -name '*.swift') \
+  Support/test-history.swift -o /tmp/imark-test-history/run && /tmp/imark-test-history/run
 node Support/test-notes.mjs
 node Support/test-export.mjs
 node Support/test-math.mjs
 swift Support/test-plus.swift
 swift Support/test-text-size.swift
 swift Support/test-pieces.swift
+swift Support/test-anchors.swift
 ```
 
 The rest of the suites, the ones a release runs:
