@@ -156,6 +156,11 @@ final class SelectionPopover {
             button.bezelStyle = .recessed
             button.isBordered = true
             button.showsBorderOnlyWhileMouseInside = true
+            // The keyboard stays with the page. With Keyboard navigation on, a
+            // popover hands the document window's focus to its first button,
+            // the web view drops out of the responder chain, and ⌘C on the
+            // selection the row is sitting over beeps instead of copying.
+            button.refusesFirstResponder = true
             button.toolTip = spec.tip
             button.symbolConfiguration = .init(pointSize: 14, weight: .regular)
             button.setContentHuggingPriority(.required, for: .horizontal)
