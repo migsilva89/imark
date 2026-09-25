@@ -19,6 +19,7 @@ final class SelectionPopover {
 
     private let container = NSView()
     private lazy var actionsView = buildActions()
+    private var rowButtons: [NSButton] = []
     private var showsCommentingControls = true
     private let composer = NSTextView()
     private let message = NSTextField(labelWithString: "")
@@ -31,16 +32,29 @@ final class SelectionPopover {
     private var picked = NoteColour.standard
     private var swatches: [Swatch] = []
 
+    /// What had the keyboard before Tab or an arrow took it into the row.
+    private weak var page: NSResponder?
+    private var keys: Any?
+
     init() {
         popover.behavior = .transient
         popover.animates = false   // it tracks a selection; easing reads as lag
 
         target.owner = self
+        popover.delegate = target
+        keys = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self else { return event }
+            return self.handle(event)
+        }
 
         let controller = NSViewController()
         controller.view = container
         popover.contentViewController = controller
         show(panel: actionsView)
+    }
+
+    deinit {
+        if let keys { NSEvent.removeMonitor(keys) }
     }
 
     // MARK: - Presenting
@@ -86,6 +100,7 @@ final class SelectionPopover {
     func setCommentingControls(_ shown: Bool) {
         guard showsCommentingControls != shown else { return }
         showsCommentingControls = shown
+        returnKeyboard()   // before the buttons holding it are replaced
         actionsView = buildActions()
         dismiss()
     }
@@ -93,6 +108,7 @@ final class SelectionPopover {
     private var isComposing = false
 
     private func show(panel: NSView) {
+        returnKeyboard()
         container.subviews.forEach { $0.removeFromSuperview() }
         panel.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(panel)
@@ -156,10 +172,11 @@ final class SelectionPopover {
             button.bezelStyle = .recessed
             button.isBordered = true
             button.showsBorderOnlyWhileMouseInside = true
-            // The keyboard stays with the page. With Keyboard navigation on, a
-            // popover hands the document window's focus to its first button,
-            // the web view drops out of the responder chain, and ⌘C on the
-            // selection the row is sitting over beeps instead of copying.
+            // The keyboard stays with the page until it is asked for; see
+            // `handle(_:)`. With Keyboard navigation on, a popover hands the
+            // document window's focus to its first button, the web view drops
+            // out of the responder chain, and ⌘C on the selection the row is
+            // sitting over beeps instead of copying.
             button.refusesFirstResponder = true
             button.toolTip = spec.tip
             button.symbolConfiguration = .init(pointSize: 14, weight: .regular)
@@ -169,6 +186,8 @@ final class SelectionPopover {
             return button
         }
 
+        rowButtons = buttons
+
         let stack = NSStackView(views: buttons)
         stack.orientation = .horizontal
         stack.spacing = 1
@@ -176,10 +195,86 @@ final class SelectionPopover {
         return stack
     }
 
+    // MARK: - Keyboard
+
+    /// Virtual key codes, the same whatever the keyboard layout.
+    private enum Key {
+        static let tab: UInt16 = 48
+        static let space: UInt16 = 49
+        static let enter: UInt16 = 36
+        static let escape: UInt16 = 53
+        static let left: UInt16 = 123
+        static let right: UInt16 = 124
+    }
+
+    /// The row leaves the keyboard with the page, so ⌘C copies what it is
+    /// sitting over. Tab or an arrow asks for the row instead and takes the
+    /// keyboard into it: Tab and the arrows go round the buttons, Space or
+    /// Return presses one, Escape closes the row, and any other key hands the
+    /// keyboard back and goes on to the page — ⌘C included.
+    private func handle(_ event: NSEvent) -> NSEvent? {
+        guard popover.isShown, actionsView.superview === container,
+              let host, let window = host.window, event.window === window
+        else { return event }
+
+        let modifiers = event.modifierFlags.intersection([.command, .option, .control, .shift])
+        var step = 0
+        switch (event.keyCode, modifiers) {
+        case (Key.tab, []), (Key.right, []): step = 1
+        case (Key.tab, [.shift]), (Key.left, []): step = -1
+        default: break
+        }
+
+        guard let at = rowButtons.firstIndex(where: { $0 === window.firstResponder }) else {
+            // Only from the page: the find field and the sidebar keep their keys.
+            guard step != 0, let responder = window.firstResponder as? NSView,
+                  responder.isDescendant(of: host) else { return event }
+            page = responder
+            return focus(step > 0 ? rowButtons.first : rowButtons.last, in: window) ? nil : event
+        }
+
+        if step != 0 {
+            _ = focus(rowButtons[(at + step + rowButtons.count) % rowButtons.count], in: window)
+            return nil
+        }
+        switch (event.keyCode, modifiers) {
+        case (Key.space, []), (Key.enter, []):
+            rowButtons[at].performClick(nil)
+            return nil
+        case (Key.escape, []):
+            dismiss()
+            return nil
+        default:
+            returnKeyboard()
+            return event
+        }
+    }
+
+    /// Puts the keyboard on a button of the row. A button takes it only with
+    /// Keyboard navigation on, which is the system's call: with it off, Tab and
+    /// the arrows go on to the page as they always have.
+    private func focus(_ button: NSButton?, in window: NSWindow) -> Bool {
+        guard let button else { return false }
+        rowButtons.forEach { $0.refusesFirstResponder = false }
+        if window.makeFirstResponder(button) { return true }
+        rowButtons.forEach { $0.refusesFirstResponder = true }
+        return false
+    }
+
+    /// Gives the keyboard back to the page if the row has it. Called whenever
+    /// the row gives way to another panel or closes: the document window would
+    /// otherwise go on sending keys to a button that is no longer on screen.
+    fileprivate func returnKeyboard() {
+        rowButtons.forEach { $0.refusesFirstResponder = true }
+        guard let window = host?.window,
+              rowButtons.contains(where: { $0 === window.firstResponder }) else { return }
+        window.makeFirstResponder(page ?? host)
+    }
+
     /// The buttons target a small forwarding object rather than the popover
     /// itself, so the button targets hold nothing strongly. One per popover —
     /// a shared one would mean two document windows fighting over it.
-    fileprivate final class Target: NSObject {
+    fileprivate final class Target: NSObject, NSPopoverDelegate {
         weak var owner: SelectionPopover?
 
         @objc func comment() {
@@ -195,6 +290,8 @@ final class SelectionPopover {
         @objc func cancelComment() { owner?.dismiss() }
         @objc func pickColour(_ sender: Swatch) { owner?.pick(sender.colour) }
 
+        /// A click beside a transient popover closes it without `dismiss()`.
+        func popoverDidClose(_ notification: Notification) { owner?.returnKeyboard() }
     }
 
     // MARK: - Translate and search
