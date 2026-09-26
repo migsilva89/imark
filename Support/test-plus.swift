@@ -225,6 +225,111 @@ results.fileNotePanelIsFirst = document.getElementById('content').firstElementCh
 results.fileNoteCardIsOpen = panel?.querySelector('.note-card')?.hidden === false
 results.fileNoteDoesNotWashABlock = document.querySelectorAll('.note-block').length === 0
 
+// 7d. Every table cell can be reached. The `+` hangs to the left of what it
+//     offers, which for a cell is inside the cell next door: on the way there
+//     that cell lit up and took the button with it, and the first column lost
+//     to the whole table as soon as the pointer left it for the margin. The
+//     hand is played back a pixel at a time, each move sent to whatever is
+//     under it, as the real pointer's are.
+await window.imark.render({
+  markdown: [
+    '# Heading',
+    '',
+    '| Name | Kind | Note |',
+    '|---|---|---|',
+    '| alpha | one | first |',
+    '| beta | two | a note long enough to wrap onto a second line and then a third one as well |',
+    '',
+  ].join('\\n'),
+  path: '/tmp/t.md',
+  theme: 'dark',
+})
+await sleep(300)
+const hover = (x, y) => (document.elementFromPoint(x, y) ?? document.body).dispatchEvent(
+  new MouseEvent('mousemove', { bubbles: true, clientX: x, clientY: y })
+)
+const glide = (fromX, fromY, toX, toY) => {
+  const steps = Math.ceil(Math.hypot(toX - fromX, toY - fromY))
+  for (let i = 1; i <= steps; i++) {
+    hover(fromX + (toX - fromX) * i / steps, fromY + (toY - fromY) * i / steps)
+  }
+}
+const tablePlus = document.querySelector('.block-plus')
+// From a point in the cell to the middle of the `+` it brought up. Reached
+// means the pointer ends on the button with that cell still the one lit.
+const reachPlus = async (cell, fromY) => {
+  hover(5, 5)
+  await sleep(300)
+  const box = cell.getBoundingClientRect()
+  const x = box.left + 20
+  const y = fromY ?? box.top + box.height / 2
+  hover(x, y)
+  const button = tablePlus.getBoundingClientRect()
+  const toX = button.left + button.width / 2
+  const toY = button.top + button.height / 2
+  glide(x, y, toX, toY)
+  await sleep(30)
+  return document.elementFromPoint(toX, toY) === tablePlus
+    && cell.classList.contains('block-target')
+}
+const [, kindCell] = document.querySelectorAll('#content th')
+const [alphaCell, oneCell, , betaCell, , longCell] = document.querySelectorAll('#content td')
+results.plusReachesACellPastTheOneToItsLeft = await reachPlus(oneCell)
+results.plusReachesAHeaderCellPastTheOneToItsLeft = await reachPlus(kindCell)
+results.plusReachesAFirstColumnCellFromTheMargin = await reachPlus(betaCell)
+results.plusReachesATallCellFromItsLastLine =
+  await reachPlus(longCell, longCell.getBoundingClientRect().bottom - 6)
+// The way to the button is only the strip beside the cell. Further into the
+// cell to the left, that cell answers as it always did.
+hover(5, 5)
+await sleep(300)
+const oneBox = oneCell.getBoundingClientRect()
+const alphaBox = alphaCell.getBoundingClientRect()
+hover(oneBox.left + 20, oneBox.top + oneBox.height / 2)
+glide(oneBox.left + 20, oneBox.top + oneBox.height / 2,
+      alphaBox.left + 10, alphaBox.top + alphaBox.height / 2)
+await sleep(30)
+results.theCellToTheLeftStillAnswers = alphaCell.classList.contains('block-target')
+  && !oneCell.classList.contains('block-target')
+// And the margin beside the table away from a lit cell still offers the table.
+hover(5, 5)
+await sleep(300)
+const tableBox = document.querySelector('#content table').getBoundingClientRect()
+hover(tableBox.left - 80, tableBox.top + tableBox.height / 2)
+await sleep(30)
+results.theMarginBesideATableStillOffersTheTable =
+  document.querySelector('#content table').classList.contains('block-target')
+
+// 7e. Beside a list the `+` stays with the item level with the pointer. The
+//     item is found by looking at the list's left edge at that height, where
+//     the button for that item already stands: the look found the button,
+//     offered the whole list, and the button went to the top of it. Every move
+//     in the margin swapped the two.
+await window.imark.render({
+  markdown: '# Heading\\n\\n- first item\\n- second item\\n- third item\\n',
+  path: '/tmp/t.md',
+  theme: 'dark',
+})
+await sleep(300)
+hover(5, 5)
+await sleep(300)
+const [, secondItem] = document.querySelectorAll('#content li')
+const itemBox = secondItem.getBoundingClientRect()
+const itemY = itemBox.top + itemBox.height / 2
+hover(itemBox.left + 20, itemY)
+const listPlus = document.querySelector('.block-plus')
+const plusTop = listPlus.style.top
+let swaps = 0
+let lit = secondItem
+for (let x = itemBox.left + 20; x >= itemBox.left - 90; x -= 1) {
+  hover(x, itemY)
+  const now = document.querySelector('.block-target')
+  if (now !== lit) swaps++
+  lit = now
+}
+results.plusStaysWithAListItemBesideIt = swaps === 0 && lit === secondItem
+  && listPlus.style.top === plusTop
+
 // 8. In the Quick Look panel there is nothing to write to, so no `+` — but the
 //    notes already in the file still have to show.
 window.imark.setPreview(true)
