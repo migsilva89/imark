@@ -687,7 +687,13 @@ img[data-blocked] {
   font-size: 14px;
 }
 
-:root[data-preview='true'] a { pointer-events: none; }
+/* The extension listens to none of the page's messages, so a link to a site, a
+   file or a wiki page would light up under the pointer and go nowhere. A link
+   to a heading or a footnote never leaves the page — it is the jump the rail
+   already makes — so those still answer. A wiki link's href is a bare `#`,
+   which is why it is named on its own. */
+:root[data-preview='true'] a:not([href^='#']),
+:root[data-preview='true'] a[data-wikilink] { pointer-events: none; }
 :root[data-preview='true'] .fm-title { font-size: 26px; }
 :root[data-preview='true'] h1 { font-size: 26px; }
 :root[data-preview='true'] h2 { font-size: 20px; }

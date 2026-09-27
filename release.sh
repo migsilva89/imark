@@ -109,6 +109,7 @@ if [ "${1:-}" != "--force" ]; then
 	swift Support/test-plus.swift >/dev/null 2>&1 || die "the margin button tests failed"
 	swift Support/test-text-size.swift >/dev/null 2>&1 || die "the text size tests failed"
 	swift Support/test-pieces.swift >/dev/null 2>&1 || die "the list and table note tests failed"
+	swift Support/test-preview.swift >/dev/null 2>&1 || die "the Quick Look link tests failed"
 	swift Support/test-front-matter.swift >/dev/null 2>&1 || die "the front matter tests failed"
 	swift Support/test-diagrams.swift >/dev/null 2>&1 || die "the diagram tests failed"
 	swift Support/test-anchors.swift >/dev/null 2>&1 || die "the heading link tests failed"

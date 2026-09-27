@@ -213,7 +213,8 @@ public final class RendererView: NSView {
     }
 
     /// Quick Look shows the same document in a much smaller panel: tighter
-    /// margins, links not clickable. The copy button on code blocks stays:
+    /// margins, and only the links that stay on the page clickable: the ones to
+    /// a heading or a footnote. The copy button on code blocks stays:
     /// the panel is where code gets copied from most.
     public func setPreviewMode() {
         previewMode = true
