@@ -256,8 +256,10 @@ enum SelectionTest {
 
         guard NSApp.isFullKeyboardAccessEnabled else {
             press(tab.0, tab.1, in: window)
-            check("with Keyboard navigation off, Tab stays with the page", window.firstResponder === opened.page,
-                  "it went to \(holder(of: window))")
+            // Tab goes on the way it always has — to the sidebar, say — but
+            // never onto the row, where a Space would open one of its panels.
+            check("with Keyboard navigation off, Tab leaves the row alone",
+                  !holder(of: window).hasSuffix("button"), "it went to \(holder(of: window))")
             return print("skipped: the rest needs Keyboard navigation on in System Settings › Keyboard")
         }
 

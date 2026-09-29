@@ -250,11 +250,13 @@ final class SelectionPopover {
         }
     }
 
-    /// Puts the keyboard on a button of the row. A button takes it only with
-    /// Keyboard navigation on, which is the system's call: with it off, Tab and
-    /// the arrows go on to the page as they always have.
+    /// Puts the keyboard on a button of the row, only with Keyboard navigation
+    /// on, which is the system's call: with it off, Tab and the arrows go on to
+    /// the page as they always have. Asked here rather than left to the button,
+    /// because `makeFirstResponder` takes a button either way — and a Space or
+    /// Return after that opened the row's panel on a key meant for the page.
     private func focus(_ button: NSButton?, in window: NSWindow) -> Bool {
-        guard let button else { return false }
+        guard let button, NSApp.isFullKeyboardAccessEnabled else { return false }
         rowButtons.forEach { $0.refusesFirstResponder = false }
         if window.makeFirstResponder(button) { return true }
         rowButtons.forEach { $0.refusesFirstResponder = true }
