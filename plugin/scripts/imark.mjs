@@ -246,24 +246,30 @@ function verdict(notes) {
  * already in it would end the review with nobody having looked, and an "approve"
  * left over from an earlier round would end the next round too.
  *
- * Matched on the note's opening line as the file has it, not on what parseNotes
- * made of the note. The app ends a note at any line holding `-->`, this script
- * only at a line that is nothing else, so a planted note can run on into the
- * next one here: its body changes as soon as the reviewer writes below it, and a
- * note it swallowed surfaces when the reviewer writes in between. The opening
- * lines are read wherever they sit, inside another note included, and neither
- * moves them. Not on the line number, because the reviewer's notes push every
- * note below them down.
+ * Matched on who wrote the note, when, and on what — the attributes of its
+ * opening line as the file has it — not on what parseNotes made of the note.
+ * The app ends a note at any line holding `-->`, this script only at a line that
+ * is nothing else, so a planted note can run on into the next one here: its
+ * body changes as soon as the reviewer writes below it, and a note it swallowed
+ * surfaces when the reviewer writes in between. The opening lines are read
+ * wherever they sit, inside another note included. Not on the line itself,
+ * because editing a note in the app rewrites it — `color=` moves to the end —
+ * and not on its number, because the reviewer's notes push every note below
+ * them down.
  */
-export function writtenSince(before, source, notes) {
-  const lines = source.split('\n')
+export function writtenSince(before, notes) {
+  const key = (quote, by, at) => JSON.stringify([quote, by, at])
   const left = new Map()
-  for (const line of before) left.set(line, (left.get(line) ?? 0) + 1)
+  for (const line of before) {
+    const attrs = attributes(line)
+    const k = key(attrs.quote ?? '', attrs.by ?? '', attrs.at ?? '')
+    left.set(k, (left.get(k) ?? 0) + 1)
+  }
   return notes.filter((note) => {
-    const line = lines[note.line - 1]
-    const count = left.get(line) ?? 0
+    const k = key(note.quote, note.by, note.at)
+    const count = left.get(k) ?? 0
     if (count === 0) return true
-    left.set(line, count - 1)
+    left.set(k, count - 1)
     return false
   })
 }
@@ -392,9 +398,8 @@ async function waitForDecision(file, request, { before = [], timeoutMs = 4 * 60 
       const stamp = `${stat.size}:${stat.mtimeMs}`
       if (stamp !== seen) {
         seen = stamp
-        const source = fs.readFileSync(file, 'utf8')
-        const notes = parseNotes(source)
-        const decided = verdict(writtenSince(before, source, notes))
+        const notes = parseNotes(fs.readFileSync(file, 'utf8'))
+        const decided = verdict(writtenSince(before, notes))
         if (decided) {
           return {
             approved: decided.approved,
