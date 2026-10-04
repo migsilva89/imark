@@ -16,6 +16,8 @@
 // The other half is what Back needs: a jump inside the page has to tell the app
 // where the reader was, the app has to be able to put them back there, and a
 // link to a heading in another file has to say which heading.
+//
+// It also covers GitHub's links to lines of a file, and queries on local links.
 
 import AppKit
 import WebKit
@@ -267,6 +269,130 @@ await window.imark.render({
 })
 await sleep(300)
 results.aMissingHeadingOpensAtTheTop = window.scrollY === 0
+
+// 11. GitHub's links to lines land on the block that holds the line, counted
+//     from the top of the file, front matter and all. A query on a local link
+//     is not part of the file's name.
+const LINES_HEAD = [
+  '---', 'title: Lines', '---', '', '# Lines', '', filler, '',
+  'The target paragraph.', '',
+  '- First item', '- The target item', '- Third item', '',
+  '> First quoted.', '>', '> Second quoted.', '',
+  filler, '',
+].join('\\n')
+const lineOf = (text) => LINES_HEAD.split('\\n').indexOf(text) + 1
+const paragraphLine = lineOf('The target paragraph.')
+const itemLine = lineOf('- The target item')
+const LINES = LINES_HEAD + [
+  `- [Line link](#L${paragraphLine})`,
+  `- [Range link](#L${itemLine}-L${itemLine + 1})`,
+  `- [Blank line link](#L${paragraphLine - 1})`,
+  '- [Past the end](#L99999)',
+  '- [Source view](other.md?plain=1#L12)',
+  '- [Query alone](other.md?plain=1)',
+  `- [Same file](?plain=1#L${paragraphLine})`,
+  '- [Front matter](#L2)',
+  `- [Blank quote line](#L${lineOf('> Second quoted.') - 1})`,
+  `- [Column](#L${itemLine}C3)`,
+  `- [Not the heading](#L${paragraphLine})`,
+  '',
+  '![Picture](pic.png?raw=true)',
+  '',
+  `## L${paragraphLine}`,
+  '',
+  filler,
+  '',
+].join('\\n')
+
+await window.imark.render({
+  markdown: LINES, path: '/tmp/lines.md', theme: 'dark', scroll: 0, frontMatter: true,
+})
+await sleep(300)
+const paragraphNamed = (text) =>
+  [...document.querySelectorAll('#content p')].find((p) => p.textContent === text)
+const paragraph = paragraphNamed('The target paragraph.')
+const item = [...document.querySelectorAll('#content li')]
+  .find((li) => li.textContent === 'The target item')
+
+window.scrollTo(0, 0)
+await sleep(50)
+const beforeLine = jumps().length
+link('Line link').click()
+await landed()
+results.aLineLinkLandsOnItsBlock = atTop(paragraph)
+results.aLineLinkIsAJump = jumps().length === beforeLine + 1
+
+window.scrollTo(0, 0)
+await sleep(50)
+link('Range link').click()
+await landed()
+results.aRangeLandsOnItsFirstLine = atTop(item)
+
+window.scrollTo(0, 0)
+await sleep(50)
+link('Blank line link').click()
+await landed()
+results.aBlankLineLandsOnTheNextBlock = atTop(paragraph)
+
+window.scrollTo(0, 500)
+await sleep(50)
+const beforePast = jumps().length
+link('Past the end').click()
+await landed()
+results.aLinePastTheEndDoesNotMove = window.scrollY === 500 && jumps().length === beforePast
+
+link('Source view').click()
+const plain = sent.filter((m) => m.type === 'openLocal').pop()
+results.theSourceViewQueryIsNotInThePath = plain?.path === '/tmp/other.md'
+results.andTheLineIsTheAnchor = plain?.anchor === 'L12'
+
+link('Query alone').click()
+results.aQueryWithoutALineOpensTheFile =
+  sent.filter((m) => m.type === 'openLocal').pop()?.path === '/tmp/other.md'
+
+results.anImageQueryIsNotInItsPath =
+  document.querySelector('#content img')?.getAttribute('src') === 'imark://file/tmp/pic.png'
+
+results.aSameFileQueryIsAnInPageLink = link('Same file')?.getAttribute('href') === `#L${paragraphLine}`
+window.scrollTo(0, 0)
+await sleep(50)
+link('Same file').click()
+await landed()
+results.andLandsOnItsBlock = atTop(paragraph)
+
+window.scrollTo(0, 500)
+await sleep(50)
+link('Front matter').click()
+await landed()
+const card = document.querySelector('#content .front-matter')
+results.aFrontMatterLineShowsTheCard =
+  !!card?.getBoundingClientRect().height && card.getBoundingClientRect().top >= 0
+
+window.scrollTo(0, 0)
+await sleep(50)
+link('Blank quote line').click()
+await landed()
+results.aBlankLineInAQuoteLandsOnTheNextParagraph = atTop(paragraphNamed('Second quoted.'))
+
+window.scrollTo(0, 0)
+await sleep(50)
+link('Column').click()
+await landed()
+results.aColumnLinkLandsOnItsBlock = atTop(item)
+
+window.scrollTo(0, 0)
+await sleep(50)
+link('Not the heading').click()
+await landed()
+results.aLineLinkWinsOverAHeadingNamedLikeIt = atTop(paragraph)
+
+await window.imark.render({
+  markdown: LINES, path: '/tmp/other.md', theme: 'dark', scroll: 0, anchor: `L${itemLine}`,
+})
+await sleep(300)
+results.aLinkedLineIsWhereItOpens = atTop(
+  [...document.querySelectorAll('#content li')].find((li) => li.textContent === 'The target item'),
+)
 
 return JSON.stringify(results)
 """

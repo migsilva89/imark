@@ -222,9 +222,14 @@ const patchAttr = (rules, rule, attr) => {
         // it was encoded into the path — `other.md%23section` — and named a
         // file that is not there.
         const hash = value.indexOf('#')
-        const file = hash < 0 ? value : value.slice(0, hash)
+        const path = hash < 0 ? value : value.slice(0, hash)
         const fragment = hash < 0 ? '' : value.slice(hash)
-        token.attrs[i][1] = fileURL(resolveLocal(file)) + fragment
+        // A query is for a web server, not part of the name: GitHub's
+        // `?plain=1` for a file's source, `?raw=true` for an image.
+        const query = path.indexOf('?')
+        const file = query < 0 ? path : path.slice(0, query)
+        // `?plain=1#L12` alone is a link within this page.
+        token.attrs[i][1] = file ? fileURL(resolveLocal(file)) + fragment : fragment
       }
     }
     return original
@@ -1444,6 +1449,8 @@ function findAnchor(fragment) {
   }
   const exact = document.getElementById(id) ?? document.getElementById(fragment)
   if (exact) return exact
+  const lineLink = LINE_LINK.exec(id)
+  if (lineLink) return blockAtLine(Number(lineLink[1]))
   // Links written against the ids Imark used to make are in documents already:
   // accents off, underscores gone, a run of spaces as one hyphen — `#acao-rapida`
   // for "Ação rápida". Compared with all of that taken out of both sides.
@@ -1451,6 +1458,25 @@ function findAnchor(fragment) {
     s.normalize('NFD').toLowerCase().replace(/[^\p{L}\p{Nd}\p{Nl}-]/gu, '').replace(/-+/g, '-')
   const wanted = plain(id)
   return [...content().querySelectorAll('[id]')].find((el) => plain(el.id) === wanted) ?? null
+}
+
+// GitHub's links to lines of a file's source, `#L12`, `#L12-L20` or `#L12C3`:
+// a rendered page has blocks, so they land on the innermost block holding the
+// first line, or the next one when that line is blank.
+const LINE_LINK = /^L([1-9]\d*)(?:C\d+)?(?:-L[1-9]\d*(?:C\d+)?)?$/
+
+function blockAtLine(lineNumber) {
+  const index = lineNumber - 1 // `data-line` counts from zero
+  // The front matter is a card with no lines of its own, at the top.
+  if (index < lineOffset) return content()
+  let holder = null
+  for (const block of content().querySelectorAll('[data-line]')) {
+    const range = lineRange(block)
+    if (!range) continue
+    if (range.start > index) return holder && !holder.contains(block) ? holder : block
+    if (index < range.end) holder = block
+  }
+  return holder
 }
 
 /* ------------------------------------------------------------------ find */
