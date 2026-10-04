@@ -17,7 +17,8 @@
 // where the reader was, the app has to be able to put them back there, and a
 // link to a heading in another file has to say which heading.
 //
-// It also covers GitHub's links to lines of a file, and queries on local links.
+// It also covers GitHub's links to lines of a file, queries on local links,
+// and a `?` or `#` escaped in a file's name.
 
 import AppKit
 import WebKit
@@ -295,6 +296,9 @@ const LINES = LINES_HEAD + [
   `- [Blank quote line](#L${lineOf('> Second quoted.') - 1})`,
   `- [Column](#L${itemLine}C3)`,
   `- [Not the heading](#L${paragraphLine})`,
+  '- [Question mark](why%3F.md#L3)',
+  '- [Hash](note%23.md)',
+  '- [Stray percent](100%.md)',
   '',
   '![Picture](pic.png?raw=true)',
   '',
@@ -349,6 +353,19 @@ results.andTheLineIsTheAnchor = plain?.anchor === 'L12'
 link('Query alone').click()
 results.aQueryWithoutALineOpensTheFile =
   sent.filter((m) => m.type === 'openLocal').pop()?.path === '/tmp/other.md'
+
+link('Question mark').click()
+const question = sent.filter((m) => m.type === 'openLocal').pop()
+results.anEscapedQuestionMarkIsInTheName = question?.path === '/tmp/why?.md'
+results.andItsLineIsTheAnchor = question?.anchor === 'L3'
+
+link('Hash').click()
+results.anEscapedHashIsInTheName =
+  sent.filter((m) => m.type === 'openLocal').pop()?.path === '/tmp/note#.md'
+
+link('Stray percent').click()
+results.aStrayPercentStaysInTheName =
+  sent.filter((m) => m.type === 'openLocal').pop()?.path === '/tmp/100%.md'
 
 results.anImageQueryIsNotInItsPath =
   document.querySelector('#content img')?.getAttribute('src') === 'imark://file/tmp/pic.png'
