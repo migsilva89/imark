@@ -46,9 +46,20 @@ function normalizePath(path) {
   return '/' + out.join('/')
 }
 
+// Each part of the path decoded whole: `decodeURI` leaves `%3F` and `%23`
+// alone, and those are the only way to write a name with `?` or `#` in it once
+// both mean a query and a fragment. A stray `%` is kept as it is.
+const decodePart = (part) => {
+  try {
+    return decodeURIComponent(part)
+  } catch {
+    return part
+  }
+}
+
 function resolveLocal(href) {
   const path = href.startsWith('/') ? href : `${docDir}/${href}`
-  return normalizePath(decodeURI(path))
+  return normalizePath(path.split('/').map(decodePart).join('/'))
 }
 
 // Local files are served by a WKURLSchemeHandler on the Swift side so that
