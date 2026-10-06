@@ -83,6 +83,7 @@ enum SelectionTest {
         try copyingWithTheRowUp(commenting: true)
         try copyingWithTheRowUp(commenting: false)
         try theRowTakesTheKeyboardWhenAskedFor()
+        try returnInTheComposer()
 
         try? FileManager.default.removeItem(at: folder)
         print(failures == 0 ? "\nall good" : "\n\(failures) failing")
@@ -180,6 +181,7 @@ enum SelectionTest {
     static let left: (UInt16, String) = (123, "\u{F702}")
     static let space: (UInt16, String) = (49, " ")
     static let escape: (UInt16, String) = (53, "\u{1B}")
+    static let enter: (UInt16, String) = (36, "\r")
     static let arrows: NSEvent.ModifierFlags = [.numericPad, .function]
 
     static func holder(of window: NSWindow) -> String {
@@ -315,5 +317,37 @@ enum SelectionTest {
         check("closing the composer closes the popover", popover(besides: window, holding: "Cancel").isEmpty)
         check("and gives the keyboard back to the page", window.firstResponder === opened.page,
               "it is on \(holder(of: window))")
+    }
+
+    static func returnInTheComposer() throws {
+        print("▸ ⇧↵ starts a line in the composer, ↵ saves")
+        defer { UserDefaults.standard.removeVolatileDomain(forName: UserDefaults.argumentDomain) }
+        guard let opened = try open(commenting: true) else { return }
+        defer { opened.controller.close() }
+        let window = opened.window
+
+        select(paragraph: 0, in: opened)
+        row(besides: window).first { $0.toolTip == "Comment" }?.performClick(nil)
+        waitFor(3) { window.firstResponder is NSTextView }
+        guard let composer = window.firstResponder as? NSTextView else {
+            return check("the composer has the keyboard", false, "it is on \(holder(of: window))")
+        }
+        composer.insertText("first", replacementRange: composer.selectedRange())
+
+        press(enter.0, enter.1, .shift, in: window)
+        check("⇧↵ leaves the composer open", !popover(besides: window, holding: "Cancel").isEmpty)
+        check("and starts a line", composer.string == "first\n", composer.string.debugDescription)
+
+        composer.insertText("second", replacementRange: composer.selectedRange())
+        press(enter.0, enter.1, .control, in: window)
+        check("⌃↵ starts one too, as a newline", composer.string == "first\nsecond\n",
+              composer.string.debugDescription)
+
+        composer.insertText("third", replacementRange: composer.selectedRange())
+        press(enter.0, enter.1, in: window)
+        waitFor(3) { popover(besides: window, holding: "Cancel").isEmpty }
+        check("↵ saves and closes the composer", popover(besides: window, holding: "Cancel").isEmpty)
+        let saved = (try? String(contentsOf: opened.controller.url, encoding: .utf8)) ?? ""
+        check("with every line in the note", saved.contains("first\nsecond\nthird"), saved.debugDescription)
     }
 }
