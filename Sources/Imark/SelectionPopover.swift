@@ -21,7 +21,7 @@ final class SelectionPopover {
     private lazy var actionsView = buildActions()
     private var rowButtons: [NSButton] = []
     private var showsCommentingControls = true
-    private let composer = NSTextView()
+    private let composer = ComposerView()
     private let message = NSTextField(labelWithString: "")
 
     /// Where the selection is, so the composer can open over the note it edits.
@@ -498,13 +498,31 @@ extension SelectionPopover.Target: NSTextViewDelegate {
             saveComment()
             return true
         case #selector(NSResponder.insertLineBreak(_:)):
-            // ⇧↵ is how you get a second line when you want one.
-            return false
+            // ⌃↵ starts a line too, as a newline: AppKit's own line break is
+            // U+2028, which would land in the file as a character nobody sees.
+            // ⇧↵ never gets here, see `ComposerView`.
+            textView.insertNewlineIgnoringFieldEditor(nil)
+            return true
         case #selector(NSResponder.cancelOperation(_:)):
             cancelComment()
             return true
         default:
             return false
+        }
+    }
+}
+
+/// ⇧↵ is how you get a second line when you want one. macOS binds nothing to
+/// it, so it reaches the delegate as a plain Return, which saves; the key is
+/// told apart here, before it is turned into a command.
+private final class ComposerView: NSTextView {
+    override func keyDown(with event: NSEvent) {
+        let isReturn = event.keyCode == 36 || event.keyCode == 76 // Return, keypad Enter
+        let modifiers = event.modifierFlags.intersection([.command, .option, .control, .shift])
+        if isReturn, modifiers == .shift || modifiers == .control {
+            insertNewlineIgnoringFieldEditor(nil)
+        } else {
+            super.keyDown(with: event)
         }
     }
 }
