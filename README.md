@@ -22,11 +22,9 @@
   </a>
 </p>
 
-<p align="center">
-  <img src=".github/assets/comment.gif" width="720" alt="Selecting a block, writing a note in the popover, and the note appearing in the margin">
-</p>
+https://github.com/user-attachments/assets/e4f23bf3-06c9-4151-9f9a-601e3c86451a
 
-<p align="center"><em>Comment on anything. The note goes into the <code>.md</code> file.</em></p>
+<p align="center"><em>A 37-second tour, with sound: comments, the editor, Quick Look, and reviewing an agent's plan.</em></p>
 
 > [!NOTE]
 > Imark opens reading, and reading is what it is for. The switch in the toolbar turns it into an editor for the file you already have open — see [Editing](#editing) — and comments go into the document itself, as HTML comments, so they travel with it.
@@ -123,6 +121,12 @@ asks nothing of your accounts; when you come back, the reader is where you left
 it, and the notes are still in the file.
 
 ## Comments
+
+<p align="center">
+  <img src=".github/assets/comment.gif" width="720" alt="Selecting a block, writing a note in the popover, and the note appearing in the margin">
+</p>
+
+<p align="center"><em>Comment on anything. The note goes into the <code>.md</code> file.</em></p>
 
 <p align="center">
   <img src=".github/assets/imark-comments.png" width="620" alt="A phrase underlined in the text, a dot in the margin, and a card floating over the right margin with the note">
