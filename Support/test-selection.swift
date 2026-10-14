@@ -83,6 +83,7 @@ enum SelectionTest {
         try copyingWithTheRowUp(commenting: true)
         try copyingWithTheRowUp(commenting: false)
         try theRowTakesTheKeyboardWhenAskedFor()
+        try thePlusStartsComposingImmediately()
         try returnInTheComposer()
 
         try? FileManager.default.removeItem(at: folder)
@@ -105,7 +106,7 @@ enum SelectionTest {
             ["showsCommentingControls": commenting], forName: UserDefaults.argumentDomain
         )
         let url = folder.appendingPathComponent("words-\(UUID().uuidString).md")
-        try "# Words\n\nSome words worth copying out of a paragraph.\n\nAnother paragraph to select.\n"
+        try "# Words\n\nSome words worth copying out of a paragraph.\n\nAnother paragraph to select.\n\n- first item\n- second item\n"
             .write(to: url, atomically: true, encoding: .utf8)
 
         let controller = DocumentWindowController(url: url)
@@ -317,6 +318,34 @@ enum SelectionTest {
         check("closing the composer closes the popover", popover(besides: window, holding: "Cancel").isEmpty)
         check("and gives the keyboard back to the page", window.firstResponder === opened.page,
               "it is on \(holder(of: window))")
+    }
+
+    static func thePlusStartsComposingImmediately() throws {
+        print("▸ the margin + opens the comment composer directly")
+        defer { UserDefaults.standard.removeVolatileDomain(forName: UserDefaults.argumentDomain) }
+        guard let opened = try open(commenting: true) else { return }
+        defer { opened.controller.close() }
+
+        var pressed = false
+        opened.page.evaluateJavaScript("""
+        (() => {
+          const item = document.querySelectorAll('#content li')[1]
+          const box = item.getBoundingClientRect()
+          item.dispatchEvent(new MouseEvent('mousemove', {
+            bubbles: true, clientX: box.left + 20, clientY: box.top + box.height / 2
+          }))
+          const plus = document.querySelector('.block-plus')
+          if (!plus || plus.style.display === 'none') return false
+          plus.click()
+          return true
+        })()
+        """) { value, _ in pressed = value as? Bool ?? false }
+
+        waitFor(3) { pressed && !popover(besides: opened.window, holding: "Cancel").isEmpty }
+        check("the + was available on a quoted list item", pressed)
+        check("one click opens the composer",
+              !popover(besides: opened.window, holding: "Cancel").isEmpty)
+        check("the selection action row was skipped", row(besides: opened.window).isEmpty)
     }
 
     static func returnInTheComposer() throws {

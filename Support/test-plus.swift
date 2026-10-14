@@ -87,8 +87,14 @@ plus.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }))
 plus.click()
 await sleep(30)
 const message = sent.filter((m) => m.type === 'selection').pop()
+const plusBox = plus.getBoundingClientRect()
 results.sentSelection = !!message
 results.sentEmptyText = message?.text === ''
+results.plusRequestsACommentDirectly = message?.directComment === true
+results.popoverAnchorsToThePlus = message?.rect?.x === plusBox.left
+  && message?.rect?.y === plusBox.top
+  && message?.rect?.width === plusBox.width
+  && message?.rect?.height === plusBox.height
 results.sentBlockLines = !!message?.block && Number.isFinite(message.block.end)
 results.blockStillLit = para.classList.contains('block-target')
 
@@ -329,6 +335,11 @@ for (let x = itemBox.left + 20; x >= itemBox.left - 90; x -= 1) {
 }
 results.plusStaysWithAListItemBesideIt = swaps === 0 && lit === secondItem
   && listPlus.style.top === plusTop
+listPlus.click()
+await sleep(30)
+const itemMessage = sent.filter((m) => m.type === 'selection').pop()
+results.listItemPlusKeepsItsQuote = itemMessage?.text.includes('second item') === true
+results.listItemPlusRequestsACommentDirectly = itemMessage?.directComment === true
 
 // 8. In the Quick Look panel there is nothing to write to, so no `+` — but the
 //    notes already in the file still have to show.
