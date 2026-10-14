@@ -35,6 +35,9 @@ public struct Selection {
     }
 
     public let text: String
+    /// The margin `+` was pressed, so the comment composer should open without
+    /// first offering the actions used for a hand-made text selection.
+    public let directComment: Bool
     /// In the renderer view's own coordinates, ready to anchor a popover to.
     public let rect: NSRect
     /// The tightest block that knows its lines — where a quote should be found.
@@ -410,7 +413,8 @@ public final class RendererView: NSView {
                 let height = owner.bounds.height
                 let rect = NSRect(x: x, y: height - y - h, width: w, height: h)
                 owner.onMessage?(.selection(Selection(
-                    text: text, rect: rect, inline: lines("inline"), block: lines("block"),
+                    text: text, directComment: body["directComment"] as? Bool ?? false,
+                    rect: rect, inline: lines("inline"), block: lines("block"),
                     occurrence: body["occurrence"] as? Int ?? 1
                 )))
 

@@ -349,10 +349,11 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
 
         case .selection(let found):
             selection = found
-            // No text means the `+` in the margin, not a selection. Straight to
-            // writing: Translate and Search need words, and offering them over
-            // a whole paragraph would be three choices where there is one.
-            if found.text.isEmpty {
+            // The `+` in the margin is already a request to write, including
+            // when it points at a list item or table cell and carries their
+            // words as the quote. Translate and Search stay on a hand-made
+            // selection and in the page's context menu.
+            if found.directComment {
                 selectionPopover.compose(
                     existing: "", colour: Settings.noteColour,
                     at: found.rect, in: content.renderer

@@ -1316,7 +1316,7 @@ function setUpBlockPlus() {
     const block = plusBlock ?? plusTarget
     const lines = lineRange(block)
     if (!target || !block || !lines) return
-    const rect = target.getBoundingClientRect()
+    const anchor = plusButton.getBoundingClientRect()
     target.classList.add('block-target')
     // On a whole block: no text. Everything downstream already carries the
     // quote through as a string, and empty means "the block".
@@ -1329,8 +1329,14 @@ function setUpBlockPlus() {
     const quote = piece ? pieceText(piece) : ''
     bridge({
       type: 'selection',
+      // A press on the margin `+` is already an explicit request to comment.
+      // Keep it distinct from selecting the same words by hand, which still
+      // offers Translate and Search as well.
+      directComment: true,
       text: quote,
-      rect: { x: rect.left, y: rect.top, width: rect.width, height: Math.min(rect.height, 24) },
+      // Point the native popover at the control that was pressed, not at the
+      // potentially very wide block or table cell it represents.
+      rect: { x: anchor.left, y: anchor.top, width: anchor.width, height: anchor.height },
       inline: lineRange(target.closest('[data-line]')) ?? lines,
       block: lines,
       occurrence: piece ? occurrenceOfPiece(block, piece, quote) : 1,
