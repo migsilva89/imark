@@ -498,6 +498,28 @@ public final class RendererView: NSView {
 /// own clicks before the window could think of moving.
 private final class PageView: WKWebView {
     override var mouseDownCanMoveWindow: Bool { true }
+
+    /// A pinch goes to the page rather than magnifying the view. Magnified, the
+    /// whole page would grow — toolbar inset, rails and all — and every place
+    /// the page reports to the app, where a popover is anchored, would be off by
+    /// the zoom. The page uses it to open a diagram and zoom into it instead.
+    override func magnify(with event: NSEvent) {
+        let at = pagePoint(event)
+        evaluateJavaScript("window.imark?.magnify(\(event.magnification), \(at.x), \(at.y))")
+    }
+
+    /// The two-finger double tap: a diagram opens, or the open one closes.
+    override func smartMagnify(with event: NSEvent) {
+        let at = pagePoint(event)
+        evaluateJavaScript("window.imark?.smartMagnify(\(at.x), \(at.y))")
+    }
+
+    /// Where the event is in the page's own pixels, which are this view's
+    /// points counted from the top left.
+    private func pagePoint(_ event: NSEvent) -> NSPoint {
+        let point = convert(event.locationInWindow, from: nil)
+        return NSPoint(x: point.x, y: isFlipped ? point.y : bounds.height - point.y)
+    }
 }
 
 // MARK: - Navigation

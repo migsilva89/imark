@@ -112,6 +112,7 @@ if [ "${1:-}" != "--force" ]; then
 	swift Support/test-preview.swift >/dev/null 2>&1 || die "the Quick Look link tests failed"
 	swift Support/test-front-matter.swift >/dev/null 2>&1 || die "the front matter tests failed"
 	swift Support/test-diagrams.swift >/dev/null 2>&1 || die "the diagram tests failed"
+	swift Support/test-diagram-zoom.swift >/dev/null 2>&1 || die "the diagram zoom tests failed"
 	swift Support/test-anchors.swift >/dev/null 2>&1 || die "the heading link tests failed"
 	Support/test-review.sh >/dev/null 2>&1 || die "the review round trip tests failed"
 	swiftc -parse-as-library -I "$TEST_BIN" -I "$TEST_BIN/Modules" -F "$TEST_BIN" \
