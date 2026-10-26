@@ -617,7 +617,84 @@ pre code {
   overflow-x: auto;
 }
 
-.mermaid-block svg { max-width: 100%; height: auto; }
+/* At the diagram's own size, which Mermaid draws for 14px labels, and grown
+   with the text from there. Wider than the column, the block scrolls sideways;
+   squeezed into it, a wide diagram's labels came out a few pixels tall. */
+.mermaid-block svg {
+  display: block;
+  margin: 0 auto;
+  width: calc(var(--size-body) / 16 * var(--natural-width, 0));
+  max-width: none;
+  height: auto;
+}
+
+.mermaid-block.is-rendered svg { cursor: zoom-in; }
+
+/* -------------------------------------------------------- diagram viewer */
+
+.diagram-viewer {
+  position: fixed;
+  /* Under the toolbar, not behind it: the controls of a sheet you cannot see
+     the top of are not much of a sheet. */
+  inset: var(--top-inset, 0px) 0 0 0;
+  z-index: 20;
+  /* Opaque: the document showing through competes with the diagram's own
+     lines, which are the same colours. */
+  background: var(--bg);
+  outline: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.diagram-viewer[hidden] { display: none; }
+
+.diagram-viewer-stage {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+}
+
+.diagram-viewer-stage.dragging { cursor: grabbing; }
+
+.diagram-viewer-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+}
+
+.diagram-viewer-canvas svg { display: block; }
+
+.diagram-viewer-controls {
+  position: absolute;
+  bottom: calc(var(--step) * 5);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12);
+}
+
+.diagram-viewer-controls button {
+  min-width: 32px;
+  padding: 4px 10px;
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.diagram-viewer-controls button:hover { background: var(--code-bg); }
+.diagram-viewer-controls .diagram-viewer-readout { min-width: 56px; font-variant-numeric: tabular-nums; color: var(--secondary); }
 
 .diagram-error {
   text-align: left;
@@ -708,6 +785,9 @@ img[data-blocked] {
   pre, .front-matter { background: #fafafa; }
   h2 { break-after: avoid; }
   pre, table, .mermaid-block { break-inside: avoid; }
+  /* Paper does not scroll sideways. */
+  .mermaid-block svg { max-width: 100%; }
+  .diagram-viewer { display: none; }
 }
 
 /* ------------------------------------------------------------------ rail */

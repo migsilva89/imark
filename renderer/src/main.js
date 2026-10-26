@@ -12,6 +12,14 @@ import mermaid from 'mermaid'
 import math from './math.js'
 import wikilink from './wikilink.js'
 import {
+  close as closeDiagram,
+  installDiagramClicks,
+  isViewing,
+  magnify,
+  sizeDiagram,
+  smartMagnify,
+} from './zoom.js'
+import {
   attachComments,
   attached as attachedNotes,
   buildNoteRail,
@@ -34,6 +42,7 @@ const bridge = (payload) => {
 
 // Absolute path of the directory holding the document currently rendered.
 let docDir = '/'
+let lastPath = null
 
 function normalizePath(path) {
   const parts = path.split('/')
@@ -397,6 +406,7 @@ function placeDrawnDiagrams(root) {
     remember(key, svg)
     block.innerHTML = svg
     block.classList.add('is-rendered')
+    sizeDiagram(block)
     showing.set(block, key)
   }
   return { themeVariables, undrawn }
@@ -444,6 +454,7 @@ async function drawEach({ themeVariables, undrawn }, token) {
       if (token !== drawing) return
       block.innerHTML = svg
       block.classList.add('is-rendered')
+      sizeDiagram(block)
       showing.set(block, key)
       remember(key, svg)
     } catch (error) {
@@ -932,6 +943,10 @@ async function render({ markdown, path, theme, preview, rail, frontMatter, comme
   const token = ++renderToken
   lastSource = markdown ?? ''
   docDir = path ? path.slice(0, path.lastIndexOf('/')) || '/' : '/'
+  // Another document is another set of diagrams. The same one saved again
+  // keeps the viewer open: a file being followed is saved every few seconds.
+  if (path !== lastPath) closeDiagram()
+  lastPath = path
   slugCounts.clear()
 
   // The very first render carries the theme and the preview flag — without this
@@ -1352,6 +1367,8 @@ function setUpBlockPlus() {
       || document.documentElement.dataset.commenting === 'false'
     ) return hidePlus()
     if (event.target === plusButton) return cancelHide()
+    // The viewer covers the page; the block under it is not on offer.
+    if (isViewing()) return hidePlus()
     // Not while a selection is live: the popover is already open on words the
     // reader chose, and a second way in would fight it.
     if (hadSelection) return hidePlus()
@@ -1622,6 +1639,8 @@ window.imark = {
     glideTo(y)
   },
   setTheme(theme) {
+    // The copy in the viewer keeps the colours it was opened in.
+    if (theme !== document.documentElement.dataset.theme) closeDiagram()
     document.documentElement.dataset.theme = theme
     const blocks = document.querySelectorAll('.mermaid-block')
     if (blocks.length) drawDiagrams(placeDrawnDiagrams(content()))
@@ -1679,6 +1698,8 @@ window.imark = {
     bridge({ type: 'comments', count: items.length, reviewing: on, items })
   },
   stepNote,
+  magnify,
+  smartMagnify,
   exportComments: () => toVisibleText(lastSource),
   /// Opens the note that was just written, so a comment lands visibly rather
   /// than silently changing a file.
@@ -1693,6 +1714,7 @@ window.imark = {
 
 installCommentHandlers()
 setUpBlockPlus()
+installDiagramClicks()
 
 // KaTeX is imported for its side-effect-free API; keep a reference so the
 // bundler cannot tree-shake the font-bearing CSS away.
