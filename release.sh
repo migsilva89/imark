@@ -106,6 +106,14 @@ if [ "${1:-}" != "--force" ]; then
 			$(find Sources/ImarkRender -name '*.swift') \
 			Support/test-history.swift -o /tmp/imark-release-history/run >/dev/null 2>&1 \
 		&& /tmp/imark-release-history/run >/dev/null || die "the back and forward tests failed"
+	# In a folder of its own: it puts the renderer beside itself to serve it.
+	mkdir -p /tmp/imark-release-tasks
+	swiftc -parse-as-library -I "$TEST_BIN" -I "$TEST_BIN/Modules" -F "$TEST_BIN" \
+			-Xlinker -rpath -Xlinker "$TEST_BIN" \
+			$(find Sources/Imark -name '*.swift' ! -name main.swift) \
+			$(find Sources/ImarkRender -name '*.swift') \
+			Support/test-tasks.swift -o /tmp/imark-release-tasks/run >/dev/null 2>&1 \
+		&& /tmp/imark-release-tasks/run >/dev/null || die "the task list tests failed"
 	swift Support/test-plus.swift >/dev/null 2>&1 || die "the margin button tests failed"
 	swift Support/test-text-size.swift >/dev/null 2>&1 || die "the text size tests failed"
 	swift Support/test-pieces.swift >/dev/null 2>&1 || die "the list and table note tests failed"

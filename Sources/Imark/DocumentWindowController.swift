@@ -369,6 +369,9 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         case .noteCommand(let command):
             perform(command)
 
+        case .task(let line, let checked):
+            setTask(line: line, checked: checked)
+
         case .comments(let found, let reviewing):
             notes = found
             noteCount = found.count
@@ -523,6 +526,22 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
             selectionPopover.reportCommentFailure(
                 (error as? LocalizedError)?.errorDescription ?? "Couldn't save the comment"
             )
+        }
+    }
+
+    /// A box in a task list was pressed. Written like a comment — the same
+    /// check that the file has not moved, the same atomic replace, the same ⌘Z —
+    /// and the page shows the tick once it is in the file, never before.
+    private func setTask(line: Int, checked: Bool) {
+        // The page is behind the editor while it is open.
+        guard !editMode else { return }
+        do {
+            snapshot(checked ? "Check Item" : "Uncheck Item")
+            try Comments.setTask(line: line, checked: checked, in: url, expecting: stamp)
+            finishWrite()
+        } catch {
+            undoStack.discardLast()
+            report(error, doing: checked ? "check that item" : "uncheck that item")
         }
     }
 

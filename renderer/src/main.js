@@ -129,8 +129,11 @@ const md = new MarkdownIt({
   },
 })
 
+// No `label`: it wrapped the item's words in a <label>, so a click anywhere on
+// them ticked the box — on its way to a comment or a selection, as often as not.
+// Only the box itself ticks.
 md.use(anchor, { slugify, permalink: false, tabIndex: false })
-  .use(taskLists, { enabled: true, label: true })
+  .use(taskLists, { enabled: true })
   .use(footnote)
   .use(deflist)
   .use(mark)
@@ -157,6 +160,64 @@ const lineAttr = (token) =>
 
 // Down here rather than in the chain above only because it needs lineAttr.
 md.use(math, { lines: lineAttr })
+
+/* ------------------------------------------------------------ task boxes */
+
+// A tick is written to the file, so a box has to know the line its `[ ]` is on.
+// That is taken from the parser, never from the page: the document is allowed
+// HTML of its own, and an <input> it wrote with a line on it would be a way to
+// make a click change some other line. Each render picks a new key and only a
+// box carrying it is believed.
+let taskKey = ''
+
+const newTaskKey = () =>
+  [...crypto.getRandomValues(new Uint32Array(4))].map((n) => n.toString(36)).join('')
+
+// The plugin marks the item and puts its box first in the item's inline
+// content, as raw HTML. Here that box becomes a token of our own, which the
+// document cannot write, carrying the line of the paragraph the `[ ]` opens —
+// the item's first line, or the one after it when the marker stands alone.
+md.core.ruler.after('github-task-lists', 'imark-task-boxes', (state) => {
+  const tokens = state.tokens
+  for (let i = 0; i + 2 < tokens.length; i++) {
+    const item = tokens[i]
+    if (item.type !== 'list_item_open' || !/\btask-list-item\b/.test(item.attrGet('class') ?? '')) continue
+    const paragraph = tokens[i + 1]
+    const box = tokens[i + 2].children?.[0]
+    if (!paragraph?.map || box?.type !== 'html_inline') continue
+    if (!box.content.startsWith('<input class="task-list-item-checkbox"')) continue
+    box.type = 'task_box'
+    box.meta = { checked: box.content.includes('checked'), line: paragraph.map[0] }
+  }
+})
+
+md.renderer.rules.task_box = (tokens, idx) => {
+  const { checked, line } = tokens[idx].meta
+  // Quick Look cannot write to anything, so a box there is not offered.
+  const disabled = document.documentElement.dataset.preview === 'true' ? ' disabled=""' : ''
+  return `<input class="task-list-item-checkbox"${checked ? ' checked=""' : ''}${disabled}`
+    + ` type="checkbox" data-task="${taskKey}:${line + lineOffset}">`
+}
+
+// The line in the file a real box stands for, or null for anything else.
+function taskLine(box) {
+  const [key, line] = (box.dataset.task ?? '').split(':')
+  return key === taskKey && /^\d+$/.test(line ?? '') ? Number(line) : null
+}
+
+// The page never ticks a box on its own: the click asks the app to write the
+// file, and the box changes when the document is rendered again from it. A tick
+// that only lived in the page was the bug — it went with the next render.
+document.addEventListener('click', (event) => {
+  const box = event.target.closest?.('input.task-list-item-checkbox')
+  if (!box || !content().contains(box)) return
+  // By now the browser has already flipped it, so this is what was asked for.
+  const checked = box.checked
+  event.preventDefault()
+  if (document.documentElement.dataset.preview === 'true') return
+  const line = taskLine(box)
+  if (line !== null) bridge({ type: 'task', line, checked })
+})
 
 const defaultRenderToken = md.renderer.renderToken.bind(md.renderer)
 md.renderer.renderToken = (tokens, idx, options) => {
@@ -982,6 +1043,7 @@ async function render({ markdown, path, theme, preview, rail, frontMatter, comme
   // and blanked rather than deleted so the line map stays honest.
   const { body: clean, comments } = extractComments(body, offset)
 
+  taskKey = newTaskKey()
   root.innerHTML = clean.trim()
     ? renderFrontMatter(data) + md.render(clean)
     : `${renderFrontMatter(data)}<p class="empty">This file is empty</p>`
@@ -1285,9 +1347,16 @@ function showPlus(target, block) {
   target.classList.add('block-target')
 
   const rect = target.getBoundingClientRect()
+  // A task item's box hangs out to the left of the item, exactly where the `+`
+  // goes, and the `+` on top of it made the box impossible to press. It moves
+  // out past the box instead.
+  const box = target.matches('.task-list-item')
+    ? target.querySelector(':scope > input.task-list-item-checkbox, :scope > p > input.task-list-item-checkbox')
+    : null
+  const left = box ? Math.min(rect.left, box.getBoundingClientRect().left) : rect.left
   plusButton.style.display = 'flex'
   plusButton.style.top = `${rect.top + 1}px`
-  plusButton.style.left = `${Math.max(4, rect.left - 34)}px`
+  plusButton.style.left = `${Math.max(4, left - 34)}px`
 }
 
 /// Whether the pointer is between a lit item or cell and its `+`, level with it.

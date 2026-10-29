@@ -27,11 +27,13 @@ enum Comments {
     enum Failure: LocalizedError {
         case fileChanged
         case unreadable
+        case notATask
 
         var errorDescription: String? {
             switch self {
             case .fileChanged: "This file changed on disk since Imark opened it."
             case .unreadable: "Imark can't read this file as UTF-8 text."
+            case .notATask: "That line of the file is not a task any more."
             }
         }
     }
@@ -42,17 +44,15 @@ enum Comments {
     private static func edit(
         _ url: URL,
         expecting stamp: Stamp?,
-        _ change: (inout [String]) -> Void
+        _ change: (inout [String]) throws -> Void
     ) throws {
-        guard let source = try? String(contentsOf: url, encoding: .utf8) else {
-            throw Failure.unreadable
-        }
+        let (source, mark) = try readText(url)
         if let stamp, let now = Stamp(of: url), now != stamp {
             throw Failure.fileChanged
         }
         var lines = source.components(separatedBy: "\n")
-        change(&lines)
-        try write(lines.joined(separator: "\n"), to: url)
+        try change(&lines)
+        try write(mark + lines.joined(separator: "\n"), to: url)
     }
 
     /// Takes a note out, along with one blank line it left behind — otherwise
@@ -145,9 +145,7 @@ enum Comments {
         into url: URL,
         expecting stamp: Stamp?
     ) throws -> Int {
-        guard let source = try? String(contentsOf: url, encoding: .utf8) else {
-            throw Failure.unreadable
-        }
+        let (source, mark) = try readText(url)
         // Checked against the file rather than against a cached copy: another
         // editor may have written since, and a size that matches by luck still
         // has a different timestamp.
@@ -176,7 +174,7 @@ enum Comments {
 
         let index = countNotes(in: lines, above: at)
         lines.insert(contentsOf: block, at: at)
-        try write(lines.joined(separator: "\n"), to: url)
+        try write(mark + lines.joined(separator: "\n"), to: url)
         return index
     }
 
@@ -209,6 +207,45 @@ enum Comments {
             guard let now = Stamp(of: url), now == stamp else { throw Failure.fileChanged }
         }
         try write(text, to: url)
+    }
+
+    // MARK: - Task lists
+
+    /// Ticks or clears the box of a task list item: one character on one line,
+    /// and every other byte of the file left as it was.
+    ///
+    /// `line` comes from the renderer, which read it off the parser. It is still
+    /// checked here, because a tick is a write: the line has to be a task, outside
+    /// any code fence, and showing the opposite of what was asked for — anything
+    /// else means the file is not the one the reader was looking at.
+    static func setTask(line: Int, checked: Bool, in url: URL, expecting stamp: Stamp?) throws {
+        try edit(url, expecting: stamp) { lines in
+            guard lines.indices.contains(line), !fencedLines(lines).contains(line),
+                  let ticked = task(lines[line], checked: checked)
+            else { throw Failure.notATask }
+            lines[line] = ticked
+        }
+    }
+
+    /// A task item's `[ ]`, at the start of a line: after any `>` of a quote, the
+    /// indentation and the list marker — `-`, `*`, `+`, `1.` or `1)` — or with no
+    /// marker at all, for an item whose marker stands alone on the line above.
+    /// Followed by a space, as the renderer requires before it draws a box.
+    private static let taskBox = try! NSRegularExpression(
+        pattern: #"^(?:[ \t]*>)*[ \t]*(?:(?:[-*+]|[0-9]{1,9}[.)])[ \t]+)?\[([ xX])\] "#
+    )
+
+    /// The line with its box set to `checked`, or nil when the line holds no
+    /// box, or holds one already set that way. Only the one character between
+    /// the brackets changes: a line ending in `\r` keeps it.
+    static func task(_ line: String, checked: Bool) -> String? {
+        let text = line as NSString
+        guard let match = taskBox.firstMatch(in: line, range: NSRange(location: 0, length: text.length))
+        else { return nil }
+        let state = match.range(at: 1)
+        let isChecked = text.substring(with: state) != " "
+        guard isChecked != checked else { return nil }
+        return text.replacingCharacters(in: state, with: checked ? "x" : " ")
     }
 
     // MARK: - Shaping
@@ -344,6 +381,19 @@ enum Comments {
     }
 
     // MARK: - Saving
+
+    /// The file as text, and the byte order mark it starts with, if any.
+    /// Foundation drops the mark while decoding, so a write of what it hands back
+    /// took three bytes off the top of every file saved with one — a document
+    /// should come back from a comment or a tick exactly as it was, but for the
+    /// change.
+    private static func readText(_ url: URL) throws -> (text: String, mark: String) {
+        guard let data = try? Data(contentsOf: url),
+              let text = String(data: data, encoding: .utf8)
+        else { throw Failure.unreadable }
+        let mark = data.starts(with: [0xEF, 0xBB, 0xBF]) && !text.hasPrefix("\u{FEFF}") ? "\u{FEFF}" : ""
+        return (text, mark)
+    }
 
     /// Written to a temporary file in the same directory and moved into place,
     /// so an interrupted write can never leave a half-written document behind.
