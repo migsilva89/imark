@@ -186,7 +186,7 @@ final class WelcomeWindowController: NSWindowController {
         let alert = NSAlert()
         alert.messageText = "Set Imark up for your coding agents?"
         alert.informativeText = [
-            "This writes:",
+            "This installs or updates these files, keeping any edits you made:",
             "",
             paths,
             "",
@@ -202,9 +202,14 @@ final class WelcomeWindowController: NSWindowController {
         guard alert.runModal() == .alertFirstButtonReturn else { return }
 
         do {
-            try AgentSetup.install()
-            // What is on disk is this version's copy, so the refresh on the next
-            // launch has nothing to bring forward until the next update.
+            let report = try AgentSetup.install()
+            if !report.kept.isEmpty {
+                let kept = NSAlert()
+                kept.messageText = "Your edited agent files were kept"
+                kept.informativeText = report.kept.map(\.path).joined(separator: "\n")
+                kept.runModal()
+            }
+            // The shipped copies are current; edited copies stay with their owner.
             Settings.agentFilesVersion = Updates.current
         } catch {
             let failure = NSAlert()
