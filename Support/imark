@@ -32,6 +32,7 @@ AGENT="$RESOURCES/agent/imark.mjs"
 usage() {
 	cat <<'USAGE'
 usage: imark [<file.md> …]        open documents in Imark
+       imark skills [install|update|--help]  manage agent skills
        imark notes <file.md>      print the notes left in a file
        imark review <file.md>     open for review, wait for the decision
 USAGE
@@ -42,6 +43,9 @@ case "${1:-}" in
 	--version)
 		/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist"
 		exit 0
+		;;
+	skills)
+		exec "$APP/Contents/MacOS/Imark" "$@"
 		;;
 	notes|review|plan-hook)
 		# The same script the coding agents are given, so `imark review` from a

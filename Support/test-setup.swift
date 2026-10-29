@@ -24,8 +24,14 @@ import Foundation
         }
         check("finds both agents", AgentSetup.found.count == 2)
         check("nothing installed to begin with", !AgentSetup.isInstalled)
+        check("status reports missing files", try AgentSetup.status().allSatisfy {
+            $0.present && $0.files.allSatisfy { $0.state == .missing }
+        })
         try AgentSetup.install()
         check("installed", AgentSetup.isInstalled)
+        check("status reports current files", try AgentSetup.status().allSatisfy {
+            $0.files.allSatisfy { $0.state == .current }
+        })
 
         let review = URL(fileURLWithPath: home)
             .appendingPathComponent(".claude/commands/imark-review.md")
@@ -67,6 +73,9 @@ import Foundation
         let mine = "My own version of this. Please keep it.\n"
         try mine.write(to: edited, atomically: true, encoding: .utf8)
 
+        let before = try AgentSetup.status().flatMap(\.files)
+        check("status recognises outdated copies", before.filter { $0.state == .outdated }.count == 2)
+        check("status recognises editing", before.filter { $0.state == .edited }.map(\.destination) == [edited])
         let report = try AgentSetup.refresh()
         check("the out-of-date command was rewritten", report.updated.contains(review))
         check("with what the app now carries", try String(contentsOf: review, encoding: .utf8)
@@ -93,6 +102,15 @@ import Foundation
         // The second launch of the same version finds nothing left to write. The
         // edited file keeps being reported, because it keeps being somebody's.
         check("nothing to rewrite the next time", try AgentSetup.refresh().updated.isEmpty)
+
+        let notes = root.appendingPathComponent(".claude/commands/imark-notes.md")
+        try FileManager.default.removeItem(at: notes)
+        _ = try AgentSetup.refresh()
+        check("refresh does not install missing commands", !FileManager.default.fileExists(atPath: notes.path))
+        let installed = try AgentSetup.install()
+        check("setup fills missing commands", installed.updated.contains(notes))
+        check("setup also preserves edited files", installed.kept == [edited]
+            && (try? String(contentsOf: edited, encoding: .utf8)) == mine)
 
         try AgentSetup.uninstall()
         check("uninstalled", !AgentSetup.isInstalled)

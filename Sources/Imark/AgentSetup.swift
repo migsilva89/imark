@@ -153,13 +153,48 @@ enum AgentSetup {
         }
     }
 
-    static func install() throws {
+    enum FileState: String {
+        case missing, current, outdated, edited
+    }
+
+    struct FileStatus {
+        let name: String
+        let destination: URL
+        let state: FileState
+    }
+
+    struct Status {
+        let agent: Agent
+        let present: Bool
+        let files: [FileStatus]
+    }
+
+    /// The same comparison drives status, setup and automatic refresh.
+    static func status() throws -> [Status] {
         let script = try readyScript()
-        for agent in found {
-            for file in payloads(for: agent) {
-                try write(contents(of: file, script: script), to: file.destination)
+        return try known.map { agent in
+            let files = try payloads(for: agent).map { file in
+                let wanted = try contents(of: file, script: script)
+                let state: FileState
+                if !FileManager.default.fileExists(atPath: file.destination.path) {
+                    // A dangling link is still somebody's file.
+                    state = (try? FileManager.default.destinationOfSymbolicLink(
+                        atPath: file.destination.path)) == nil ? .missing : .edited
+                } else if let current = try? String(contentsOf: file.destination, encoding: .utf8) {
+                    state = current == wanted ? .current
+                        : shipped(file.name).contains(fingerprint(of: current)) ? .outdated : .edited
+                } else {
+                    state = .edited
+                }
+                return FileStatus(name: file.name, destination: file.destination, state: state)
             }
+            return Status(agent: agent, present: found.contains { $0.home == agent.home }, files: files)
         }
+    }
+
+    @discardableResult
+    static func install() throws -> Refresh {
+        try apply(installMissing: true)
     }
 
     // MARK: - Keeping the copies current
@@ -194,22 +229,24 @@ enum AgentSetup {
     /// there: an agent installed since setup is the setup offer's business, not
     /// this one's.
     static func refresh() throws -> Refresh {
+        try apply(installMissing: false)
+    }
+
+    private static func apply(installMissing: Bool) throws -> Refresh {
         let script = try readyScript()
         var report = Refresh()
-        for agent in found {
-            for file in payloads(for: agent) {
-                guard let current = try? String(contentsOf: file.destination, encoding: .utf8)
-                else { continue }
-                let wanted = try contents(of: file, script: script)
-                // Compared against the text as it would be written, path and
-                // all, so dragging the app somewhere else is repaired too.
-                if current == wanted { continue }
-                guard shipped(file.name).contains(fingerprint(of: current)) else {
+        for agent in try status() where agent.present {
+            for file in agent.files {
+                switch file.state {
+                case .current: continue
+                case .edited:
                     report.kept.append(file.destination)
-                    continue
+                case .missing where !installMissing: continue
+                case .missing, .outdated:
+                    let payload = Payload(name: file.name, destination: file.destination)
+                    try write(contents(of: payload, script: script), to: file.destination)
+                    report.updated.append(file.destination)
                 }
-                try write(wanted, to: file.destination)
-                report.updated.append(file.destination)
             }
         }
         return report

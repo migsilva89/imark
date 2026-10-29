@@ -91,7 +91,18 @@ before it writes anything.
 ```bash
 imark notes.md            # opens it in the copy already running
 imark notes notes.md      # the notes somebody left in it, as text
+imark skills              # agent presence and skill/command status
+imark skills install      # install missing files and update shipped copies
+imark skills update       # update existing shipped copies only
 ```
+
+The skills commands run without opening a window. They use the same setup as
+the app for Claude Code and Codex, preserve edited files, and never install
+plugins or change agent settings. Status distinguishes missing, current,
+outdated and edited files, and lists unsupported agents it finds.
+`imark skills --help` explains the commands. Exit code 1 means missing or
+outdated files for a present agent, no supported agents, or an error; 2 means
+invalid arguments. Edited files are kept and do not cause a non-zero exit.
 
 A document already open comes forward instead of opening twice. This is separate
 from making Imark the default for `.md` on purpose: `open notes.md` should still
