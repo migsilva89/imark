@@ -33,6 +33,7 @@ https://github.com/user-attachments/assets/e4f23bf3-06c9-4151-9f9a-601e3c86451a
 
 - **Editing, when you ask for it** — one switch in the toolbar, and the page becomes the file: line numbers, Markdown in colour, a bar beside every line you have changed, `⌘S` to write it. Reading is the state it opens in
 - **Comments in the file** — select, comment, edit or delete, and the note lives in the document as an HTML comment, so it survives being emailed, committed, or opened in anything else. `⌘Z` undoes any of it
+- **Task lists you can tick** — press the box on a `- [ ]` item and the tick is saved to the `.md` file, so the document goes back with your choice in it
 - **Quick Look previews** — the space bar in the Finder renders the document, not raw text, using the same engine as the app
 - **Live reload** — saving in your editor updates the view in under 300ms, keeping your scroll position, and it survives the delete-and-rename that editors call an atomic save
 - **Foldable outline** — headings in the sidebar, with sections you can collapse; past twenty entries it opens folded, so a changelog is one row per version

@@ -25,6 +25,10 @@ public enum RendererMessage {
     case selectionCleared
     case comments(notes: [NoteSummary], reviewing: Bool)
     case noteCommand(NoteCommand)
+    /// A task list's box was pressed. `line` is the file's line with the `[ ]`
+    /// on it, counted from zero; `checked` is what the reader asked for. The
+    /// page has not changed the box — it changes when the file does.
+    case task(line: Int, checked: Bool)
 }
 
 /// A live selection in the document, and where it came from in the file.
@@ -454,6 +458,12 @@ public final class RendererView: NSView {
                     colour: body["colour"] as? String ?? "",
                     rect: NSRect(x: x, y: owner.bounds.height - y - h, width: w, height: h)
                 )))
+
+            case "task":
+                guard let line = body["line"] as? Int, line >= 0,
+                      let checked = body["checked"] as? Bool
+                else { break }
+                owner.onMessage?(.task(line: line, checked: checked))
 
             case "wikilinks":
                 owner.onMessage?(.wikilinks(body["targets"] as? [String] ?? []))

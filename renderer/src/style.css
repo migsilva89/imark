@@ -416,6 +416,9 @@ blockquote > :last-child { margin-bottom: 0; }
   vertical-align: baseline;
 }
 
+/* Quick Look draws the boxes but cannot write the tick anywhere. */
+.task-list-item input[type='checkbox']:disabled { cursor: default; }
+
 /* ----------------------------------------------------------------- tables */
 
 table {
