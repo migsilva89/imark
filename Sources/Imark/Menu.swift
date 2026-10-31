@@ -105,6 +105,10 @@ enum Menu {
         menu.addItem(.separator())
         let reveal = menu.addItem(withTitle: "Reveal in Finder", action: #selector(DocumentWindowController.revealInFinder(_:)), keyEquivalent: "r")
         reveal.keyEquivalentModifierMask = [.command, .shift]
+        // ⌥⌘C because it is the Finder's own key for "Copy as Pathname", so the
+        // hand that already knows it there does not have to learn another here.
+        let copyPath = menu.addItem(withTitle: "Copy Path", action: #selector(DocumentWindowController.copyPath(_:)), keyEquivalent: "c")
+        copyPath.keyEquivalentModifierMask = [.command, .option]
         menu.addItem(withTitle: "Print…", action: #selector(DocumentWindowController.printDocument(_:)), keyEquivalent: "p")
         menu.addItem(
             withTitle: "Export Comments as Text…",
