@@ -960,6 +960,14 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         NSWorkspace.shared.activateFileViewerSelecting([url])
     }
 
+    /// The plain POSIX path, not a file:// URL: what a terminal, a chat or
+    /// another app's Go to Folder expects when you paste it.
+    @objc func copyPath(_ sender: Any?) {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(url.path, forType: .string)
+    }
+
     @objc func openInEditor(_ sender: NSMenuItem) {
         guard let editor = sender.representedObject as? URL else { return NSSound.beep() }
         Editors.open(url, with: editor)

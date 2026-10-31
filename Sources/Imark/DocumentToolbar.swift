@@ -350,6 +350,11 @@ extension DocumentWindowController: NSToolbarDelegate {
         )
         reveal.image = icon(for: URL(fileURLWithPath: "/System/Library/CoreServices/Finder.app"))
         reveal.target = self
+        // The other half of "where it lives": the path itself, for pasting into
+        // a terminal or a chat with an agent. Same command as ⌥⌘C.
+        let copyPath = menu.addItem(withTitle: "Copy Path", action: #selector(copyPath(_:)), keyEquivalent: "")
+        copyPath.image = NSImage(systemSymbolName: "doc.on.clipboard", accessibilityDescription: nil)
+        copyPath.target = self
         return menu
     }
 
