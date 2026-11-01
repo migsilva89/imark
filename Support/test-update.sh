@@ -22,6 +22,10 @@ check "unused sandbox services are absent" test ! -e "$FRAMEWORK/XPCServices"
 check "the framework and its helpers are signed" codesign --verify --deep --strict "$FRAMEWORK"
 check "the app can find the embedded framework" sh -c \
 	"otool -l '$APP/Contents/MacOS/Imark' | grep -q '@loader_path/../Frameworks'"
+check "the app runs on Apple silicon and Intel" sh -c \
+	"archs=\$(lipo -archs '$APP/Contents/MacOS/Imark'); case \" \$archs \" in *' arm64 '*) ;; *) exit 1;; esac; case \" \$archs \" in *' x86_64 '*) ;; *) exit 1;; esac"
+check "Sparkle runs on Apple silicon and Intel" sh -c \
+	"archs=\$(lipo -archs '$FRAMEWORK/Versions/B/Sparkle'); case \" \$archs \" in *' arm64 '*) ;; *) exit 1;; esac; case \" \$archs \" in *' x86_64 '*) ;; *) exit 1;; esac"
 check "the feed has one stable address" sh -c \
 	"test \"\$(/usr/libexec/PlistBuddy -c 'Print :SUFeedURL' '$INFO')\" = \
 	'https://github.com/migsilva89/imark/releases/latest/download/appcast.xml'"

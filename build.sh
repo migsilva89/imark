@@ -61,9 +61,16 @@ step "renderer (esbuild)"
 
 # ------------------------------------------------------------------ swift
 
+# A release is one app for both kinds of Mac. Debug and dev builds stay native
+# so the edit/build loop is fast, and so they build on an Intel Mac too.
+ARCHS=()
+if [ "$CONFIG" = "release" ]; then
+	ARCHS=(--arch arm64 --arch x86_64)
+fi
+
 step "swift build ($CONFIG)"
-swift build -c "$CONFIG" --arch arm64
-BIN="$(swift build -c "$CONFIG" --arch arm64 --show-bin-path)"
+swift build -c "$CONFIG" ${ARCHS[@]+"${ARCHS[@]}"}
+BIN="$(swift build -c "$CONFIG" ${ARCHS[@]+"${ARCHS[@]}"} --show-bin-path)"
 
 # Generated after both builds, from what actually ships: the JavaScript bundle
 # and Sparkle's resolved binary framework.
@@ -163,6 +170,21 @@ fi
 mkdir -p "$APPEX/Contents/Resources"
 if [ -d "$ROOT/Resources" ]; then
 	cp -R "$ROOT/Resources/." "$APPEX/Contents/Resources/"
+fi
+
+# Every executable in the bundle, Sparkle's helpers included, checked before it
+# is signed: one thin binary is enough for the app to fail on the other Mac.
+if [ "$CONFIG" = "release" ]; then
+	while IFS= read -r -d '' file; do
+		file -b "$file" | grep -q '^Mach-O' || continue
+		archs=" $(lipo -archs "$file") "
+		case "$archs" in *" arm64 "*) ;; *) archs="" ;; esac
+		case "$archs" in *" x86_64 "*) ;; *) archs="" ;; esac
+		[ -n "$archs" ] || {
+			echo "error: ${file#"$APP"/} is not universal ($(lipo -archs "$file"))" >&2
+			exit 1
+		}
+	done < <(find "$APP" -type f -print0)
 fi
 
 # ----------------------------------------------------------------- sign
