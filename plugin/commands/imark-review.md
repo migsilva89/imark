@@ -1,12 +1,28 @@
 ---
 description: Open a markdown document in Imark for review and wait for the reviewer's notes
 argument-hint: "<file.md> [--no-wait]"
-allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/imark.mjs" review *)
+allowed-tools: Bash(command -v imark), Bash(imark review *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/imark.mjs" review *)
 ---
 
 Open a document in Imark for the user to review, and wait for their decision.
 
-Run this, passing the arguments through as they came:
+First see whether `imark` — the command the user has in their own terminal,
+so the two of you drive Imark the same way — is on the PATH:
+
+```
+command -v imark
+```
+
+If that prints a path, run this, passing the arguments through as they came:
+
+```
+imark review $ARGUMENTS
+```
+
+Whatever it returns is the answer, an error included: do not run the script
+below after `imark` has run. Only if `command -v imark` printed nothing, run the
+script it wraps instead, with the same arguments, and tell the user once that
+**Imark ▸ Install the imark Command…** puts `imark` on their PATH:
 
 ```
 node "${CLAUDE_PLUGIN_ROOT}/scripts/imark.mjs" review $ARGUMENTS

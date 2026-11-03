@@ -41,6 +41,15 @@ if git show v0.2.3:plugin/commands/imark-notes.md > "$HOME_DIR/old-notes.md" 2>/
 else
   echo "note: no v0.2.3 tag here, so the past-release check is skipped"
 fi
+# The skill as it was before the agent ran the imark command.
+if git show v0.6.9:plugin/skills/imark-comments/SKILL.md > "$HOME_DIR/old-skill.md" 2>/dev/null; then
+  sed -i '' \
+    's|"${CLAUDE_PLUGIN_ROOT}/scripts/imark.mjs"|"/Applications/Imark.app/Contents/Resources/agent/imark.mjs"|' \
+    "$HOME_DIR/old-skill.md"
+  export IMARK_TEST_OLD_SKILL="$HOME_DIR/old-skill.md"
+else
+  echo "note: no v0.6.9 tag here, so the old-skill check is skipped"
+fi
 
 IMARK_TEST_HOME="$HOME_DIR" \
 IMARK_TEST_RESOURCES="$HOME_DIR/Resources" \

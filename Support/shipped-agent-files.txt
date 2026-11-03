@@ -36,3 +36,8 @@ fff991c12c6598dc9517600672bff649310296e7d953f78465ea72a86a463419  commands/imark
 # after v0.6.2: each command pre-approves its own script, not every node command
 7e53fbcc2ad26eb02682e16fb523452376f8a312fe366e1e2aeaac06c62d0d10  commands/imark-review.md
 64ac28852bd6f32442c981d0eb2aa39080f06a3171e40bd970a28d02023e1611  commands/imark-notes.md
+
+# after v0.6.9: look for the imark command first, the script only when it is missing
+a873395f755eea6eba8df4c520ffe2ee36f8708fde1bf70641c54ce76179d08f  SKILL.md
+280e572f89daad6ed8ec1b17cb7ce2cddea7a9e322550b872c11fbbb71c016af  commands/imark-notes.md
+b67cd4b506bd00d229327b97c55364ed7fb78750706708d1f50ba06a08891ff9  commands/imark-review.md

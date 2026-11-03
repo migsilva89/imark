@@ -14,7 +14,9 @@ machine.
 /plugin install imark@imark
 ```
 
-Needs Imark in `/Applications` and Node 20.
+Needs Imark in `/Applications` and Node 20. The commands run `imark`, the same
+command you use in a terminal, when it is on the PATH, and the plugin's own
+script when it is not.
 
 ## Use
 

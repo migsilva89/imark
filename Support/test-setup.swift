@@ -44,6 +44,26 @@ import Foundation
             .appendingPathComponent(".claude/skills/imark-comments/SKILL.md"), encoding: .utf8)
         check("the skill was rewritten too", !skill.contains("CLAUDE_PLUGIN_ROOT"))
 
+        // The agent looks for the command the user runs, runs it when it is
+        // there, and runs this app's script only when it is not (issue #72).
+        let script = AgentSetup.script!.path
+        let notesCommand = try String(contentsOf: root
+            .appendingPathComponent(".claude/commands/imark-notes.md"), encoding: .utf8)
+        let files = [("review", text, "$ARGUMENTS"), ("notes", notesCommand, "$ARGUMENTS"),
+                     ("notes", skill, "<file.md>")]
+        check("every file asks the shell whether imark exists",
+              files.allSatisfy { $0.1.contains("\ncommand -v imark\n") })
+        check("then runs imark", files.allSatisfy { $0.1.contains("\nimark \($0.0) \($0.2)\n") })
+        check("and otherwise this app's script, quoted",
+              files.allSatisfy { $0.1.contains("\nnode \"\(script)\" \($0.0) \($0.2)\n") })
+        check("the script only when the command printed nothing", files.allSatisfy {
+            $0.1.contains("Only if `command -v imark` printed nothing")
+                && $0.1.contains("do not run the script\nbelow after `imark` has run")
+        })
+        check("the commands pre-approve exactly those three", [("review", text), ("notes", notesCommand)]
+            .allSatisfy { $0.1.contains("allowed-tools: Bash(command -v imark), Bash(imark \($0.0) *), "
+                + "Bash(node \"\(script)\" \($0.0) *)\n") })
+
         let codex = root.appendingPathComponent(".codex/skills/imark-comments/SKILL.md")
         check("Codex got the same skill", FileManager.default.fileExists(atPath: codex.path))
         check("with the same contents", (try? String(contentsOf: codex, encoding: .utf8)) == skill)
@@ -97,6 +117,19 @@ import Foundation
             check("a copy from an older release was rewritten", past.updated == [notes])
             check("pointing at this app's script",
                   try String(contentsOf: notes, encoding: .utf8).contains(AgentSetup.script!.path))
+        }
+        // The last skill that called the script directly, installed by an app
+        // somewhere else: still ours, so it moves to the imark command.
+        if let old = ProcessInfo.processInfo.environment["IMARK_TEST_OLD_SKILL"] {
+            let codexSkill = codex
+            try String(contentsOf: URL(fileURLWithPath: old), encoding: .utf8)
+                .write(to: codexSkill, atomically: true, encoding: .utf8)
+            let past = try AgentSetup.refresh()
+            let now = try String(contentsOf: codexSkill, encoding: .utf8)
+            check("a skill that called the script directly was rewritten", past.updated == [codexSkill])
+            check("to look for imark first", now.contains("\ncommand -v imark\n")
+                && now.contains("\nimark notes <file.md>\n")
+                && now.contains(AgentSetup.script!.path))
         }
 
         // The second launch of the same version finds nothing left to write. The
