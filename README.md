@@ -238,7 +238,9 @@ Launched with no document, Imark offers to **set itself up for the coding agents
 on your machine** — one skill, written into each one's `skills` folder. The alert
 names every file before writing it, and undoing it is deleting those. Claude Code
 and Codex read the same `SKILL.md`; only Claude Code also takes the two loose
-commands.
+commands. They tell the agent to run `imark notes` and `imark review`, the same
+commands you type, and to fall back to the script inside the app only when
+`imark` is not on its PATH.
 
 Those files are copies, so a new version of Imark brings them forward on its
 first launch and says which ones it rewrote. A copy you edited yourself is never

@@ -1,10 +1,28 @@
 ---
 description: Read the Imark comments out of a markdown file
 argument-hint: "<file.md>"
-allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/imark.mjs" notes *)
+allowed-tools: Bash(command -v imark), Bash(imark notes *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/imark.mjs" notes *)
 ---
 
 Read the notes the user left inside a markdown file with Imark.
+
+First see whether `imark` — the command the user has in their own terminal,
+so the two of you drive Imark the same way — is on the PATH:
+
+```
+command -v imark
+```
+
+If that prints a path, run this, passing the arguments through as they came:
+
+```
+imark notes $ARGUMENTS
+```
+
+Whatever it returns is the answer, an error included: do not run the script
+below after `imark` has run. Only if `command -v imark` printed nothing, run the
+script it wraps instead, with the same arguments, and tell the user once that
+**Imark ▸ Install the imark Command…** puts `imark` on their PATH:
 
 ```
 node "${CLAUDE_PLUGIN_ROOT}/scripts/imark.mjs" notes $ARGUMENTS

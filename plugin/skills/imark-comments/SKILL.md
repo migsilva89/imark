@@ -20,7 +20,23 @@ Workable with which team? This needs a number, not an adjective.
 
 ## Reading them
 
-Do not hand-roll a parser:
+Do not hand-roll a parser. First see whether `imark` — the command the user
+has in their own terminal — is on the PATH:
+
+```bash
+command -v imark
+```
+
+If that prints a path, use it, quoting the file if its name has spaces:
+
+```bash
+imark notes <file.md>
+```
+
+Whatever it returns is the answer, an error included: do not run the script
+below after `imark` has run. Only if `command -v imark` printed nothing, run the
+script it wraps instead, with the same arguments, and tell the user once that
+**Imark ▸ Install the imark Command…** puts `imark` on their PATH:
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/scripts/imark.mjs" notes <file.md>
