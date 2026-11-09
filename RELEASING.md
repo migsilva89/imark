@@ -82,14 +82,17 @@ signed, notarised, broken build is worse than an unsigned one: it carries
 somebody's name and opens without a warning. `--force` skips the gate and is for
 when you know exactly why.
 
-It leaves `dist/Imark-<version>.dmg`, signed, notarised and stapled, plus
+It leaves `dist/Imark-<version>.dmg`, signed, notarised and stapled — and so
+is the app inside it, so the copy dragged out of the image carries its own
+ticket — plus
 `dist/appcast.xml`, the signed feed that tells installed copies about it, plus
 `dist/Imark-<version>-update.dmg` — the same image, byte for byte, under the
 name the feed points at. Two names for one build is the only way to read the
 download counters apart: GitHub counts per asset, so the plain name is people
 installing Imark for the first time and the `-update` one is copies updating
 themselves.
-Notarisation is Apple looking at the binary and takes a few minutes.
+Notarisation is Apple looking at the binary and takes a few minutes, twice:
+once for the app, then once for the image made from the stapled app.
 
 Either variable can be left out. Without `IMARK_NOTARY_PROFILE` you get a signed
 image that Gatekeeper still warns about elsewhere; without both, an unsigned one
@@ -101,10 +104,15 @@ are fine for handing to a friend, neither is fine for a public release.
 ```bash
 spctl -a -vvv -t install dist/Imark-<version>.dmg
 xcrun stapler validate dist/Imark-<version>.dmg
+M="$(hdiutil attach -nobrowse -readonly dist/Imark-<version>.dmg | awk -F'\t' '/Volumes/{print $3}')"
+xcrun stapler validate "$M/Imark.app"
+hdiutil detach "$M"
 ```
 
 `spctl` should say `accepted` and `source=Notarized Developer ID`. Anything else
-— `Unnotarized Developer ID` in particular — means it is not ready.
+— `Unnotarized Developer ID` in particular — means it is not ready. Both
+`stapler validate` lines must pass: the second one is the app people actually
+run, after the image is gone.
 
 The last check is not a command: mount the image on a Mac that has never built
 this app, drag it across, open it. Gatekeeper is only really tested somewhere
