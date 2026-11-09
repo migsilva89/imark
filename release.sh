@@ -5,7 +5,8 @@
 #                                                 who will click through once
 #   IMARK_SIGN_IDENTITY="Developer ID Application: Name (TEAMID)" ./release.sh
 #                                                 signed, ready to notarise
-#   IMARK_NOTARY_PROFILE=imark ./release.sh        signed, notarised, stapled
+#   IMARK_NOTARY_PROFILE=imark ./release.sh        signed, notarised, stapled —
+#                                                 the app and then the image
 #
 # The notary profile is stored once, and never in this repository:
 #
@@ -164,6 +165,26 @@ if [ "${1:-}" != "--force" ]; then
 	echo "setup ok"
 fi
 
+# ------------------------------------------------------------ notarise app
+#
+# Apple's ticket for the image covers the app inside it, but stapling the image
+# only attaches the ticket to the image. The app copied out of it has no ticket
+# of its own, and a stapled ticket is what lets Gatekeeper check it without a
+# network. So the app is notarised and stapled first, and the image is made from
+# the stapled copy. Stapling adds a file the signature does not cover, so the
+# signature build.sh made still holds.
+
+if [ -n "$SIGN_IDENTITY" ] && [ -n "$NOTARY_PROFILE" ]; then
+	step "notarise the app (this takes a while — Apple is looking at it)"
+	APP_ZIP="$ROOT/dist/Imark-$VERSION-app.zip"
+	rm -f "$APP_ZIP"
+	ditto -c -k --keepParent "$APP" "$APP_ZIP"
+	xcrun notarytool submit "$APP_ZIP" --keychain-profile "$NOTARY_PROFILE" --wait
+	rm -f "$APP_ZIP"
+	xcrun stapler staple "$APP"
+	xcrun stapler validate "$APP"
+fi
+
 # --------------------------------------------------------------------- dmg
 
 step "disk image"
@@ -199,8 +220,8 @@ else
 		echo "       somebody else's machine." >&2
 	else
 		# Waits for the verdict rather than returning a ticket to chase, and
-		# staples it so the app opens on a machine with no network.
-		step "notarise (this takes a while — Apple is looking at it)"
+		# staples it so the image opens on a machine with no network.
+		step "notarise the image (this takes a while — Apple is looking at it)"
 		xcrun notarytool submit "$DMG" --keychain-profile "$NOTARY_PROFILE" --wait
 		xcrun stapler staple "$DMG"
 		xcrun stapler validate "$DMG"
