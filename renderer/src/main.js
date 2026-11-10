@@ -1,25 +1,24 @@
 import { t, setLanguage } from './i18n.js'
-import MarkdownIt from 'markdown-it'
-import anchor from 'markdown-it-anchor'
-import taskLists from 'markdown-it-task-lists'
-import footnote from 'markdown-it-footnote'
-import deflist from 'markdown-it-deflist'
-import mark from 'markdown-it-mark'
-import hljs from 'highlight.js'
-import { load as parseYaml } from 'js-yaml'
 import katex from 'katex'
-import mermaid from 'mermaid'
 
-import math from './math.js'
-import wikilink from './wikilink.js'
+import {
+  createMarkdown,
+  isExternal,
+} from './shared/markdown.js'
+import {
+  diagramsDrawn,
+  drawDiagrams,
+  placeDrawnDiagrams,
+  readPalette,
+} from './shared/diagrams.js'
 import {
   close as closeDiagram,
   installDiagramClicks,
   isViewing,
   magnify,
-  sizeDiagram,
   smartMagnify,
 } from './zoom.js'
+
 import {
   attachComments,
   attached as attachedNotes,
@@ -76,134 +75,23 @@ function resolveLocal(href) {
 // images next to the document load without granting file:// access.
 const fileURL = (absPath) => `imark://file${absPath.split('/').map(encodeURIComponent).join('/')}`
 
-const isExternal = (href) => /^[a-z][a-z0-9+.-]*:/i.test(href) && !href.startsWith('imark:')
-
 /* ----------------------------------------------------------------- parser */
 
-// Every id handed out in this document, and how many times each heading text
-// has come round.
-const slugCounts = new Map()
-
-// The id GitHub gives the same heading, so a link written for GitHub — or by
-// any of the tools that write a table of contents the way GitHub reads it —
-// lands here too. Checked against github-slugger for every character it knows.
-//
-// Marks stay on their letters: `й` and `ї` are letters of their own in
-// Ukrainian, not an `и` and an `і` with something to take off. Underscores stay,
-// and every space is a hyphen of its own, so `a  b` is `a--b`.
-function slugify(text) {
-  const base =
-    text
-      .toLowerCase()
-      .trim()
-      .replace(/[^\p{Alphabetic}\p{M}\p{Nd}\p{Pc} -]/gu, '')
-      .replace(/ /g, '-') || 'section'
-  // A repeat is numbered, and so is a number that is already somebody's
-  // heading: `a`, `a`, `a-1` come out as `a`, `a-1`, `a-1-1`.
-  let slug = base
-  while (slugCounts.has(slug)) {
-    slugCounts.set(base, slugCounts.get(base) + 1)
-    slug = `${base}-${slugCounts.get(base)}`
-  }
-  slugCounts.set(slug, 0)
-  return slug
-}
-
-const md = new MarkdownIt({
-  html: true,
-  linkify: true,
-  typographer: true,
-  breaks: false,
-  highlight(code, lang) {
-    if (lang && hljs.getLanguage(lang)) {
-      try {
-        return hljs.highlight(code, { language: lang, ignoreIllegals: true }).value
-      } catch {
-        /* fall through to auto */
-      }
-    }
-    try {
-      return hljs.highlightAuto(code).value
-    } catch {
-      return ''
-    }
-  },
+// The markdown-it pipeline lives in shared/markdown.js, where nothing else on
+// this page can reach into it. What it needs from the page comes in here: where
+// a relative link points, and whether boxes are offered.
+const pipeline = createMarkdown({
+  resolveFile: (file) => fileURL(resolveLocal(file)),
+  // Quick Look cannot write to anything, so a box there is not offered.
+  isPreview: () => document.documentElement.dataset.preview === 'true',
 })
-
-// No `label`: it wrapped the item's words in a <label>, so a click anywhere on
-// them ticked the box — on its way to a comment or a selection, as often as not.
-// Only the box itself ticks.
-md.use(anchor, { slugify, permalink: false, tabIndex: false })
-  .use(taskLists, { enabled: true })
-  .use(footnote)
-  .use(deflist)
-  .use(mark)
-  .use(wikilink)
-
-// Every block token knows which lines of the source produced it. Emitting that
-// into the DOM is what lets a selection on screen be turned back into a
-// position in the file — without it, writing anything next to a paragraph is
-// guesswork.
-// The front matter is stripped before parsing, so markdown-it counts from the
-// body while the file counts from the top. Everything it reports is short by
-// however many lines the front matter took.
-let lineOffset = 0
-
-const stampLines = (token) => {
-  if (!token.map) return
-  token.attrSet('data-line', `${token.map[0] + lineOffset},${token.map[1] + lineOffset}`)
-}
-
-// For the blocks whose HTML is built by hand below, which never reach
-// renderToken and so have to be given the same attribute themselves.
-const lineAttr = (token) =>
-  token.map ? ` data-line="${token.map[0] + lineOffset},${token.map[1] + lineOffset}"` : ''
-
-// Down here rather than in the chain above only because it needs lineAttr.
-md.use(math, { lines: lineAttr })
 
 /* ------------------------------------------------------------ task boxes */
-
-// A tick is written to the file, so a box has to know the line its `[ ]` is on.
-// That is taken from the parser, never from the page: the document is allowed
-// HTML of its own, and an <input> it wrote with a line on it would be a way to
-// make a click change some other line. Each render picks a new key and only a
-// box carrying it is believed.
-let taskKey = ''
-
-const newTaskKey = () =>
-  [...crypto.getRandomValues(new Uint32Array(4))].map((n) => n.toString(36)).join('')
-
-// The plugin marks the item and puts its box first in the item's inline
-// content, as raw HTML. Here that box becomes a token of our own, which the
-// document cannot write, carrying the line of the paragraph the `[ ]` opens —
-// the item's first line, or the one after it when the marker stands alone.
-md.core.ruler.after('github-task-lists', 'imark-task-boxes', (state) => {
-  const tokens = state.tokens
-  for (let i = 0; i + 2 < tokens.length; i++) {
-    const item = tokens[i]
-    if (item.type !== 'list_item_open' || !/\btask-list-item\b/.test(item.attrGet('class') ?? '')) continue
-    const paragraph = tokens[i + 1]
-    const box = tokens[i + 2].children?.[0]
-    if (!paragraph?.map || box?.type !== 'html_inline') continue
-    if (!box.content.startsWith('<input class="task-list-item-checkbox"')) continue
-    box.type = 'task_box'
-    box.meta = { checked: box.content.includes('checked'), line: paragraph.map[0] }
-  }
-})
-
-md.renderer.rules.task_box = (tokens, idx) => {
-  const { checked, line } = tokens[idx].meta
-  // Quick Look cannot write to anything, so a box there is not offered.
-  const disabled = document.documentElement.dataset.preview === 'true' ? ' disabled=""' : ''
-  return `<input class="task-list-item-checkbox"${checked ? ' checked=""' : ''}${disabled}`
-    + ` type="checkbox" data-task="${taskKey}:${line + lineOffset}">`
-}
 
 // The line in the file a real box stands for, or null for anything else.
 function taskLine(box) {
   const [key, line] = (box.dataset.task ?? '').split(':')
-  return key === taskKey && /^\d+$/.test(line ?? '') ? Number(line) : null
+  return key === pipeline.taskKey && /^\d+$/.test(line ?? '') ? Number(line) : null
 }
 
 // The page never ticks a box on its own: the click asks the app to write the
@@ -220,155 +108,6 @@ document.addEventListener('click', (event) => {
   if (line !== null) bridge({ type: 'task', line, checked })
 })
 
-const defaultRenderToken = md.renderer.renderToken.bind(md.renderer)
-md.renderer.renderToken = (tokens, idx, options) => {
-  if (tokens[idx].nesting !== -1) stampLines(tokens[idx])
-  return defaultRenderToken(tokens, idx, options)
-}
-
-/**
- * A ```diff block, rendered the way everybody already reads a diff: the whole
- * row tinted rather than just the `+` or the `-`, with the old and new line
- * numbers down the side.
- *
- * highlight.js colours the marker character and leaves the rest of the line on
- * the block's own background, which is legible but has to be read a character
- * at a time. Tinting the row is what makes a diff scannable.
- *
- * Unified only. A reading column is one column, and two columns of code inside
- * it is a different app.
- */
-function renderDiff(source) {
-  const HUNK = /^@@+ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/
-  let oldNo = 0
-  let newNo = 0
-
-  const rows = source.split('\n').map((line) => {
-    const cell = (kind, left, right) =>
-      `<div class="diff-row diff-${kind}">`
-      + `<span class="diff-num">${left}</span>`
-      + `<span class="diff-num">${right}</span>`
-      + `<code>${escapeHtml(line) || '&nbsp;'}</code>`
-      + '</div>'
-
-    const hunk = line.match(HUNK)
-    if (hunk) {
-      oldNo = Number(hunk[1])
-      newNo = Number(hunk[2])
-      return cell('hunk', '', '')
-    }
-    // The `diff --git`, `index`, `---` and `+++` preamble. Matched before the
-    // +/- tests, or the file headers would be read as an added and a removed
-    // line and tinted as changes nobody made.
-    if (/^(diff --git |index |--- |\+\+\+ |new file|deleted file|similarity|rename |Binary files )/.test(line)) {
-      return cell('meta', '', '')
-    }
-    if (line.startsWith('+')) return cell('add', '', newNo++)
-    if (line.startsWith('-')) return cell('del', oldNo++, '')
-    if (line.startsWith('\\')) return cell('meta', '', '')
-    return cell('ctx', oldNo++, newNo++)
-  })
-
-  return `<div class="diff-block">${rows.join('')}</div>`
-}
-
-// Fenced ```mermaid blocks are held aside and rendered after the HTML lands.
-const defaultFence = md.renderer.rules.fence.bind(md.renderer.rules)
-md.renderer.rules.fence = (tokens, idx, options, env, self) => {
-  const token = tokens[idx]
-  const info = (token.info || '').trim().split(/\s+/)[0]
-  // Built by hand rather than through renderToken, so the offset has to be
-  // applied here too — this is exactly where it was forgotten once already.
-  const lines = lineAttr(token)
-  if (info === 'mermaid') {
-    return `<div class="mermaid-block"${lines} data-graph="${encodeURIComponent(token.content)}"></div>`
-  }
-  if (info === 'diff') {
-    return `<div class="code-wrap diff-wrap"${lines} data-lang="diff">${renderDiff(token.content)}</div>`
-  }
-  const html = defaultFence(tokens, idx, options, env, self)
-  const label = info || 'text'
-  return `<div class="code-wrap"${lines} data-lang="${label}">${html}</div>`
-}
-
-// Rewrite relative hrefs/srcs so they resolve against the document's folder.
-const patchAttr = (rules, rule, attr) => {
-  const original = rules[rule]
-  rules[rule] = (tokens, idx, options, env, self) => {
-    const token = tokens[idx]
-    const i = token.attrIndex(attr)
-    if (i >= 0) {
-      const value = token.attrs[i][1]
-      if (!isExternal(value) && !value.startsWith('#')) {
-        // The fragment is not part of the file's name. Resolved along with it,
-        // it was encoded into the path — `other.md%23section` — and named a
-        // file that is not there.
-        const hash = value.indexOf('#')
-        const path = hash < 0 ? value : value.slice(0, hash)
-        const fragment = hash < 0 ? '' : value.slice(hash)
-        // A query is for a web server, not part of the name: GitHub's
-        // `?plain=1` for a file's source, `?raw=true` for an image.
-        const query = path.indexOf('?')
-        const file = query < 0 ? path : path.slice(0, query)
-        // `?plain=1#L12` alone is a link within this page.
-        token.attrs[i][1] = file ? fileURL(resolveLocal(file)) + fragment : fragment
-      }
-    }
-    return original
-      ? original(tokens, idx, options, env, self)
-      : self.renderToken(tokens, idx, options)
-  }
-}
-patchAttr(md.renderer.rules, 'image', 'src')
-patchAttr(md.renderer.rules, 'link_open', 'href')
-
-/* ------------------------------------------------------- front matter */
-
-function splitFrontMatter(text) {
-  if (!text.startsWith('---')) return { data: null, body: text, offset: 0 }
-  const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/.exec(text)
-  if (!match) return { data: null, body: text, offset: 0 }
-  try {
-    const data = parseYaml(match[1])
-    if (data && typeof data === 'object') {
-      return {
-        data,
-        body: text.slice(match[0].length),
-        offset: match[0].split('\n').length - 1,
-      }
-    }
-  } catch {
-    /* malformed front matter is shown as-is */
-  }
-  return { data: null, body: text, offset: 0 }
-}
-
-const escapeHtml = (s) =>
-  String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-
-function renderFrontMatter(data) {
-  if (!data) return ''
-  const title = data.title ?? data.name
-  const rows = Object.entries(data)
-    // `imark:` is how a document tells the app what it is — machinery, not
-    // something the person reading it put there or needs to see.
-    .filter(([key]) => key !== 'title' && key !== 'name' && key !== 'imark')
-    .map(([key, value]) => {
-      const shown = Array.isArray(value)
-        ? value.map((v) => `<span class="fm-chip">${escapeHtml(v)}</span>`).join('')
-        : value && typeof value === 'object'
-          ? `<code>${escapeHtml(JSON.stringify(value))}</code>`
-          : escapeHtml(value)
-      return `<div class="fm-row"><dt>${escapeHtml(key)}</dt><dd>${shown}</dd></div>`
-    })
-    .join('')
-  if (!title && !rows) return ''
-  return `<header class="front-matter">
-    ${title ? `<h1 class="fm-title">${escapeHtml(title)}</h1>` : ''}
-    ${rows ? `<dl class="fm-grid">${rows}</dl>` : ''}
-  </header>`
-}
-
 // Hidden with CSS rather than by leaving the card out of the HTML: the front
 // matter still occupies its lines in the file, and a document that is not built
 // again is a document whose notes cannot move.
@@ -384,153 +123,6 @@ function setFrontMatter(shown) {
   // A render does this for itself, further down; a toggle has nothing else.
   buildRail(content())
   buildNoteRail()
-}
-
-/* --------------------------------------------------------------- mermaid */
-
-let mermaidSeq = 0
-
-// Mermaid ships its own palette, which clashes badly with ours. Feeding it the
-// live CSS variables keeps diagrams on-theme in both light and dark.
-function mermaidTheme() {
-  const css = getComputedStyle(document.documentElement)
-  const token = (name) => css.getPropertyValue(name).trim()
-  return {
-    background: token('--bg'),
-    primaryColor: token('--code-bg'),
-    primaryTextColor: token('--text'),
-    primaryBorderColor: token('--diagram'),
-    secondaryColor: token('--accent-soft'),
-    secondaryBorderColor: token('--diagram'),
-    tertiaryColor: token('--bg'),
-    tertiaryBorderColor: token('--border'),
-    lineColor: token('--secondary'),
-    textColor: token('--text'),
-    mainBkg: token('--code-bg'),
-    nodeBorder: token('--diagram'),
-    clusterBkg: token('--bg'),
-    clusterBorder: token('--border'),
-    edgeLabelBackground: token('--bg'),
-    fontSize: '14px',
-  }
-}
-
-// Every diagram drawn so far, by palette and source. Mermaid is by far the
-// slowest part of a render — eight small diagrams in a long document took a
-// second and a half, all of its markdown about a tenth of a second — and all
-// of it was done again for a step Back, for a document opened a second time,
-// for every save of a file being followed and for every change in Settings,
-// which sends the palette again. A diagram that changed is a different key,
-// so nothing here goes stale. A drawing is 20 to 50 KB of text, so keeping a
-// hundred costs a few megabytes; past that the oldest are let go.
-const drawnDiagrams = new Map()
-const DIAGRAMS_KEPT = 100
-
-// Which drawing each block on the page is showing, by the same key. Every
-// change in Settings sends the palette again, the one already on the page, and
-// putting the same drawings back in made WebKit lay the whole document out
-// again: 230 ms of the 400 that a step of the text size took on a long one.
-const showing = new WeakMap()
-
-function remember(key, svg) {
-  // Put back at the end, so the diagrams in use are the last to go.
-  drawnDiagrams.delete(key)
-  drawnDiagrams.set(key, svg)
-  if (drawnDiagrams.size > DIAGRAMS_KEPT) drawnDiagrams.delete(drawnDiagrams.keys().next().value)
-}
-
-// Puts in every diagram in `root` already drawn in the current palette, and
-// hands the rest to `drawDiagrams`. A render calls it before anything measures
-// the page, so a document seen before is laid out once with its diagrams in
-// it, and not a second time when they arrive.
-function placeDrawnDiagrams(root) {
-  const themeVariables = mermaidTheme()
-  const palette = JSON.stringify(themeVariables)
-  const blocks = [...root.querySelectorAll('.mermaid-block')].map((block) => {
-    const source = decodeURIComponent(block.dataset.graph || '')
-    return { block, source, key: `${palette}\n${source}` }
-  })
-  // Once per page: an SVG styles itself by its own id, and the same diagram
-  // placed twice would put two of that id in one document. Blocks already
-  // showing their drawing are counted first, wherever they sit: counted on the
-  // way down, one lower on the page was missed, and a palette that came back
-  // while it was being drawn in another gave its drawing to a block above too.
-  const placed = new Set(blocks.filter(({ block, key }) => showing.get(block) === key).map(({ key }) => key))
-  const undrawn = []
-  for (const { block, source, key } of blocks) {
-    if (showing.get(block) === key) continue
-    const svg = drawnDiagrams.get(key)
-    if (svg === undefined || placed.has(key)) {
-      undrawn.push({ block, source, key })
-      continue
-    }
-    placed.add(key)
-    remember(key, svg)
-    block.innerHTML = svg
-    block.classList.add('is-rendered')
-    sizeDiagram(block)
-    showing.set(block, key)
-  }
-  return { themeVariables, undrawn }
-}
-
-let drawing = 0
-let latestDrawing = Promise.resolve()
-
-function drawDiagrams(diagrams) {
-  // Counted even with nothing to draw: a document whose diagrams all came back
-  // still takes the page from one whose diagrams are being drawn.
-  latestDrawing = drawEach(diagrams, ++drawing)
-  return latestDrawing
-}
-
-// Waits for the drawing that has the page, whichever it is by then. A change
-// in Settings while a render waits on its own drawing draws everything again in
-// the new palette, and the render went on as soon as its own gave up: it put
-// the page back where it was against a page still missing its diagrams, and
-// said it was done before they were in.
-async function diagramsDrawn() {
-  let latest
-  while (latest !== latestDrawing) {
-    latest = latestDrawing
-    await latest
-  }
-}
-
-async function drawEach({ themeVariables, undrawn }, token) {
-  if (!undrawn.length) return
-  mermaid.initialize({
-    startOnLoad: false,
-    theme: 'base',
-    themeVariables,
-    securityLevel: 'strict',
-    fontFamily: 'inherit',
-  })
-  for (const { block, source, key } of undrawn) {
-    try {
-      const { svg } = await mermaid.render(`mermaid-${mermaidSeq++}`, source)
-      // Another document, or this one in another palette, has started
-      // drawing since, and has the page now. Mermaid's settings are global and
-      // that drawing has just changed them, so this SVG may be half in the
-      // wrong colours — and kept, it would come back in them every time.
-      if (token !== drawing) return
-      block.innerHTML = svg
-      block.classList.add('is-rendered')
-      sizeDiagram(block)
-      showing.set(block, key)
-      remember(key, svg)
-    } catch (error) {
-      if (token !== drawing) return
-      block.classList.add('is-error')
-      block.innerHTML = `<div class="diagram-error"><strong>${t('Invalid diagram')}</strong><pre>${escapeHtml(
-        error?.message ?? error,
-      )}</pre></div>`
-      // Shown as well, or every change in Settings parsed it again and put in a
-      // new error box. Not kept: a new render parses it once more, which costs
-      // nothing like a drawing.
-      showing.set(block, key)
-    }
-  }
 }
 
 /* ------------------------------------------------------------------- toc */
@@ -1011,7 +603,6 @@ async function render({ markdown, path, theme, language, preview, rail, frontMat
   // keeps the viewer open: a file being followed is saved every few seconds.
   if (path !== lastPath) closeDiagram()
   lastPath = path
-  slugCounts.clear()
 
   // The very first render carries the theme and the preview flag — without this
   // the page keeps the defaults from index.html until something calls the
@@ -1027,8 +618,6 @@ async function render({ markdown, path, theme, language, preview, rail, frontMat
   if (frontMatter !== undefined) applyFrontMatter(frontMatter)
   if (commentingControls !== undefined) setCommentingControls(commentingControls)
 
-  const { data, body, offset } = splitFrontMatter(markdown ?? '')
-  lineOffset = offset
   const root = content()
   // A reload keeps the place. Another document, or a step Back to one, says
   // where to land instead: without it a file opened from a link started as far
@@ -1044,14 +633,17 @@ async function render({ markdown, path, theme, language, preview, rail, frontMat
 
   // Taken out before parsing so the blocks can never show up as document text,
   // and blanked rather than deleted so the line map stays honest.
-  const { body: clean, comments } = extractComments(body, offset)
-
-  taskKey = newTaskKey()
-  root.innerHTML = clean.trim()
-    ? renderFrontMatter(data) + md.render(clean)
-    : `${renderFrontMatter(data)}<p class="empty">This file is empty</p>`
+  let comments
+  const { html } = pipeline.renderDocument(markdown ?? '', {
+    prepare: (body, offset) => {
+      const lifted = extractComments(body, offset)
+      comments = lifted.comments
+      return lifted.body
+    },
+  })
+  root.innerHTML = html
   if (token !== renderToken) return
-  const diagrams = placeDrawnDiagrams(root)
+  const diagrams = placeDrawnDiagrams(root, readPalette())
   // Now as well as at the end, so the new document does not sit at the old
   // one's place for as long as its diagrams take — and a glide still running
   // in the old one does not carry on in this one. After the drawings already
@@ -1574,7 +1166,7 @@ const LINE_LINK = /^L([1-9]\d*)(?:C\d+)?(?:-L[1-9]\d*(?:C\d+)?)?$/
 function blockAtLine(lineNumber) {
   const index = lineNumber - 1 // `data-line` counts from zero
   // The front matter is a card with no lines of its own, at the top.
-  if (index < lineOffset) return content()
+  if (index < pipeline.lineOffset) return content()
   let holder = null
   for (const block of content().querySelectorAll('[data-line]')) {
     const range = lineRange(block)
@@ -1715,7 +1307,7 @@ window.imark = {
     if (theme !== document.documentElement.dataset.theme) closeDiagram()
     document.documentElement.dataset.theme = theme
     const blocks = document.querySelectorAll('.mermaid-block')
-    if (blocks.length) drawDiagrams(placeDrawnDiagrams(content()))
+    if (blocks.length) drawDiagrams(placeDrawnDiagrams(content(), readPalette()))
   },
   setWidth(width) {
     keepingPlace(() => {
