@@ -206,7 +206,10 @@ enum Comments {
         if let stamp {
             guard let now = Stamp(of: url), now == stamp else { throw Failure.fileChanged }
         }
-        try write(text, to: url)
+        // Editors load through Foundation, which drops the mark, so what arrives
+        // here never has one. The file on disk is the authority on whether it did.
+        let mark = text.hasPrefix("\u{FEFF}") ? "" : (try? readText(url).mark) ?? ""
+        try write(mark + text, to: url)
     }
 
     // MARK: - Task lists
