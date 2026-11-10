@@ -31,9 +31,9 @@ enum Comments {
 
         var errorDescription: String? {
             switch self {
-            case .fileChanged: "This file changed on disk since Imark opened it."
-            case .unreadable: "Imark can't read this file as UTF-8 text."
-            case .notATask: "That line of the file is not a task any more."
+            case .fileChanged: NSLocalizedString("This file changed on disk since Imark opened it.", comment: "")
+            case .unreadable: NSLocalizedString("Imark can't read this file as UTF-8 text.", comment: "")
+            case .notATask: NSLocalizedString("That line of the file is not a task any more.", comment: "")
             }
         }
     }

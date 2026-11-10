@@ -51,11 +51,11 @@ final class WelcomeWindowController: NSWindowController {
         let title = NSTextField(labelWithString: "Imark")
         title.font = .systemFont(ofSize: 26, weight: .semibold)
 
-        let subtitle = NSTextField(labelWithString: "Drop a .md file here")
+        let subtitle = NSTextField(labelWithString: NSLocalizedString("Drop a .md file here", comment: ""))
         subtitle.font = .systemFont(ofSize: 13)
         subtitle.textColor = .secondaryLabelColor
 
-        let openButton = NSButton(title: "Open…", target: self, action: #selector(openPanel))
+        let openButton = NSButton(title: NSLocalizedString("Open…", comment: ""), target: self, action: #selector(openPanel))
         openButton.bezelStyle = .rounded
         openButton.keyEquivalent = "\r"
 
@@ -101,7 +101,7 @@ final class WelcomeWindowController: NSWindowController {
             check.contentTintColor = .secondaryLabelColor
             check.symbolConfiguration = .init(pointSize: 11, weight: .regular)
 
-            let label = NSTextField(labelWithString: "Default for .md files")
+            let label = NSTextField(labelWithString: NSLocalizedString("Default for .md files", comment: ""))
             label.font = .systemFont(ofSize: 11)
             label.textColor = .secondaryLabelColor
 
@@ -111,7 +111,7 @@ final class WelcomeWindowController: NSWindowController {
         }
 
         let button = NSButton(
-            title: "Make Imark the default for .md",
+            title: NSLocalizedString("Make Imark the default for .md", comment: ""),
             target: self,
             action: #selector(makeDefault)
         )
@@ -135,8 +135,8 @@ final class WelcomeWindowController: NSWindowController {
         // truncates says less than one that says "your coding agents" and lets
         // the alert do the naming.
         let names = found.count > 2
-            ? "your coding agents"
-            : found.map(\.name).joined(separator: " and ")
+            ? NSLocalizedString("your coding agents", comment: "")
+            : found.map(\.name).joined(separator: NSLocalizedString(" and ", comment: ""))
 
         guard !AgentSetup.isInstalled else {
             let check = NSImageView(
@@ -146,7 +146,7 @@ final class WelcomeWindowController: NSWindowController {
             check.contentTintColor = .secondaryLabelColor
             check.symbolConfiguration = .init(pointSize: 11, weight: .regular)
 
-            let label = NSTextField(labelWithString: "Set up for \(names)")
+            let label = NSTextField(labelWithString: String(format: NSLocalizedString("Set up for %@", comment: ""), String(describing: names)))
             label.font = .systemFont(ofSize: 11)
             label.textColor = .secondaryLabelColor
 
@@ -160,7 +160,7 @@ final class WelcomeWindowController: NSWindowController {
         }
 
         let button = NSButton(
-            title: "Set up for \(names)",
+            title: String(format: NSLocalizedString("Set up for %@", comment: ""), String(describing: names)),
             target: self,
             action: #selector(installAgentSetup)
         )
@@ -169,7 +169,7 @@ final class WelcomeWindowController: NSWindowController {
         button.bezelStyle = .rounded
         button.controlSize = .small
         button.font = .systemFont(ofSize: 11)
-        button.toolTip = "Adds a skill so your agent can open documents here for review"
+        button.toolTip = NSLocalizedString("Adds a skill so your agent can open documents here for review", comment: "")
         agentRow.addArrangedSubview(button)
     }
 
@@ -184,28 +184,26 @@ final class WelcomeWindowController: NSWindowController {
 
         let skipped = AgentSetup.unsupportedFound
         let alert = NSAlert()
-        alert.messageText = "Set Imark up for your coding agents?"
+        alert.messageText = NSLocalizedString("Set Imark up for your coding agents?", comment: "")
         alert.informativeText = [
-            "This installs or updates these files, keeping any edits you made:",
+            NSLocalizedString("This installs or updates these files, keeping any edits you made:", comment: ""),
             "",
             paths,
             "",
-            "Your agent can then open a document here for you to comment on, and "
-                + "read your notes back out of the file. Nothing else is touched, "
-                + "and Remove deletes exactly these.",
-            skipped.isEmpty ? "" : "\nAlso found, and left alone: "
+            NSLocalizedString("Your agent can then open a document here for you to comment on, and read your notes back out of the file. Nothing else is touched, and Remove deletes exactly these.", comment: ""),
+            skipped.isEmpty ? "" : NSLocalizedString("\nAlso found, and left alone: ", comment: "")
                 + skipped.map(\.name).joined(separator: ", ")
-                + ". Imark doesn't know where those keep their skills.",
+                + NSLocalizedString(". Imark doesn't know where those keep their skills.", comment: ""),
         ].joined(separator: "\n")
-        alert.addButton(withTitle: "Set Up")
-        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: NSLocalizedString("Set Up", comment: ""))
+        alert.addButton(withTitle: NSLocalizedString("Cancel", comment: ""))
         guard alert.runModal() == .alertFirstButtonReturn else { return }
 
         do {
             let report = try AgentSetup.install()
             if !report.kept.isEmpty {
                 let kept = NSAlert()
-                kept.messageText = "Your edited agent files were kept"
+                kept.messageText = NSLocalizedString("Your edited agent files were kept", comment: "")
                 kept.informativeText = report.kept.map(\.path).joined(separator: "\n")
                 kept.runModal()
             }
@@ -213,7 +211,7 @@ final class WelcomeWindowController: NSWindowController {
             Settings.agentFilesVersion = Updates.current
         } catch {
             let failure = NSAlert()
-            failure.messageText = "Imark couldn't set that up."
+            failure.messageText = NSLocalizedString("Imark couldn't set that up.", comment: "")
             failure.informativeText = (error as? LocalizedError)?.errorDescription ?? "\(error)"
             failure.runModal()
         }

@@ -83,10 +83,9 @@ enum CommandLineTool {
 
         var errorDescription: String? {
             switch self {
-            case .missing: "This copy of Imark is missing the command."
+            case .missing: NSLocalizedString("This copy of Imark is missing the command.", comment: "")
             case .occupied(let path):
-                "There is already something at \(path) that Imark did not put there. "
-                    + "Remove it first, or link the command yourself."
+                String(format: NSLocalizedString("There is already something at %@ that Imark did not put there. Remove it first, or link the command yourself.", comment: ""), String(describing: path))
             }
         }
     }

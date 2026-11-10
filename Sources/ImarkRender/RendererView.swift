@@ -165,6 +165,7 @@ public final class RendererView: NSView {
             "scroll": scroll.map { $0 as Any } ?? NSNull(),
             "anchor": anchor ?? "",
             "theme": palette,
+            "language": Bundle.main.preferredLocalizations.first ?? "en",
             // Carried in the payload rather than sent separately: a standalone
             // call lands before the page is ready and is silently dropped.
             "preview": previewMode,

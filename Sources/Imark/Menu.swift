@@ -24,15 +24,15 @@ enum Menu {
 
         let helpItem = NSMenuItem()
         main.addItem(helpItem)
-        let help = NSMenu(title: "Help")
+        let help = NSMenu(title: NSLocalizedString("Help", comment: ""))
         help.addItem(
-            withTitle: "Keyboard Shortcuts",
+            withTitle: NSLocalizedString("Keyboard Shortcuts", comment: ""),
             action: #selector(AppDelegate.showShortcuts(_:)),
             keyEquivalent: "/"
         )
         help.addItem(.separator())
         help.addItem(
-            withTitle: "Buy Me a Coffee…",
+            withTitle: NSLocalizedString("Buy Me a Coffee…", comment: ""),
             action: #selector(AppDelegate.buyCoffee(_:)),
             keyEquivalent: ""
         )
@@ -40,9 +40,9 @@ enum Menu {
 
         let windowItem = NSMenuItem()
         main.addItem(windowItem)
-        let window = NSMenu(title: "Window")
-        window.addItem(withTitle: "Minimize", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
-        window.addItem(withTitle: "Zoom", action: #selector(NSWindow.performZoom(_:)), keyEquivalent: "")
+        let window = NSMenu(title: NSLocalizedString("Window", comment: ""))
+        window.addItem(withTitle: NSLocalizedString("Minimize", comment: ""), action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
+        window.addItem(withTitle: NSLocalizedString("Zoom", comment: ""), action: #selector(NSWindow.performZoom(_:)), keyEquivalent: "")
         windowItem.submenu = window
         NSApp.windowsMenu = window
 
@@ -51,67 +51,67 @@ enum Menu {
 
     private static func appMenu() -> NSMenu {
         let menu = NSMenu(title: "Imark")
-        menu.addItem(withTitle: "About Imark", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
+        menu.addItem(withTitle: NSLocalizedString("About Imark", comment: ""), action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
         let updates = menu.addItem(
-            withTitle: "Check for Updates…",
+            withTitle: NSLocalizedString("Check for Updates…", comment: ""),
             action: #selector(AppDelegate.checkForUpdates(_:)),
             keyEquivalent: ""
         )
         updates.target = NSApp.delegate
         menu.addItem(.separator())
         let settings = menu.addItem(
-            withTitle: "Settings…",
+            withTitle: NSLocalizedString("Settings…", comment: ""),
             action: #selector(AppDelegate.showSettings(_:)),
             keyEquivalent: ","
         )
         settings.target = NSApp.delegate
         menu.addItem(.separator())
         let makeDefault = menu.addItem(
-            withTitle: "Make Imark the Default for .md",
+            withTitle: NSLocalizedString("Make Imark the Default for .md", comment: ""),
             action: #selector(AppDelegate.makeDefaultHandler(_:)),
             keyEquivalent: ""
         )
         makeDefault.target = NSApp.delegate
         let commandLine = menu.addItem(
-            withTitle: "Install the imark Command…",
+            withTitle: NSLocalizedString("Install the imark Command…", comment: ""),
             action: #selector(AppDelegate.installCommandLineTool(_:)),
             keyEquivalent: ""
         )
         commandLine.target = NSApp.delegate
         menu.addItem(.separator())
-        let hide = menu.addItem(withTitle: "Hide Imark", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+        let hide = menu.addItem(withTitle: NSLocalizedString("Hide Imark", comment: ""), action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         hide.target = NSApp
         menu.addItem(.separator())
-        let quit = menu.addItem(withTitle: "Quit Imark", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        let quit = menu.addItem(withTitle: NSLocalizedString("Quit Imark", comment: ""), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         quit.target = NSApp
         return menu
     }
 
     private static func fileMenu() -> NSMenu {
-        let menu = NSMenu(title: "File")
-        menu.addItem(withTitle: "Open…", action: #selector(AppDelegate.openDocument(_:)), keyEquivalent: "o")
+        let menu = NSMenu(title: NSLocalizedString("File", comment: ""))
+        menu.addItem(withTitle: NSLocalizedString("Open…", comment: ""), action: #selector(AppDelegate.openDocument(_:)), keyEquivalent: "o")
         menu.addItem(.separator())
-        menu.addItem(withTitle: "Close", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+        menu.addItem(withTitle: NSLocalizedString("Close", comment: ""), action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
         menu.addItem(
-            withTitle: "Save",
+            withTitle: NSLocalizedString("Save", comment: ""),
             action: #selector(DocumentWindowController.saveDocument(_:)),
             keyEquivalent: "s"
         )
         menu.addItem(
-            withTitle: "Revert to Saved",
+            withTitle: NSLocalizedString("Revert to Saved", comment: ""),
             action: #selector(DocumentWindowController.revertDocument(_:)),
             keyEquivalent: ""
         )
         menu.addItem(.separator())
-        let reveal = menu.addItem(withTitle: "Reveal in Finder", action: #selector(DocumentWindowController.revealInFinder(_:)), keyEquivalent: "r")
+        let reveal = menu.addItem(withTitle: NSLocalizedString("Reveal in Finder", comment: ""), action: #selector(DocumentWindowController.revealInFinder(_:)), keyEquivalent: "r")
         reveal.keyEquivalentModifierMask = [.command, .shift]
         // ⌥⌘C because it is the Finder's own key for "Copy as Pathname", so the
         // hand that already knows it there does not have to learn another here.
-        let copyPath = menu.addItem(withTitle: "Copy Path", action: #selector(DocumentWindowController.copyPath(_:)), keyEquivalent: "c")
+        let copyPath = menu.addItem(withTitle: NSLocalizedString("Copy Path", comment: ""), action: #selector(DocumentWindowController.copyPath(_:)), keyEquivalent: "c")
         copyPath.keyEquivalentModifierMask = [.command, .option]
-        menu.addItem(withTitle: "Print…", action: #selector(DocumentWindowController.printDocument(_:)), keyEquivalent: "p")
+        menu.addItem(withTitle: NSLocalizedString("Print…", comment: ""), action: #selector(DocumentWindowController.printDocument(_:)), keyEquivalent: "p")
         menu.addItem(
-            withTitle: "Export Comments as Text…",
+            withTitle: NSLocalizedString("Export Comments as Text…", comment: ""),
             action: #selector(DocumentWindowController.exportComments(_:)),
             keyEquivalent: ""
         )
@@ -119,10 +119,10 @@ enum Menu {
     }
 
     private static func editMenu() -> NSMenu {
-        let menu = NSMenu(title: "Edit")
-        menu.addItem(withTitle: "Undo", action: #selector(DocumentWindowController.undoComment(_:)), keyEquivalent: "z")
+        let menu = NSMenu(title: NSLocalizedString("Edit", comment: ""))
+        menu.addItem(withTitle: NSLocalizedString("Undo", comment: ""), action: #selector(DocumentWindowController.undoComment(_:)), keyEquivalent: "z")
         let redo = menu.addItem(
-            withTitle: "Redo",
+            withTitle: NSLocalizedString("Redo", comment: ""),
             action: #selector(DocumentWindowController.redoTyping(_:)),
             keyEquivalent: "z"
         )
@@ -130,39 +130,39 @@ enum Menu {
         menu.addItem(.separator())
         // Cut and Paste arrived with the editor: in a reader there was nothing to
         // cut, and ⌘V did nothing at all until the file could be typed in.
-        menu.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
-        menu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
-        menu.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        menu.addItem(withTitle: NSLocalizedString("Cut", comment: ""), action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        menu.addItem(withTitle: NSLocalizedString("Copy", comment: ""), action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        menu.addItem(withTitle: NSLocalizedString("Paste", comment: ""), action: #selector(NSText.paste(_:)), keyEquivalent: "v")
         menu.addItem(.separator())
         // A tick rather than two titles: editing is a state the window is in,
         // and the same key puts it back.
         menu.addItem(
-            withTitle: "Editing Mode",
+            withTitle: NSLocalizedString("Editing Mode", comment: ""),
             action: #selector(DocumentWindowController.toggleEditMode(_:)),
             keyEquivalent: "e"
         )
-        menu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        menu.addItem(withTitle: NSLocalizedString("Select All", comment: ""), action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
         menu.addItem(.separator())
-        menu.addItem(withTitle: "Find…", action: #selector(DocumentWindowController.performFind(_:)), keyEquivalent: "f")
-        let next = menu.addItem(withTitle: "Find Next", action: #selector(DocumentWindowController.findNext(_:)), keyEquivalent: "g")
+        menu.addItem(withTitle: NSLocalizedString("Find…", comment: ""), action: #selector(DocumentWindowController.performFind(_:)), keyEquivalent: "f")
+        let next = menu.addItem(withTitle: NSLocalizedString("Find Next", comment: ""), action: #selector(DocumentWindowController.findNext(_:)), keyEquivalent: "g")
         next.keyEquivalentModifierMask = [.command]
-        let previous = menu.addItem(withTitle: "Find Previous", action: #selector(DocumentWindowController.findPrevious(_:)), keyEquivalent: "g")
+        let previous = menu.addItem(withTitle: NSLocalizedString("Find Previous", comment: ""), action: #selector(DocumentWindowController.findPrevious(_:)), keyEquivalent: "g")
         previous.keyEquivalentModifierMask = [.command, .shift]
         return menu
     }
 
     private static func viewMenu() -> NSMenu {
-        let menu = NSMenu(title: "View")
-        menu.addItem(withTitle: "Toggle Sidebar", action: #selector(DocumentWindowController.toggleSidebar(_:)), keyEquivalent: "\\")
+        let menu = NSMenu(title: NSLocalizedString("View", comment: ""))
+        menu.addItem(withTitle: NSLocalizedString("Toggle Sidebar", comment: ""), action: #selector(DocumentWindowController.toggleSidebar(_:)), keyEquivalent: "\\")
         menu.addItem(.separator())
-        menu.addItem(withTitle: "Bigger Text", action: #selector(DocumentWindowController.increaseText(_:)), keyEquivalent: "+")
-        menu.addItem(withTitle: "Smaller Text", action: #selector(DocumentWindowController.decreaseText(_:)), keyEquivalent: "-")
-        menu.addItem(withTitle: "Actual Size", action: #selector(DocumentWindowController.resetText(_:)), keyEquivalent: "0")
+        menu.addItem(withTitle: NSLocalizedString("Bigger Text", comment: ""), action: #selector(DocumentWindowController.increaseText(_:)), keyEquivalent: "+")
+        menu.addItem(withTitle: NSLocalizedString("Smaller Text", comment: ""), action: #selector(DocumentWindowController.decreaseText(_:)), keyEquivalent: "-")
+        menu.addItem(withTitle: NSLocalizedString("Actual Size", comment: ""), action: #selector(DocumentWindowController.resetText(_:)), keyEquivalent: "0")
 
         // The column width used to live only inside the toolbar's AA menu, which
         // means it went with it. The menu bar is where macOS expects every
         // command to be findable, and it is what ⌘/ reads to build its list.
-        let widths = NSMenu(title: "Column Width")
+        let widths = NSMenu(title: NSLocalizedString("Column Width", comment: ""))
         for width in Settings.Width.allCases {
             let item = widths.addItem(
                 withTitle: width.label,
@@ -171,45 +171,45 @@ enum Menu {
             )
             item.representedObject = width.rawValue
         }
-        menu.addItem(withTitle: "Column Width", action: nil, keyEquivalent: "").submenu = widths
+        menu.addItem(withTitle: NSLocalizedString("Column Width", comment: ""), action: nil, keyEquivalent: "").submenu = widths
 
         // A tick rather than a title that flips between "Show" and "Hide": the
         // front matter is a thing the document either shows or does not, and a
         // checked item says which without having to be read twice.
         menu.addItem(
-            withTitle: "Show Front Matter",
+            withTitle: NSLocalizedString("Show Front Matter", comment: ""),
             action: #selector(DocumentWindowController.toggleFrontMatter(_:)),
             keyEquivalent: ""
         )
 
         menu.addItem(.separator())
         menu.addItem(
-            withTitle: "Back",
+            withTitle: NSLocalizedString("Back", comment: ""),
             action: #selector(DocumentWindowController.goBackInHistory(_:)),
             keyEquivalent: "["
         )
         menu.addItem(
-            withTitle: "Forward",
+            withTitle: NSLocalizedString("Forward", comment: ""),
             action: #selector(DocumentWindowController.goForwardInHistory(_:)),
             keyEquivalent: "]"
         )
         menu.addItem(.separator())
-        menu.addItem(withTitle: "Reload", action: #selector(DocumentWindowController.reloadDocument(_:)), keyEquivalent: "r")
+        menu.addItem(withTitle: NSLocalizedString("Reload", comment: ""), action: #selector(DocumentWindowController.reloadDocument(_:)), keyEquivalent: "r")
         menu.addItem(.separator())
 
         let allComments = menu.addItem(
-            withTitle: "Show All Comments",
+            withTitle: NSLocalizedString("Show All Comments", comment: ""),
             action: #selector(DocumentWindowController.toggleAllComments(_:)),
             keyEquivalent: "c"
         )
         allComments.keyEquivalentModifierMask = [.command, .shift]
         menu.addItem(
-            withTitle: "Next Comment",
+            withTitle: NSLocalizedString("Next Comment", comment: ""),
             action: #selector(DocumentWindowController.nextComment(_:)),
             keyEquivalent: "'"
         )
         let previousComment = menu.addItem(
-            withTitle: "Previous Comment",
+            withTitle: NSLocalizedString("Previous Comment", comment: ""),
             action: #selector(DocumentWindowController.previousComment(_:)),
             keyEquivalent: "'"
         )

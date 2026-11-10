@@ -363,3 +363,26 @@ inside the app: **Imark › About Imark** shows it.
 
 Imark itself is [MIT](LICENSE) — use it, change it, redistribute it, just keep
 the copyright notice.
+
+### Interface languages
+
+The app and Quick Look preview support English and Simplified Chinese. They
+follow the preferred language in macOS. To choose a language just for Imark, use
+System Settings → General → Language & Region → Applications, add Imark, and
+choose English or Simplified Chinese. Quit and reopen Imark after changing it.
+Documents, comments, file names, and agent command formats keep their original
+content.
+
+Translations live in `Support/Localizations/{en,zh-Hans}.lproj/Localizable.strings`
+for native controls and `renderer/src/locales/zh-Hans.json` for the rendered page.
+Keep format placeholders unchanged. The build script copies the native resources
+into both the app and the Quick Look extension.
+
+For an Intel Mac build, run `IMARK_ARCH=x86_64 ./build.sh --no-install` after
+installing renderer dependencies with `(cd renderer && npm ci)`. The app is
+written to `dist/Imark.app`. To check the language resources and renderer:
+
+```bash
+python3 Support/test-localization-resources.py
+swift Support/test-localization.swift
+```

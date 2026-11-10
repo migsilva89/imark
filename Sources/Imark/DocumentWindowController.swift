@@ -238,7 +238,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
 
         guard let source = try? String(contentsOf: url, encoding: .utf8) else {
             content.renderer.render(
-                markdown: "# Can't read this file\n\n`\(url.path)`\n\nIt exists, but it isn't UTF-8 text.",
+                markdown: String(format: NSLocalizedString("# Can't read this file\n\n`%@`\n\nIt exists, but it isn't UTF-8 text.", comment: ""), String(describing: url.path)),
                 path: url.path
             )
             return
@@ -247,7 +247,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
 
         if text.utf8.count > Self.sizeLimit {
             let prefix = String(decoding: Array(text.utf8.prefix(Self.sizeLimit)), as: UTF8.self)
-            text = prefix + "\n\n---\n\n> **Truncated.** Above 5 MB Imark shows only the beginning."
+            text = prefix + NSLocalizedString("\n\n---\n\n> **Truncated.** Above 5 MB Imark shows only the beginning.", comment: "")
         }
 
         stamp = Comments.Stamp(of: url)
@@ -265,7 +265,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
 
     private func showVanished() {
         content.renderer.render(
-            markdown: "# This file no longer exists\n\n`\(url.path)`",
+            markdown: String(format: NSLocalizedString("# This file no longer exists\n\n`%@`", comment: ""), String(describing: url.path)),
             path: url.path
         )
     }
@@ -414,12 +414,12 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     private func confirmOpening(_ target: URL, with app: URL) {
         guard let window else { return NSSound.beep() }
         let alert = NSAlert()
-        alert.messageText = "Open this link in \(FileManager.default.displayName(atPath: app.path))?"
+        alert.messageText = String(format: NSLocalizedString("Open this link in %@?", comment: ""), String(describing: FileManager.default.displayName(atPath: app.path)))
         alert.informativeText = target.absoluteString
-            + "\n\nThe link comes from the document, and opening it hands it to another app."
+            + NSLocalizedString("\n\nThe link comes from the document, and opening it hands it to another app.", comment: "")
         alert.alertStyle = .warning
-        alert.addButton(withTitle: "Open")
-        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: NSLocalizedString("Open", comment: ""))
+        alert.addButton(withTitle: NSLocalizedString("Cancel", comment: ""))
         // Return is not the way to agree to something a document asked for.
         alert.buttons[0].keyEquivalent = ""
         alert.buttons[1].keyEquivalent = "\r"
@@ -454,11 +454,11 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         let fileNote = composingFileNote
         composingFileNote = false
         guard fileNote || selection?.block != nil else {
-            selectionPopover.reportCommentFailure("Couldn't tell where that selection came from")
+            selectionPopover.reportCommentFailure(NSLocalizedString("Couldn't tell where that selection came from", comment: ""))
             return
         }
         do {
-            snapshot("Comment")
+            snapshot(NSLocalizedString("Comment", comment: ""))
             let index = try Comments.insert(
                 quote: fileNote ? "" : (selection?.text ?? ""),
                 body: body,
@@ -484,7 +484,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         } catch {
             undoStack.discardLast()
             selectionPopover.reportCommentFailure(
-                (error as? LocalizedError)?.errorDescription ?? "Couldn't save the comment"
+                (error as? LocalizedError)?.errorDescription ?? NSLocalizedString("Couldn't save the comment", comment: "")
             )
         }
     }
@@ -504,12 +504,12 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
 
         case .delete:
             do {
-                snapshot("Delete Comment")
+                snapshot(NSLocalizedString("Delete Comment", comment: ""))
                 try Comments.remove(lines: command.lines, from: url, expecting: stamp)
                 finishWrite()
             } catch {
                 undoStack.discardLast()
-                report(error, doing: "delete that comment")
+                report(error, doing: NSLocalizedString("delete that comment", comment: ""))
             }
         }
     }
@@ -517,14 +517,14 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     private func updateComment(_ body: String, colour: NoteColour, at range: ClosedRange<Int>) {
         editingNote = nil
         do {
-            snapshot("Edit Comment")
+            snapshot(NSLocalizedString("Edit Comment", comment: ""))
             try Comments.update(lines: range, body: body, colour: colour, in: url, expecting: stamp)
             selectionPopover.dismiss()
             finishWrite()
         } catch {
             undoStack.discardLast()
             selectionPopover.reportCommentFailure(
-                (error as? LocalizedError)?.errorDescription ?? "Couldn't save the comment"
+                (error as? LocalizedError)?.errorDescription ?? NSLocalizedString("Couldn't save the comment", comment: "")
             )
         }
     }
@@ -536,12 +536,12 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         // The page is behind the editor while it is open.
         guard !editMode else { return }
         do {
-            snapshot(checked ? "Check Item" : "Uncheck Item")
+            snapshot(checked ? NSLocalizedString("Check Item", comment: "") : NSLocalizedString("Uncheck Item", comment: ""))
             try Comments.setTask(line: line, checked: checked, in: url, expecting: stamp)
             finishWrite()
         } catch {
             undoStack.discardLast()
-            report(error, doing: checked ? "check that item" : "uncheck that item")
+            report(error, doing: checked ? NSLocalizedString("check that item", comment: "") : NSLocalizedString("uncheck that item", comment: ""))
         }
     }
 
@@ -567,7 +567,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         guard on != editMode else { return }
         if on {
             guard let text = try? String(contentsOf: url, encoding: .utf8) else {
-                return report(Comments.Failure.unreadable, doing: "edit this file")
+                return report(Comments.Failure.unreadable, doing: NSLocalizedString("edit this file", comment: ""))
             }
             stamp = Comments.Stamp(of: url)
             content.editor.load(text)
@@ -624,11 +624,11 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         // that cannot be read snapshots as an empty string — so a save on a
         // vanished file, followed by ⌘Z, emptied the document.
         guard (try? String(contentsOf: url, encoding: .utf8)) != nil else {
-            report(Comments.Failure.fileChanged, doing: "save this file")
+            report(Comments.Failure.fileChanged, doing: NSLocalizedString("save this file", comment: ""))
             return false
         }
         do {
-            snapshot("Edit")
+            snapshot(NSLocalizedString("Edit", comment: ""))
             try Comments.save(content.editor.text, to: url, expecting: stamp)
             content.editor.markSaved()
             lastWrite = Date()
@@ -639,7 +639,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
             return true
         } catch {
             undoStack.discardLast()
-            report(error, doing: "save this file")
+            report(error, doing: NSLocalizedString("save this file", comment: ""))
             return false
         }
     }
@@ -649,15 +649,15 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     @objc func revertDocument(_ sender: Any?) {
         guard editMode, content.editor.isDirty else { return }
         let alert = NSAlert()
-        alert.messageText = "Throw away your changes?"
-        alert.informativeText = "The file on disk goes back into the editor. This cannot be undone."
+        alert.messageText = NSLocalizedString("Throw away your changes?", comment: "")
+        alert.informativeText = NSLocalizedString("The file on disk goes back into the editor. This cannot be undone.", comment: "")
         alert.alertStyle = .warning
-        alert.addButton(withTitle: "Throw Away")
-        alert.addButton(withTitle: "Keep Editing")
+        alert.addButton(withTitle: NSLocalizedString("Throw Away", comment: ""))
+        alert.addButton(withTitle: NSLocalizedString("Keep Editing", comment: ""))
         guard alert.runModal() == .alertFirstButtonReturn else { return }
 
         guard let text = try? String(contentsOf: url, encoding: .utf8) else {
-            return report(Comments.Failure.unreadable, doing: "read this file again")
+            return report(Comments.Failure.unreadable, doing: NSLocalizedString("read this file again", comment: ""))
         }
         stamp = Comments.Stamp(of: url)
         content.editor.load(text)
@@ -671,12 +671,12 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     /// editing, opening another document, closing the window.
     func askAboutUnsaved() -> UnsavedAnswer {
         let alert = NSAlert()
-        alert.messageText = "Save your changes to \(url.lastPathComponent)?"
-        alert.informativeText = "You have edits that are not in the file yet."
+        alert.messageText = String(format: NSLocalizedString("Save your changes to %@?", comment: ""), String(describing: url.lastPathComponent))
+        alert.informativeText = NSLocalizedString("You have edits that are not in the file yet.", comment: "")
         alert.alertStyle = .warning
-        alert.addButton(withTitle: "Save")
-        alert.addButton(withTitle: "Don't Save")
-        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: NSLocalizedString("Save", comment: ""))
+        alert.addButton(withTitle: NSLocalizedString("Don't Save", comment: ""))
+        alert.addButton(withTitle: NSLocalizedString("Cancel", comment: ""))
         switch alert.runModal() {
         case .alertFirstButtonReturn: return .save
         case .alertSecondButtonReturn: return .discard
@@ -732,7 +732,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
 
     private func report(_ error: Error, doing what: String) {
         let alert = NSAlert()
-        alert.messageText = "Couldn't \(what)"
+        alert.messageText = String(format: NSLocalizedString("Couldn't %@", comment: ""), String(describing: what))
         alert.informativeText = (error as? LocalizedError)?.errorDescription
             ?? error.localizedDescription
         alert.alertStyle = .warning
@@ -755,7 +755,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
             lastWrite = Date()
             load()
         } catch {
-            report(error, doing: "undo that")
+            report(error, doing: NSLocalizedString("undo that", comment: ""))
         }
     }
 
@@ -849,10 +849,10 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
             // Named after what it will actually put back, so the menu never
             // offers a vague "Undo" that might mean something else.
             if editMode {
-                item.title = "Undo Typing"
+                item.title = NSLocalizedString("Undo Typing", comment: "")
                 return content.editor.canUndo
             }
-            item.title = undoStack.last.map { "Undo \($0.what)" } ?? "Undo"
+            item.title = undoStack.last.map { String(format: NSLocalizedString("Undo %@", comment: ""), String(describing: $0.what)) } ?? NSLocalizedString("Undo", comment: "")
             return !undoStack.isEmpty
         case #selector(toggleEditMode(_:)):
             item.state = editMode ? .on : .off
@@ -943,14 +943,14 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
             panel.nameFieldStringValue = self.url.deletingPathExtension().lastPathComponent
                 + "-comments." + (self.url.pathExtension.isEmpty ? "md" : self.url.pathExtension)
             panel.directoryURL = self.url.deletingLastPathComponent()
-            panel.message = "The comments become blockquotes. Your document is not changed."
+            panel.message = NSLocalizedString("The comments become blockquotes. Your document is not changed.", comment: "")
             panel.beginSheetModal(for: window) { response in
                 guard response == .OK, let target = panel.url else { return }
                 do {
                     try text.write(to: target, atomically: true, encoding: .utf8)
                     NSWorkspace.shared.activateFileViewerSelecting([target])
                 } catch {
-                    self.report(error, doing: "export the comments")
+                    self.report(error, doing: NSLocalizedString("export the comments", comment: ""))
                 }
             }
         }

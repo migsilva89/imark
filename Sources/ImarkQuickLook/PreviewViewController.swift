@@ -41,7 +41,7 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
             throw CocoaError(.fileReadInapplicableStringEncoding)
         }
         if data.count > Self.sizeLimit {
-            body += "\n\n---\n\n> Preview truncated — open in Imark to see everything."
+            body += NSLocalizedString("\n\n---\n\n> Preview truncated — open in Imark to see everything.", comment: "")
         }
 
         renderer.setPreviewMode()

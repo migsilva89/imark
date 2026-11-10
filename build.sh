@@ -108,6 +108,7 @@ printf 'APPL????' > "$APP/Contents/PkgInfo"
 if [ -d "$ROOT/Resources" ]; then
 	cp -R "$ROOT/Resources/." "$APP/Contents/Resources/"
 fi
+cp -R "$ROOT/Support/Localizations/." "$APP/Contents/Resources/"
 # The one file the window is useless without, checked in the assembled bundle
 # rather than in the tree it was copied from.
 [ -f "$APP/Contents/Resources/bundle.js" ] \
@@ -171,6 +172,7 @@ mkdir -p "$APPEX/Contents/Resources"
 if [ -d "$ROOT/Resources" ]; then
 	cp -R "$ROOT/Resources/." "$APPEX/Contents/Resources/"
 fi
+cp -R "$ROOT/Support/Localizations/." "$APPEX/Contents/Resources/"
 
 # Every executable in the bundle, Sparkle's helpers included, checked before it
 # is signed: one thin binary is enough for the app to fail on the other Mac.

@@ -45,8 +45,8 @@ final class ThemeButton: NSButton {
         let moved = showing != nil && showing != theme
         showing = theme
 
-        toolTip = "Appearance: \(theme.label)"
-        setAccessibilityLabel("Appearance: \(theme.label)")
+        toolTip = String(format: NSLocalizedString("Appearance: %@", comment: ""), String(describing: theme.label))
+        setAccessibilityLabel(String(format: NSLocalizedString("Appearance: %@", comment: ""), String(describing: theme.label)))
 
         let configuration = NSImage.SymbolConfiguration(pointSize: 14, weight: .regular)
         guard let image = NSImage(systemSymbolName: theme.symbol, accessibilityDescription: theme.label)?

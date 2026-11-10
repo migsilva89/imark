@@ -158,7 +158,7 @@ final class SidebarViewController: NSViewController {
     private func rebuild() {
         var built: [Row] = []
         if !toc.isEmpty {
-            built.append(.header("Contents"))
+            built.append(.header(NSLocalizedString("Contents", comment: "")))
             for (entry, index) in visibleHeadings() {
                 built.append(.heading(
                     entry,
@@ -169,11 +169,11 @@ final class SidebarViewController: NSViewController {
         }
         // A lone file is just the document you already have open.
         if files.count > 1 {
-            built.append(.header("In this folder"))
+            built.append(.header(NSLocalizedString("In this folder", comment: "")))
             built.append(contentsOf: files.map(Row.file))
         }
         if !recents.isEmpty {
-            built.append(.header("Recent"))
+            built.append(.header(NSLocalizedString("Recent", comment: "")))
             built.append(contentsOf: recents.map(Row.file))
         }
         rows = built
@@ -268,7 +268,7 @@ extension SidebarViewController: NSTableViewDataSource, NSTableViewDelegate {
             )
             // A gesture with no menu item behind it has nowhere else to be
             // discovered, and ⌘/ only lists what the menus already say.
-            cell.toolTip = "\(url.lastPathComponent)\n⌘-click to open in a new tab"
+            cell.toolTip = String(format: NSLocalizedString("%@\n⌘-click to open in a new tab", comment: ""), String(describing: url.lastPathComponent))
             return cell
         }
     }

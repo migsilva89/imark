@@ -36,7 +36,7 @@ final class PreferencesWindowController: NSWindowController, NSWindowDelegate {
             backing: .buffered,
             defer: false
         )
-        window.title = "Imark Settings"
+        window.title = NSLocalizedString("Imark Settings", comment: "")
         super.init(window: window)
         window.delegate = self
 
@@ -48,11 +48,11 @@ final class PreferencesWindowController: NSWindowController, NSWindowDelegate {
         grid.columnSpacing = 14
         grid.translatesAutoresizingMaskIntoConstraints = false
 
-        add(heading: "Appearance", to: grid, first: true)
+        add(heading: NSLocalizedString("Appearance", comment: ""), to: grid, first: true)
         add(rows: appearanceRows(), to: grid)
-        add(heading: "Comments", to: grid, first: false)
+        add(heading: NSLocalizedString("Comments", comment: ""), to: grid, first: false)
         add(rows: commentRows(), to: grid)
-        add(heading: "General", to: grid, first: false)
+        add(heading: NSLocalizedString("General", comment: ""), to: grid, first: false)
         add(rows: generalRows(), to: grid)
 
         grid.column(at: 0).xPlacement = .trailing
@@ -126,15 +126,15 @@ final class PreferencesWindowController: NSWindowController, NSWindowDelegate {
         return [
             // Not "Appearance" again: the group above it already says that, and
             // a row that repeats its own heading tells you nothing.
-            ("Mode", appearance),
-            ("Theme", palette),
-            ("Text size", size),
-            ("Column", width),
+            (NSLocalizedString("Mode", comment: ""), appearance),
+            (NSLocalizedString("Theme", comment: ""), palette),
+            (NSLocalizedString("Text size", comment: ""), size),
+            (NSLocalizedString("Column", comment: ""), width),
         ]
     }
 
     private func commentRows() -> [(String, NSView)] {
-        commentingControls.title = "Show controls for adding comments"
+        commentingControls.title = NSLocalizedString("Show controls for adding comments", comment: "")
         commentingControls.setButtonType(.switch)
         commentingControls.target = self
         commentingControls.action = #selector(commentingControlsChanged)
@@ -149,9 +149,9 @@ final class PreferencesWindowController: NSWindowController, NSWindowDelegate {
         colours.spacing = 6
 
         return [
-            ("Commenting", commentingControls),
-            ("Sign notes as", author),
-            ("Default colour", colours),
+            (NSLocalizedString("Commenting", comment: ""), commentingControls),
+            (NSLocalizedString("Sign notes as", comment: ""), author),
+            (NSLocalizedString("Default colour", comment: ""), colours),
         ]
     }
 
@@ -164,7 +164,7 @@ final class PreferencesWindowController: NSWindowController, NSWindowDelegate {
         editor.removeAllItems()
         let editors = Editors.installed
         if editors.isEmpty {
-            editor.addItem(withTitle: "No editors found")
+            editor.addItem(withTitle: NSLocalizedString("No editors found", comment: ""))
             editor.isEnabled = false
         } else {
             for found in editors {
@@ -176,7 +176,7 @@ final class PreferencesWindowController: NSWindowController, NSWindowDelegate {
         editor.target = self
         editor.action = #selector(editorChanged)
 
-        makeDefault.title = "Make Imark the Default"
+        makeDefault.title = NSLocalizedString("Make Imark the Default", comment: "")
         makeDefault.bezelStyle = .rounded
         makeDefault.target = self
         makeDefault.action = #selector(makeDefaultPressed)
@@ -186,7 +186,7 @@ final class PreferencesWindowController: NSWindowController, NSWindowDelegate {
             accessibilityDescription: nil
         ) ?? NSImage())
         tick.contentTintColor = .systemGreen
-        let done = NSTextField(labelWithString: "Imark opens them")
+        let done = NSTextField(labelWithString: NSLocalizedString("Imark opens them", comment: ""))
         done.textColor = .secondaryLabelColor
         isDefault.setViews([tick, done], in: .leading)
         isDefault.spacing = 6
@@ -194,29 +194,29 @@ final class PreferencesWindowController: NSWindowController, NSWindowDelegate {
         let markdown = NSStackView(views: [makeDefault, isDefault])
         markdown.spacing = 0
 
-        menuBar.title = "Show icon in the menu bar"
+        menuBar.title = NSLocalizedString("Show icon in the menu bar", comment: "")
         menuBar.setButtonType(.switch)
         menuBar.target = self
         menuBar.action = #selector(menuBarChanged)
 
-        updates.title = "Check for updates automatically"
+        updates.title = NSLocalizedString("Check for updates automatically", comment: "")
         updates.setButtonType(.switch)
         updates.target = self
         updates.action = #selector(updatesChanged)
-        updates.toolTip = "Checks GitHub once a day. No documents are sent."
+        updates.toolTip = NSLocalizedString("Checks GitHub once a day. No documents are sent.", comment: "")
 
-        shortcuts.title = "Keyboard Shortcuts…"
+        shortcuts.title = NSLocalizedString("Keyboard Shortcuts…", comment: "")
         shortcuts.bezelStyle = .rounded
         shortcuts.target = self
         shortcuts.action = #selector(shortcutsPressed)
 
         return [
-            ("Search with", engine),
-            ("Open in", editor),
-            ("Markdown files", markdown),
-            ("Menu bar", menuBar),
-            ("Updates", updates),
-            ("Reference", shortcuts),
+            (NSLocalizedString("Search with", comment: ""), engine),
+            (NSLocalizedString("Open in", comment: ""), editor),
+            (NSLocalizedString("Markdown files", comment: ""), markdown),
+            (NSLocalizedString("Menu bar", comment: ""), menuBar),
+            (NSLocalizedString("Updates", comment: ""), updates),
+            (NSLocalizedString("Reference", comment: ""), shortcuts),
         ]
     }
 
@@ -266,7 +266,7 @@ final class PreferencesWindowController: NSWindowController, NSWindowDelegate {
         palette.selectItem(at: Settings.Palette.allCases.firstIndex(of: Settings.palette) ?? 0)
 
         textSize.doubleValue = Settings.textScale
-        textSizeLabel.stringValue = "\(Int(Settings.textScale)) pt"
+        textSizeLabel.stringValue = String(format: NSLocalizedString("%@ pt", comment: ""), String(describing: Int(Settings.textScale)))
         width.selectItem(at: Settings.Width.allCases.firstIndex(of: Settings.width) ?? 1)
 
         // Left empty when it is only the account name, so the placeholder can
@@ -306,7 +306,7 @@ final class PreferencesWindowController: NSWindowController, NSWindowDelegate {
 
     @objc private func textSizeChanged() {
         Settings.textScale = textSize.doubleValue.rounded()
-        textSizeLabel.stringValue = "\(Int(Settings.textScale)) pt"
+        textSizeLabel.stringValue = String(format: NSLocalizedString("%@ pt", comment: ""), String(describing: Int(Settings.textScale)))
     }
 
     @objc private func widthChanged() {

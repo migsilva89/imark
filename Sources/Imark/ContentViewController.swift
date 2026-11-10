@@ -121,7 +121,7 @@ final class ContentViewController: NSViewController {
         findBar.layer?.masksToBounds = true
         findBar.isHidden = true
 
-        searchField.placeholderString = "Find in document"
+        searchField.placeholderString = NSLocalizedString("Find in document", comment: "")
         searchField.sendsSearchStringImmediately = true
         searchField.sendsWholeSearchString = false
         searchField.target = self
@@ -134,7 +134,7 @@ final class ContentViewController: NSViewController {
 
         let previous = button(symbol: "chevron.up", action: #selector(findPrevious))
         let next = button(symbol: "chevron.down", action: #selector(findNext))
-        let done = NSButton(title: "Done", target: self, action: #selector(closeFind))
+        let done = NSButton(title: NSLocalizedString("Done", comment: ""), target: self, action: #selector(closeFind))
         done.bezelStyle = .rounded
         done.controlSize = .small
 
@@ -199,8 +199,8 @@ final class ContentViewController: NSViewController {
 
     private func updateCounter(count: Int, index: Int) {
         counter.stringValue = count == 0
-            ? (searchField.stringValue.isEmpty ? "" : "no results")
-            : "\(index) of \(count)"
+            ? (searchField.stringValue.isEmpty ? "" : NSLocalizedString("no results", comment: ""))
+            : String(format: NSLocalizedString("%@ of %@", comment: ""), String(describing: index), String(describing: count))
     }
 
     // MARK: - Status bar
@@ -273,12 +273,12 @@ final class ContentViewController: NSViewController {
     /// hiding it in the same grey as the word count.
     private func refreshStatus() {
         let formatted = words.formatted(.number.grouping(.automatic))
-        statusLeft.stringValue = "\(formatted) words · \(minutes) min read"
+        statusLeft.stringValue = String(format: NSLocalizedString("%@ words · %@ min read", comment: ""), String(describing: formatted), String(describing: minutes))
 
         commentsButton.isHidden = comments == 0
         guard comments > 0 else { return }
         commentsButton.attributedTitle = NSAttributedString(
-            string: comments == 1 ? "1 comment" : "\(comments) comments",
+            string: comments == 1 ? NSLocalizedString("1 comment", comment: "") : String(format: NSLocalizedString("%@ comments", comment: ""), String(describing: comments)),
             attributes: [
                 .font: NSFont.systemFont(ofSize: 11, weight: .medium),
                 .foregroundColor: NSColor.imarkAccent,
@@ -286,7 +286,7 @@ final class ContentViewController: NSViewController {
                 .underlineColor: NSColor.imarkAccent.withAlphaComponent(0.4),
             ]
         )
-        commentsButton.toolTip = "Show every comment"
+        commentsButton.toolTip = NSLocalizedString("Show every comment", comment: "")
     }
 
     @objc private func showComments() {
@@ -304,14 +304,14 @@ final class ContentViewController: NSViewController {
     /// Confirmation that the file is genuinely being watched. Without it a
     /// silent re-render is indistinguishable from nothing happening.
     func flashReloaded() {
-        flash("Updated just now")
+        flash(NSLocalizedString("Updated just now", comment: ""))
     }
 
     /// The file moved under an editor with unsaved text in it. Nothing was
     /// reloaded — that would have taken the text with it — so this is the only
     /// warning there is until the save refuses.
     func flashChangedOnDisk() {
-        flash("Changed on disk · your text is still here")
+        flash(NSLocalizedString("Changed on disk · your text is still here", comment: ""))
     }
 
     private func flash(_ message: String) {

@@ -1,3 +1,4 @@
+import { t } from './i18n.js'
 // Mermaid diagrams at a size that can be read, and a closer look at any of them.
 //
 // Mermaid draws a diagram as wide as the column and no wider, so a sequence
@@ -50,7 +51,7 @@ function build() {
   viewer.tabIndex = -1
   viewer.setAttribute('role', 'dialog')
   viewer.setAttribute('aria-modal', 'true')
-  viewer.setAttribute('aria-label', 'Diagram')
+  viewer.setAttribute('aria-label', t('Diagram'))
 
   stage = document.createElement('div')
   stage.className = 'diagram-viewer-stage'
@@ -73,11 +74,11 @@ function build() {
     controls.appendChild(el)
     return el
   }
-  button('−', 'Zoom out', () => zoomBy(1 / 1.25))
-  readout = button('100%', 'Actual size', () => zoomTo(1))
+  button('−', t('Zoom out'), () => zoomBy(1 / 1.25))
+  readout = button('100%', t('Actual size'), () => zoomTo(1))
   readout.classList.add('diagram-viewer-readout')
-  button('+', 'Zoom in', () => zoomBy(1.25))
-  button('Fit', 'Fit to window', fit)
+  button('+', t('Zoom in'), () => zoomBy(1.25))
+  button(t('Fit'), t('Fit to window'), fit)
   button('Done', 'Close', close)
 
   viewer.append(stage, controls)

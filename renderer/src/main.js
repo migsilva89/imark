@@ -1,3 +1,4 @@
+import { t, setLanguage } from './i18n.js'
 import MarkdownIt from 'markdown-it'
 import anchor from 'markdown-it-anchor'
 import taskLists from 'markdown-it-task-lists'
@@ -521,7 +522,7 @@ async function drawEach({ themeVariables, undrawn }, token) {
     } catch (error) {
       if (token !== drawing) return
       block.classList.add('is-error')
-      block.innerHTML = `<div class="diagram-error"><strong>Invalid diagram</strong><pre>${escapeHtml(
+      block.innerHTML = `<div class="diagram-error"><strong>${t('Invalid diagram')}</strong><pre>${escapeHtml(
         error?.message ?? error,
       )}</pre></div>`
       // Shown as well, or every change in Settings parsed it again and put in a
@@ -814,7 +815,7 @@ function tipContent(index) {
   const position = railBlocks.length > 1 ? index / (railBlocks.length - 1) : 0
 
   return {
-    label: `${Math.round(position * 100)}% in`,
+    label: t('{percent}% in', { percent: Math.round(position * 100) }),
     title: flatten(heading),
     body,
     notes: notesInSection(heading),
@@ -833,7 +834,7 @@ function showTip(index, tick) {
   if (content.notes) {
     const badge = document.createElement('i')
     badge.className = 'rail-tip-notes'
-    badge.textContent = content.notes === 1 ? '1 comment' : `${content.notes} comments`
+    badge.textContent = content.notes === 1 ? t('1 comment') : t('{count} comments', { count: content.notes })
     label.appendChild(badge)
   }
   railTip.appendChild(label)
@@ -969,7 +970,7 @@ function addCopyButtons(root) {
     const button = document.createElement('button')
     button.className = 'copy-btn'
     button.type = 'button'
-    button.textContent = 'Copy'
+    button.textContent = t('Copy')
     button.addEventListener('click', async () => {
       // A diff is one `code` per row, so the first one alone would copy a
       // single line and look like it had worked.
@@ -978,12 +979,12 @@ function addCopyButtons(root) {
         : wrap.querySelector('code')?.textContent ?? ''
       try {
         await navigator.clipboard.writeText(code)
-        button.textContent = 'Copied'
+        button.textContent = t('Copied')
       } catch {
-        button.textContent = 'Failed'
+        button.textContent = t('Failed')
       }
       setTimeout(() => {
-        button.textContent = 'Copy'
+        button.textContent = t('Copy')
       }, 1400)
     })
     wrap.appendChild(button)
@@ -1000,7 +1001,9 @@ let renderToken = 0
 // Kept so comments can be exported without asking Swift to hand the file back.
 let lastSource = ''
 
-async function render({ markdown, path, theme, preview, rail, frontMatter, commentingControls, scroll, anchor }) {
+async function render({ markdown, path, theme, language, preview, rail, frontMatter, commentingControls, scroll, anchor }) {
+  setLanguage(language)
+  plusButton?.setAttribute('aria-label', t('Comment on this block'))
   const token = ++renderToken
   lastSource = markdown ?? ''
   docDir = path ? path.slice(0, path.lastIndexOf('/')) || '/' : '/'
@@ -1382,7 +1385,7 @@ function setUpBlockPlus() {
   plusButton.type = 'button'
   plusButton.className = 'block-plus'
   plusButton.textContent = '+'
-  plusButton.setAttribute('aria-label', 'Comment on this block')
+  plusButton.setAttribute('aria-label', t('Comment on this block'))
   plusButton.style.display = 'none'
   document.body.appendChild(plusButton)
 
