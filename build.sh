@@ -171,6 +171,9 @@ fi
 mkdir -p "$APPEX/Contents/Resources"
 if [ -d "$ROOT/Resources" ]; then
 	cp -R "$ROOT/Resources/." "$APPEX/Contents/Resources/"
+	# The Live editor (editor.html/js/css) is the app's alone: Quick Look only
+	# previews, and has no reason to carry CodeMirror.
+	rm -f "$APPEX/Contents/Resources/"editor.*
 fi
 cp -R "$ROOT/Support/Localizations/." "$APPEX/Contents/Resources/"
 

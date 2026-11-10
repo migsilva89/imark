@@ -25,8 +25,28 @@ const result = await esbuild.build({
   metafile: true,
 })
 
-writeFileSync('.esbuild-meta.json', JSON.stringify(result.metafile))
+// The Live editor: its own page and bundle, so the preview (and Quick Look,
+// which gets a copy of Resources without editor.*) never loads CodeMirror.
+const editor = await esbuild.build({
+  entryPoints: { editor: 'src/editor/main.js' },
+  bundle: true,
+  minify: true,
+  format: 'iife',
+  target: ['safari17'],
+  outdir: OUT,
+  legalComments: 'none',
+  logLevel: 'warning',
+  metafile: true,
+})
+
+// One metafile for both bundles, so the credits cover the editor's packages too.
+const meta = {
+  inputs: { ...result.metafile.inputs, ...editor.metafile.inputs },
+  outputs: { ...result.metafile.outputs, ...editor.metafile.outputs },
+}
+writeFileSync('.esbuild-meta.json', JSON.stringify(meta))
 
 copyFileSync('src/index.html', `${OUT}/index.html`)
+copyFileSync('src/editor.html', `${OUT}/editor.html`)
 
-console.log('renderer → Resources/{index.html,bundle.js,bundle.css}')
+console.log('renderer → Resources/{index.html,bundle.js,bundle.css,editor.html,editor.js,editor.css}')

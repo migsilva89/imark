@@ -1,0 +1,45 @@
+/* The Live editor page. Spike-level: enough to see a document and edit it.
+   Theme variables, text size and width come in M1, shared with style.css. */
+
+:root {
+  color-scheme: light dark;
+  --editor-bg: #ffffff;
+  --editor-fg: #1f2328;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --editor-bg: #1e1e1e;
+    --editor-fg: #d4d4d4;
+  }
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--editor-bg);
+  color: var(--editor-fg);
+}
+
+#editor {
+  height: 100%;
+}
+
+#editor .cm-editor {
+  height: 100%;
+}
+
+#editor .cm-editor.cm-focused {
+  outline: none;
+}
+
+#editor .cm-scroller {
+  font: 15px/1.6 -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+}
+
+#editor .cm-content {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+}
