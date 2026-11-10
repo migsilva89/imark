@@ -7,9 +7,13 @@
 //     Sources/ImarkRender/SchemeHandler.swift Support/spike-live-editor.swift \
 //     -o /tmp/imark-spike-live/run && /tmp/imark-spike-live/run
 //
-// It puts a window on screen for a few seconds and takes keyboard focus: ⌘Z and
-// the input method are only honest when the window is really key. Each item
-// prints OK or FAIL; lines starting `note` are measurements, not verdicts.
+// It wraps itself in ImarkSpike.app (beside the binary) and launches that, then
+// puts a window on screen for a few seconds. If the system will not make the app
+// active (macOS 14+ cooperative activation, e.g. while another app is in use),
+// key status is forced on the window and ⌘Z is given to the window before the
+// menu by hand, as NSApplication would; a note says so. Run it from a frontmost
+// Terminal to get the real `NSApp.sendEvent` route. Each item prints OK or FAIL;
+// lines starting `note` are measurements, not verdicts.
 //
 //   (a) CodeMirror's injected styles apply under the page's CSP
 //   (b) the Swift mirror equals `state.sliceDoc()` after random edits (LF, CRLF)
@@ -702,10 +706,19 @@ enum Spike {
             js("window.__composition = []")
 
             var composing: [Bool] = []
+            var marksShown: [Bool] = []
+            let shown = "document.querySelector('.cm-content').textContent.includes('**')"
+            check("(e) \(label): `**` on the caret's line \(decorations ? "hidden" : "shown") before composing",
+                  (js(shown) as? Bool) == !decorations)
             for (marked, sel) in [("z", 1), ("zh", 2), ("zhong", 5), ("zhong wen", 9), ("中文", 2)] {
                 client.setMarkedText(marked, selectedRange: NSRange(location: sel, length: 0), replacementRange: none)
                 spin(0.15)
                 composing.append(js("window.imarkEditor.__spike.view.composing") as? Bool ?? false)
+                marksShown.append(js(shown) as? Bool ?? true)
+            }
+            if decorations {
+                check("(e) \(label): the hidden `**` beside the composition stayed hidden while it ran",
+                      !marksShown.contains(true), "\(marksShown)")
             }
             let midText = js("window.imarkEditor.__spike.slice()") as? String ?? ""
             client.insertText("中文", replacementRange: none)
@@ -714,8 +727,10 @@ enum Spike {
             // Then move off the line, which flips the decorations around it.
             client.insertText("。", replacementRange: none)
             spin(0.2)
-            js("window.imarkEditor.__spike.view.dispatch({selection: {anchor: 0}})")
+            let intoBold = (doc as NSString).range(of: "粗").location + 1
+            js("window.imarkEditor.__spike.view.dispatch({selection: {anchor: \(intoBold)}})")
             spin(0.2)
+            check("(e) \(label): caret into the bold shows its `**`", (js(shown) as? Bool) == true)
 
             let expected = doc.replacingOccurrences(of: "后面", with: "后面中文。")
             let final = js("window.imarkEditor.__spike.slice()") as? String ?? ""
