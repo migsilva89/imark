@@ -130,8 +130,9 @@ const caretMarks = ViewPlugin.fromClass(
       syntaxTree(view.state).iterate({
         enter(node) {
           if (node.name !== 'EmphasisMark' && node.name !== 'HeaderMark') return
-          const line = view.state.doc.lineAt(node.from)
-          if (head >= line.from && head <= line.to) return
+          // Shown while the caret is inside the construct the mark belongs to.
+          const owner = node.node.parent
+          if (owner && head >= owner.from && head <= owner.to) return
           ranges.push(Decoration.replace({}).range(node.from, node.to))
         },
       })
