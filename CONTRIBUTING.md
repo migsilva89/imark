@@ -40,6 +40,8 @@ swiftc -parse-as-library -I "$TEST_BIN" -I "$TEST_BIN/Modules" -F "$TEST_BIN" \
 node Support/test-notes.mjs
 node Support/test-export.mjs
 node Support/test-math.mjs
+node Support/test-live-decorations.mjs
+node Support/test-live-blocks.mjs
 swift Support/test-plus.swift
 swift Support/test-text-size.swift
 swift Support/test-pieces.swift
@@ -47,7 +49,23 @@ swift Support/test-preview.swift
 swift Support/test-diagrams.swift
 swift Support/test-diagram-zoom.swift
 swift Support/test-anchors.swift
+mkdir -p /tmp/imark-test-live
+swiftc -parse-as-library -I "$TEST_BIN" -I "$TEST_BIN/Modules" -F "$TEST_BIN" \
+  -Xlinker -rpath -Xlinker "$TEST_BIN" \
+  $(find Sources/Imark -name '*.swift' ! -name main.swift) \
+  $(find Sources/ImarkRender -name '*.swift') \
+  Support/test-live-editor.swift -o /tmp/imark-test-live/run && /tmp/imark-test-live/run
+mkdir -p /tmp/imark-spike-live
+swiftc -parse-as-library Sources/Imark/LiveMirror.swift \
+  Sources/ImarkRender/SchemeHandler.swift Support/spike-live-editor.swift \
+  -o /tmp/imark-spike-live/run && /tmp/imark-spike-live/run
 ```
+
+The last two cover the Live Preview editor: `test-live-editor.swift` drives the
+real window and CodeMirror page in a web view, and the spike harness checks the
+page's mirror, undo and text input under the app's scheme handler and policy.
+The harness puts a window on screen for a few seconds, so run it from a
+frontmost Terminal.
 
 The rest of the suites, the ones a release runs:
 
