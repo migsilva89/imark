@@ -80,6 +80,8 @@ enum LiveEditorTest {
         try findGoesToTheEditor()
         try theEditorTakesTheSettings()
         try noCommentIsWrittenUnderABuffer()
+        try aTaskBoxTicksTheBufferNotTheFile()
+        try aNoteIsACardUntilDoubleClicked()
         try aMirrorCatchingUpIsNeitherSavedNorSwitched()
         linksFromTheEditorGoWhereThePreviewsGo()
 
@@ -549,6 +551,91 @@ enum LiveEditorTest {
         window.saveComment("a note", colour: .standard)
         spin(0.3)
         check("the file is untouched", bytes(url) == Data("text\n".utf8))
+        finish(window)
+    }
+
+    /// Invariant 2, for task boxes (§4, M3): a click on a box in Live is an edit
+    /// to the buffer — one character, unsaved until ⌘S — and never the reading
+    /// view's path, which writes the file through Comments.setTask.
+    static func aTaskBoxTicksTheBufferNotTheFile() throws {
+        print("▸ a task box in Live ticks the buffer, not the file")
+        let original = "- [ ] one\n- [x] two\n\nend\n"
+        let url = fixture(original, named: "tasks.md")
+        let window = open(url)
+        guard startEditing(window, expecting: original) else { return check("the page has the file", false) }
+        let caret = { js(window, "const s = window.imarkEditor.__spike.view.state.selection.main; return [s.anchor, s.head]") as? [Int] }
+        js(window, "window.imarkEditor.__spike.view.dispatch({selection: {anchor: 22}}); return 0")
+        let before = caret()
+        let boxes = { js(window, "return [...document.querySelectorAll('input.cm-live-task')].map((b) => b.checked)") as? [Bool] }
+        check("each task item is drawn as a real checkbox", until { boxes() == [false, true] }, "\(boxes() ?? [])")
+
+        // The events a click sends, on the box itself: the page's own handlers
+        // decide what happens, as they would for the mouse.
+        js(window, """
+            const box = document.querySelectorAll('input.cm-live-task')[0];
+            for (const type of ['mousedown', 'mouseup', 'click'])
+              box.dispatchEvent(new MouseEvent(type, {bubbles: true, cancelable: true, button: 0, detail: 1}));
+            return 0
+            """)
+        let ticked = "- [x] one\n- [x] two\n\nend\n"
+        check("the click ticks the buffer", until { window.content.editor.text == ticked }, window.content.editor.text)
+        check("which is unsaved", window.content.editor.isDirty)
+        spin(0.5)
+        check("and the file is byte for byte what it was", bytes(url) == Data(original.utf8),
+              String(decoding: bytes(url), as: UTF8.self).debugDescription)
+        check("the caret stayed where it was", caret() == before, "\(caret() ?? []) vs \(before ?? [])")
+        check("the box is drawn ticked", until { boxes() == [true, true] }, "\(boxes() ?? [])")
+
+        // The reading view's task message, arriving while the buffer is open:
+        // the window must not write the file under it.
+        window.content.onMessage?(.task(line: 1, checked: false))
+        spin(0.4)
+        check("the reading view's task path does not write under a buffer", bytes(url) == Data(original.utf8))
+        check("nor touch the buffer", window.content.editor.text == ticked && window.content.editor.isDirty)
+
+        window.undoComment(nil)
+        check("⌘Z takes the tick back, and the buffer is clean again",
+              until { window.content.editor.text == original && !window.content.editor.isDirty }, window.content.editor.text)
+        finish(window)
+    }
+
+    /// A comment block is a card in Live; a double-click shows its source.
+    static func aNoteIsACardUntilDoubleClicked() throws {
+        print("▸ a note in Live is a card, until a double-click")
+        let original = "Before.\n\n<!-- imark by=\"reviewer\"\nTighten this.\n-->\n\nAfter.\n"
+        let url = fixture(original, named: "note-card.md")
+        let window = open(url)
+        guard startEditing(window, expecting: original) else { return check("the page has the file", false) }
+        let card = { js(window, "const c = document.querySelector('.cm-live-note'); return c ? c.textContent : ''") as? String }
+        check("the note is drawn as a card with its author and words",
+              until { (card() ?? "").contains("reviewer") && (card() ?? "").contains("Tighten this.") }, card() ?? "nil")
+        js(window, """
+            const c = document.querySelector('.cm-live-note');
+            c.dispatchEvent(new MouseEvent('mousedown', {bubbles: true, cancelable: true, button: 0, detail: 1}));
+            c.dispatchEvent(new MouseEvent('mousedown', {bubbles: true, cancelable: true, button: 0, detail: 2}));
+            return 0
+            """)
+        check("a double-click shows the source", until { card() == "" })
+        let head = js(window, "return window.imarkEditor.__spike.view.state.selection.main.head") as? Int
+        check("with the caret at its start", head == 9, "\(head ?? -1)")
+        js(window, "window.imarkEditor.__spike.view.dispatch({selection: {anchor: 0}}); return 0")
+        check("and the card comes back when the caret leaves", until { (card() ?? "").contains("reviewer") })
+        check("none of which is an edit", !window.content.editor.isDirty && bytes(url) == Data(original.utf8))
+
+        // Backspace from the line after the card, through the page's own keymap:
+        // the note goes whole, with its line break, as one undoable edit.
+        js(window, """
+            const view = window.imarkEditor.__spike.view;
+            view.dispatch({selection: {anchor: view.state.doc.toString().indexOf('-->') + 4}});
+            view.contentDOM.dispatchEvent(new KeyboardEvent('keydown', {key: 'Backspace', code: 'Backspace', keyCode: 8, bubbles: true, cancelable: true}));
+            return 0
+            """)
+        check("Backspace beside the card deletes the note and its newline",
+              until { window.content.editor.text == "Before.\n\n\nAfter.\n" }, window.content.editor.text.debugDescription)
+        check("in the buffer, not the file", window.content.editor.isDirty && bytes(url) == Data(original.utf8))
+        window.undoComment(nil)
+        check("and one ⌘Z brings it back", until { window.content.editor.text == original && !window.content.editor.isDirty },
+              window.content.editor.text.debugDescription)
         finish(window)
     }
 

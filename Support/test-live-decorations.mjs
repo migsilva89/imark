@@ -233,7 +233,8 @@ const at = (doc, needle, nth = 0) => {
   check('wikilink: an empty label shows the target, the | is syntax', same(hidden(w), ['[[', '|]]', '[[', '| ]]', '[[c|', ']]']) && same(styled(w, 'cm-live-wikilink'), ['a', 'b', 'd']), JSON.stringify(hidden(w)))
   const long = '[[a]] '.repeat(2000) + '[[open\nbroken]]'
   check('wikilink: a long paragraph of them parses', same(styled(away(long), 'cm-live-wikilink').length, 2000))
-  const dim = away('![i](p.png)\n\n<!-- imark x -->\n\n[r]: http://x.test\n\n- [ ] t\n\n| a | b |\n|---|---|\n| 1 | 2 |')
+  // A plain HTML comment: an imark note is drawn as a card since M3.
+  const dim = away('![i](p.png)\n\n<!-- x -->\n\n[r]: http://x.test\n\n- [ ] t\n\n| a | b |\n|---|---|\n| 1 | 2 |')
   check('dimmed: images, comments, definitions, task markers and table rules are not left unstyled',
     styled(dim, 'cm-live-dim').length >= 5, JSON.stringify(styled(dim, 'cm-live-dim')))
 }
@@ -254,10 +255,12 @@ const at = (doc, needle, nth = 0) => {
   const items = decorate(s)
   check('list: -, * and + become bullets', items.filter((i) => i.kind === 'bullet').map((i) => s.sliceDoc(i.from, i.to)).join('') === '-*+')
   check('list: ordered numbers stay, dimmed', same(styled(s, 'cm-live-number', items), ['1.']))
-  check('list: a task item keeps its source', items.filter((i) => i.kind === 'bullet').length === 3)
+  check('list: a task item gets no bullet', items.filter((i) => i.kind === 'bullet').length === 3)
   const near = stateFor(lists, 1)
   check('list: caret at the marker shows it', decorate(near).filter((i) => i.kind === 'bullet').length === 2)
-  check('list: no source is ever hidden for lists', same(hidden(s), []))
+  // M3: beside a drawn box the "- " hides, as the preview draws no bullet there
+  // (Support/test-live-blocks.mjs has the rest of it).
+  check('list: only a task item hides its marker, with the space', same(hidden(s), ['- ']), JSON.stringify(hidden(s)))
 
   const hr = 'a\n\n---\n\nb'
   check('rule: styled while the caret is off it', styled(stateFor(hr, 0), 'cm-live-hr').length === 1)
