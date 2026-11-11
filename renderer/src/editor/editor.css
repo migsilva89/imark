@@ -531,3 +531,30 @@ html[data-theme] {
   color: var(--secondary);
   opacity: 0.8;
 }
+
+/* The changed-lines gutter (gutter.js), drawn as the source editor's LineGutter
+   draws it: a two-point bar in the accent at the left edge, inset from the top
+   and bottom of the line. It takes no room — the negative margin gives back its
+   width — so the text column stays where the preview's is. */
+#editor .cm-gutters {
+  background: transparent;
+  border: none;
+  margin-right: -6px;
+}
+
+#editor .cm-imark-changes {
+  width: 6px;
+}
+
+#editor .cm-imark-changes .cm-gutterElement {
+  position: relative;
+}
+
+#editor .cm-imark-changed-bar {
+  position: absolute;
+  left: 0;
+  top: 2px;
+  bottom: 2px;
+  width: 2px;
+  background: var(--accent);
+}

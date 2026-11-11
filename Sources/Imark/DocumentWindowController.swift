@@ -207,6 +207,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
             forward.removeAll()
         }
         url = target
+        previewLine = nil
         content.documentPath = target.path
         scrollOffset = offset
         window?.title = target.lastPathComponent
@@ -274,7 +275,11 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         //
         // Only when there is nothing unsaved: the caller checked that before
         // reloading at all, and this is the second lock on the same door.
-        if editMode, !content.editor.isDirty { content.loadEditor(source) }
+        //
+        // A reload, so the editor keeps its caret line and its top line: a file
+        // somebody else is saving every few seconds should not throw the view
+        // back to the top each time.
+        if editMode, !content.editor.isDirty { content.reloadEditor(source) }
         content.renderer.render(markdown: text, path: url.path, scroll: offset, anchor: anchor)
     }
 
@@ -398,7 +403,15 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
             refreshCommentsButton()
             if found.isEmpty { commentsList.dismiss() }
 
-        case .ready, .rendered, .find:
+        case .rendered:
+            // Back from editing: the block the editor had at its top goes to
+            // the top of the page.
+            if let line = previewLine, !editMode {
+                previewLine = nil
+                content.renderer.scrollTo(line: line)
+            }
+
+        case .ready, .find:
             break
         }
     }
@@ -646,11 +659,17 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
             // The style is picked here, and so is the fallback: a file with mixed
             // line breaks opens in the source editor whatever the setting says.
             content.beginEditing(text)
+            previewLine = nil
+            openEditorOnPreviewLine()
         } else {
+            // Asked before the question below: Don't Save loads the file back
+            // into the editor, which puts it at the top.
+            let line = content.editor.topLine
             // The same question the window asks on the way out, and the segment
             // has already moved under the pointer — putting it back is what makes
             // staying mean staying.
             guard mayLeaveDocument() else { return refreshEditButton() }
+            previewLine = line
         }
 
         editMode = on
@@ -658,6 +677,24 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         commentsList.dismiss()
         applyEditMode()
         if !on { load() }
+    }
+
+    /// The editor's top line, waiting for the preview to finish the render that
+    /// leaving editing starts. Applied on that render's `rendered`, not before:
+    /// a render ends by putting the page back where it was, and would undo a
+    /// scroll made while it was still drawing.
+    private var previewLine: Int?
+
+    /// The editor opens on the line the preview was showing at its top, with
+    /// the caret on it. The page answers after the editor already has the file,
+    /// so editing starts at once and moves there a moment later — unless the
+    /// window has moved on by then.
+    private func openEditorOnPreviewLine() {
+        let document = url
+        content.renderer.topLine { [weak self] line in
+            guard let self, let line, self.editMode, self.url == document else { return }
+            self.content.editor.scrollTo(line: line, caret: line)
+        }
     }
 
     /// Puts the mode on screen: which of the two views is showing, which row of
