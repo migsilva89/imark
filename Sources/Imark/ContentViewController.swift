@@ -13,6 +13,10 @@ final class ContentViewController: NSViewController {
     /// Live style, not before: a window that only reads should not cost a second
     /// web content process.
     private(set) var liveEditor: LiveEditorView?
+    /// Where the document is, for the Live editor to resolve its images against.
+    var documentPath = "" {
+        didSet { liveEditor?.documentPath = documentPath }
+    }
     private var liveIsActive = false
     /// Which style this window is editing in. Taken from the setting each time
     /// editing starts; ⇧⌘E changes it for this window until editing ends.
@@ -215,6 +219,7 @@ final class ContentViewController: NSViewController {
     private func buildLiveEditor() {
         let live = LiveEditorView(frame: .zero)
         live.isHidden = true
+        live.documentPath = documentPath
         live.translatesAutoresizingMaskIntoConstraints = false
         // Under the header, the find bar and the status bar, like the source
         // editor: added on top, it would cover the find bar it is searched from.
