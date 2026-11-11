@@ -170,9 +170,10 @@ fi
 mkdir -p "$APPEX/Contents/Resources"
 if [ -d "$ROOT/Resources" ]; then
 	cp -R "$ROOT/Resources/." "$APPEX/Contents/Resources/"
-	# The Live editor (editor.html/js/css) is the app's alone: Quick Look only
-	# previews, and has no reason to carry CodeMirror.
-	rm -f "$APPEX/Contents/Resources/"editor.*
+	# The Live editor (editor.html/js/css, and editor-diagrams.js, its Mermaid)
+	# is the app's alone: Quick Look only previews, and has no reason to carry
+	# CodeMirror. `editor.*` does not match `editor-diagrams.js`, hence both.
+	rm -f "$APPEX/Contents/Resources/"editor.* "$APPEX/Contents/Resources/"editor-*
 fi
 
 # Every executable in the bundle, Sparkle's helpers included, checked before it
