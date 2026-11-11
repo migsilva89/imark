@@ -42,6 +42,8 @@ import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import { SearchQuery } from '@codemirror/search'
 import { inlineExtensions } from './inline.js'
 import { livePreview } from './live.js'
+import { restyle } from './blocks.js'
+import { setDocumentPath } from './doc-path.js'
 import './editor.css'
 
 const handler = () => window.webkit?.messageHandlers?.imarkEditor
@@ -290,7 +292,25 @@ document.addEventListener(
 // same attributes the preview sets on its root.
 
 function setTheme(theme) {
-  if (theme) document.documentElement.dataset.theme = theme
+  if (!theme) return
+  document.documentElement.dataset.theme = theme
+  // A diagram is drawn in the palette it was made for; the widgets that depend
+  // on the page's colours are made again.
+  view.dispatch({ effects: restyle.of(null) })
+}
+
+/// Where the document is, so an image next to it is found; the widgets that
+/// point at files are made again.
+function setPath(path) {
+  setDocumentPath(path)
+  view.dispatch({ effects: restyle.of(null) })
+}
+
+/// The preview's View ▸ Front Matter switch, as the attribute its stylesheet
+/// reads. The card is only hidden, never taken out of the document.
+function setFrontMatter(shown) {
+  document.documentElement.dataset.frontMatter = shown === false ? 'hidden' : 'shown'
+  view.requestMeasure()
 }
 
 function setTextScale(scale) {
@@ -309,6 +329,8 @@ function setWidth(width) {
 function load(args) {
   generation = args.generation
   seq = 0
+  setDocumentPath(args.path)
+  setFrontMatter(args.frontMatter)
   setTheme(args.theme)
   setTextScale(args.textScale)
   setWidth(args.width)
@@ -385,6 +407,8 @@ window.imarkEditor = {
   findStep,
   findClear,
   setTheme,
+  setPath,
+  setFrontMatter,
   setTextScale,
   setWidth,
 }

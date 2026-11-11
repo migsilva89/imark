@@ -34,6 +34,7 @@ import { isolateHistory } from '@codemirror/commands'
 import { load as parseYaml } from 'js-yaml'
 import { createMarkdown, splitFrontMatter } from '../shared/markdown.js'
 import { notesIn } from './notes.js'
+import { resolveFile } from './doc-path.js'
 
 /// Where a leading front-matter block ends (the end of its closing `---`), or 0.
 /// The preview takes `---` … `---` at the very top as front matter only when the
@@ -100,7 +101,7 @@ export function renderContext(state) {
   let ctx = contexts.get(doc)
   if (ctx) return ctx
   let env = null
-  const pipeline = () => (markdown ??= createMarkdown())
+  const pipeline = () => (markdown ??= createMarkdown({ resolveFile }))
   ctx = {
     doc,
     /// markdown-it's env for the whole document: `references`, `footnotes`.
@@ -119,7 +120,12 @@ export function renderContext(state) {
     /// A slice of the document as the preview would draw it, with the
     /// document's definitions. The env is copied: rendering a footnote reference
     /// adds to the env's list, and one widget's render must not number the next.
+    ///
+    /// `bare: true` renders with no definitions at all, and so without the
+    /// whole-document parse: for a formula, a diff, a diagram, none of which can
+    /// mean anything but what they say.
     render(source, options) {
+      if (options?.bare) return pipeline().renderSlice(source, {}, options)
       const whole = ctx.env()
       const slice = { ...whole }
       if (whole.footnotes) {
@@ -237,14 +243,24 @@ export const revealBlock = StateEffect.define({ map: (pos, mapping) => mapping.m
 
 // --- The field
 
+// What a widget draws can depend on the page and not only the text: the palette
+// a diagram is drawn in, the folder an image is read from. `restyle` says one of
+// those changed; every widget is then made again, and since `epoch` is part of
+// what makes two widgets equal (BlockWidget.eq), the DOM of each is too.
+let epoch = 0
+
+/// Dispatched by the page when the theme or the document's path changes.
+export const restyle = StateEffect.define()
+
 const widgets = new WeakMap()
 const widgetFor = (item, original) => {
-  let widget = widgets.get(original)
-  if (!widget) {
-    widget = byType.get(item.type).widget(item.data, { from: item.from, to: item.to, source: item.source, type: item.type })
-    widgets.set(original, widget)
+  let hit = widgets.get(original)
+  if (!hit || hit.epoch !== epoch) {
+    const widget = byType.get(item.type).widget(item.data, { from: item.from, to: item.to, source: item.source, type: item.type })
+    hit = { epoch, widget }
+    widgets.set(original, hit)
   }
-  return widget
+  return hit.widget
 }
 const atomicMark = Decoration.mark({})
 
@@ -281,7 +297,12 @@ export const blockField = StateField.define({
   },
   update(value, tr) {
     let forced = tr.docChanged ? value.forced.map((pos) => tr.changes.mapPos(pos)) : value.forced
-    for (const effect of tr.effects) if (effect.is(revealBlock)) forced = [...forced, effect.value]
+    let restyled = false
+    for (const effect of tr.effects) {
+      if (effect.is(revealBlock)) forced = [...forced, effect.value]
+      else if (effect.is(restyle)) restyled = true
+    }
+    if (restyled) epoch += 1
     // During a composition the set is kept, moved with the text, exactly as the
     // M2 plugin keeps its marks: redrawing a widget beside text the input method
     // owns loses its candidate window (§5). Caught up on the next transaction
@@ -299,6 +320,7 @@ export const blockField = StateField.define({
       value.stale ||
       tr.docChanged ||
       tr.selection ||
+      restyled ||
       forced !== value.forced ||
       syntaxTree(tr.state) !== syntaxTree(tr.startState)
     ) {
@@ -342,10 +364,11 @@ export class BlockWidget extends WidgetType {
     super()
     this.source = source
     this.data = data
+    this.epoch = epoch
   }
 
   eq(other) {
-    return other.constructor === this.constructor && other.source === this.source
+    return other.constructor === this.constructor && other.source === this.source && other.epoch === this.epoch
   }
 
   get estimatedHeight() {

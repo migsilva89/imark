@@ -132,6 +132,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
 
         buildToolbar()
 
+        content.documentPath = url.path
         content.onMessage = { [weak self] in self?.handle($0) }
         content.onOpenLink = { [weak self] link in
             // Only an editor on screen follows links; one still answering from
@@ -206,6 +207,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
             forward.removeAll()
         }
         url = target
+        content.documentPath = target.path
         scrollOffset = offset
         window?.title = target.lastPathComponent
         window?.representedURL = target
