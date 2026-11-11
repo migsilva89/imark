@@ -757,5 +757,46 @@ enum Spike {
             check("(e) \(label): undo never surfaces romanisation", !undone.contains("zh"), undone.debugDescription)
             js("window.imarkEditor.__spike.setDecorations(false)")
         }
+
+        // The commit itself moves the caret off the construct whose marks were
+        // showing. Rebuilding in the same transaction would hide them under the
+        // input method's last update; the plugin waits for its own timer.
+        let shown = "document.querySelector('.cm-content').textContent.includes('**')"
+        for quick in [false, true] {
+            let label = quick ? "a second composition within 50 ms of the first commit" : "caret after a revealed bold, commit moves past it"
+            let doc = "**粗**\n\nend\n"
+            host.load(doc)
+            _ = until { same(js("window.imarkEditor.__spike.slice()"), doc) }
+            js("window.imarkEditor.__spike.setDecorations(true)")
+            let caret = (doc as NSString).range(of: "**粗**").upperBound
+            js("window.imarkEditor.__spike.view.dispatch({selection: {anchor: \(caret)}})")
+            check("(e) \(label): window key and editor focused", focusEditor())
+            spin(0.2)
+            check("(e) \(label): the adjacent `**` are showing before composing", (js(shown) as? Bool) == true)
+
+            for (marked, sel) in [("z", 1), ("zhong wen", 9), ("中文", 2)] {
+                client.setMarkedText(marked, selectedRange: NSRange(location: sel, length: 0), replacementRange: none)
+                spin(0.1)
+            }
+            client.insertText("中文", replacementRange: none)
+            var expected = "**粗**中文\n\nend\n"
+            if quick {
+                // No pause: inside the grace period after the first commit.
+                client.setMarkedText("z", selectedRange: NSRange(location: 1, length: 0), replacementRange: none)
+                spin(0.01)
+                client.setMarkedText("字", selectedRange: NSRange(location: 1, length: 0), replacementRange: none)
+                spin(0.01)
+                client.insertText("字", replacementRange: none)
+                expected = "**粗**中文字\n\nend\n"
+            }
+            spin(0.5)
+            let final = js("window.imarkEditor.__spike.slice()") as? String ?? ""
+            check("(e) \(label): text exact", final == expected, "\(final.debugDescription) expected \(expected.debugDescription)")
+            check("(e) \(label): composition ended", !(js("window.imarkEditor.__spike.view.compositionStarted") as? Bool ?? true))
+            check("(e) \(label): the `**` hide after catch-up", (js(shown) as? Bool) == false)
+            spin(0.2)
+            check("(e) \(label): mirror agrees", host.mirror.text == final, host.mirror.text.debugDescription)
+            js("window.imarkEditor.__spike.setDecorations(false)")
+        }
     }
 }

@@ -37,10 +37,12 @@ import {
   undoDepth,
   redoDepth,
 } from '@codemirror/commands'
-import { syntaxHighlighting, defaultHighlightStyle, syntaxTree } from '@codemirror/language'
+import { syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language'
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import { SearchQuery } from '@codemirror/search'
 import { setLanguage } from '../i18n.js'
+import { inlineExtensions } from './inline.js'
+import { livePreview } from './live.js'
 import './editor.css'
 
 const handler = () => window.webkit?.messageHandlers?.imarkEditor
@@ -229,31 +231,13 @@ function findClear() {
   view.dispatch({ effects: findChanged.of(null) })
 }
 
-// --- Spike-only: a decoration that changes with the caret, so IME can be
-// tried with marks appearing and disappearing around the composition. Off
-// unless the harness turns it on. Not the M2 implementation.
-const spikeDecorations = new Compartment()
-const caretMarks = ViewPlugin.fromClass(
-  class {
-    constructor(view) { this.decorations = this.build(view) }
-    update(u) { if (u.docChanged || u.selectionSet) this.decorations = this.build(u.view) }
-    build(view) {
-      const head = view.state.selection.main.head
-      const ranges = []
-      syntaxTree(view.state).iterate({
-        enter(node) {
-          if (node.name !== 'EmphasisMark' && node.name !== 'HeaderMark') return
-          // Shown while the caret is inside the construct the mark belongs to.
-          const owner = node.node.parent
-          if (owner && head >= owner.from && head <= owner.to) return
-          ranges.push(Decoration.replace({}).range(node.from, node.to))
-        },
-      })
-      return Decoration.set(ranges, true)
-    }
-  },
-  { decorations: (v) => v.decorations }
-)
+// --- The Live Preview (live.js, inline.js). In a compartment so the harness can
+// switch it off: off is the M1 look, the Markdown source highlighted in full,
+// which is also what the default highlight style gives the marks the Live
+// Preview hides and restyles itself.
+const livePreviewOn = livePreview({ openLink: (target) => post('openLink', target) })
+const sourceLook = syntaxHighlighting(defaultHighlightStyle, { fallback: true })
+const liveLook = new Compartment()
 
 function extensions(lineSeparator) {
   const list = [
@@ -261,12 +245,11 @@ function extensions(lineSeparator) {
     history(),
     drawSelection(),
     highlightActiveLine(),
-    syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
-    markdown({ base: markdownLanguage }),
+    markdown({ base: markdownLanguage, extensions: inlineExtensions }),
     findHighlighter,
     keys.of(baseKeys),
     normaliseBreaks.of(breakFilter),
-    spikeDecorations.of([]),
+    liveLook.of(livePreviewOn),
     EditorView.lineWrapping,
     EditorView.contentAttributes.of({
       spellcheck: 'false',
@@ -387,7 +370,7 @@ const spike = {
     view.dispatch({ effects: normaliseBreaks.reconfigure(on ? breakFilter : []) })
   },
   setDecorations(on) {
-    view.dispatch({ effects: spikeDecorations.reconfigure(on ? caretMarks : []) })
+    view.dispatch({ effects: liveLook.reconfigure(on ? livePreviewOn : sourceLook) })
   },
   /// The true document text, as it would be saved.
   slice() { return view.state.sliceDoc() },

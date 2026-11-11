@@ -28,6 +28,17 @@ final class LiveEditorView: NSView, DocumentEditor {
     var onFind: ((_ count: Int, _ index: Int) -> Void)?
     /// A line for the status bar.
     var onNotice: ((String) -> Void)?
+    /// ⌘-click on a link in the text. The page only says which; where it goes is
+    /// the window's to decide, the same as for a link in the preview.
+    var onOpenLink: ((Link) -> Void)?
+
+    enum Link: Equatable {
+        /// The destination as written in the document: a URL, or a path
+        /// relative to it, possibly with a `#heading`.
+        case href(String)
+        /// The target of `[[target]]` / `[[target|label]]`.
+        case wiki(String)
+    }
 
     /// Set by the test harnesses before any editor is built, never by the app:
     /// it makes the page expose `imarkEditor.__spike`, which reaches straight
@@ -283,6 +294,13 @@ final class LiveEditorView: NSView, DocumentEditor {
 
         case "save":
             onSave?()
+
+        case "openLink":
+            if let wiki = body["wiki"] as? String, !wiki.isEmpty {
+                onOpenLink?(.wiki(wiki))
+            } else if let href = body["href"] as? String, !href.isEmpty {
+                onOpenLink?(.href(href))
+            }
 
         case "find":
             onFind?((body["count"] as? NSNumber)?.intValue ?? 0, (body["index"] as? NSNumber)?.intValue ?? 0)

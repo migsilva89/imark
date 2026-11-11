@@ -90,3 +90,117 @@ html[data-theme] {
 #editor .cm-imark-match-current {
   background: color-mix(in srgb, #f5a318 70%, transparent);
 }
+
+/* --------------------------------------------------------------- Live Preview
+   The classes live.js puts on the text. The look is the preview's (style.css):
+   the same fonts, sizes, colours and spacing intent, written against
+   CodeMirror's lines instead of the preview's elements. Heading space is
+   padding, not margin, because CodeMirror measures lines by their boxes. */
+
+/* Marks that are showing because the caret is in their construct. */
+#editor .cm-live-syntax {
+  color: var(--secondary);
+}
+
+#editor .cm-line[class*='cm-live-h'] {
+  font-family: var(--font-display);
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.012em;
+  padding-top: calc(var(--step) * 3);
+  padding-bottom: var(--step);
+}
+
+#editor .cm-live-h1 { font-size: 32px; letter-spacing: -0.02em; }
+#editor .cm-live-h2 {
+  font-size: 24px;
+  padding-bottom: calc(var(--step) * 2);
+  border-bottom: 1px solid var(--border);
+}
+#editor .cm-live-h3 { font-size: 19px; }
+#editor .cm-live-h4 { font-size: 16px; }
+#editor .cm-live-h5,
+#editor .cm-live-h6 { font-size: 15px; color: var(--secondary); }
+
+#editor .cm-live-em { font-style: italic; }
+#editor .cm-live-strong { font-weight: 600; }
+#editor .cm-live-strike { text-decoration: line-through; }
+
+#editor .cm-live-mark {
+  background: var(--accent-soft);
+  border-radius: 3px;
+  padding: 0 3px;
+}
+
+#editor .cm-live-code {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  background: var(--code-bg);
+  padding: 2px 5px;
+  border-radius: 5px;
+}
+
+#editor .cm-live-link,
+#editor .cm-live-wikilink {
+  color: var(--accent);
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+#editor .cm-live-wikilink { border-bottom-style: dashed; }
+
+#editor .cm-line.cm-live-quote {
+  padding-left: calc(var(--step) * 5);
+  border-left: 3px solid var(--border);
+  color: var(--secondary);
+}
+
+#editor .cm-line.cm-live-codeline {
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  line-height: 1.55;
+  background: var(--code-bg);
+  padding-left: calc(var(--step) * 4);
+  padding-right: calc(var(--step) * 4);
+}
+
+#editor .cm-line.cm-live-codeline-first {
+  border-top-left-radius: var(--radius);
+  border-top-right-radius: var(--radius);
+}
+
+#editor .cm-line.cm-live-codeline-last {
+  border-bottom-left-radius: var(--radius);
+  border-bottom-right-radius: var(--radius);
+}
+
+/* The `---` stays in the line so the caret has somewhere to go; it is only
+   made invisible, and a background draws the rule — no border or margin, which
+   would change the line's height as the caret moves on and off it. */
+#editor .cm-line.cm-live-hr {
+  color: transparent;
+  background: linear-gradient(var(--border), var(--border)) center / 100% 1px no-repeat;
+}
+
+#editor .cm-live-bullet,
+#editor .cm-live-number {
+  color: var(--secondary);
+}
+
+#editor .cm-live-bullet {
+  font-weight: 700;
+  font-size: 1.15em;
+  line-height: 1;
+}
+
+/* Source left as source in M2 — images, comments, HTML, reference definitions,
+   task markers, table rules — dimmed, as the preview dims what is not prose. */
+#editor .cm-live-dim {
+  color: var(--secondary);
+}
+
+/* Front matter: plain monospace until M3 draws its card. */
+#editor .cm-line.cm-live-frontmatter {
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  color: var(--secondary);
+}
