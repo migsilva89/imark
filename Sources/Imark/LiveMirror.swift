@@ -41,8 +41,13 @@ final class LiveMirror {
     private(set) var isAwaitingResync = false
 
     private let buffer = NSMutableString()
-    /// The text on disk, in the same coordinates, for `isDirty`.
-    private var disk: NSString = ""
+    /// The text on disk, in the same coordinates, for `isDirty`. Nil when the
+    /// file on disk cannot be written in them (it mixes breaks the buffer does
+    /// not): then nothing the buffer holds can be the same text, and it is
+    /// unsaved until it is saved.
+    private var disk: NSString? = ""
+    /// The same, as the file has it, for handing to the other editor.
+    private var diskFile = ""
 
     // MARK: - Reading
 
@@ -61,7 +66,13 @@ final class LiveMirror {
     /// A literal comparison, unit by unit. Swift's `==` on `String` treats
     /// canonically equivalent text as equal, and a file whose `é` changed from
     /// two code points to one has changed.
-    var isDirty: Bool { !buffer.isEqual(to: disk as String) }
+    var isDirty: Bool {
+        guard let disk else { return true }
+        return !buffer.isEqual(to: disk as String)
+    }
+
+    /// What the file on disk holds, as the file has it.
+    var savedText: String { diskFile }
 
     // MARK: - Driving
 
@@ -95,13 +106,27 @@ final class LiveMirror {
     /// this moment on, before the page has even loaded.
     @discardableResult
     func load(_ fileText: String, lineSeparator separator: String) -> Int {
+        load(fileText, lineSeparator: separator, saved: fileText)
+    }
+
+    /// A buffer that is not what is on disk: the text the other editor had when
+    /// the window switched to this one, with its unsaved changes still in it.
+    /// `saved` is what the file holds, which may not even use the same breaks.
+    @discardableResult
+    func load(_ fileText: String, lineSeparator separator: String, saved: String) -> Int {
         precondition(separator == "\n" || separator == "\r\n", "unsupported line separator")
         lineSeparator = separator
-        let coordinates = separator == "\n"
-            ? fileText
-            : fileText.replacingOccurrences(of: "\r\n", with: "\n")
-        buffer.setString(coordinates)
-        disk = buffer.copy() as! NSString
+        buffer.setString(Self.coordinates(of: fileText, separator: separator))
+        diskFile = saved
+        disk = saved == fileText ? (buffer.copy() as! NSString) : Self.representable(saved, separator: separator)
+        return restart()
+    }
+
+    /// The same document under a new generation, for a page that has to be told
+    /// it again — the web content process died, or the page reloaded. The buffer
+    /// and what counts as saved stay exactly as they were.
+    @discardableResult
+    func restart() -> Int {
         generation += 1
         seq = 0
         isAwaitingResync = false
@@ -110,7 +135,25 @@ final class LiveMirror {
 
     /// What was just written is now what is on disk.
     func markSaved() {
-        disk = buffer.copy() as! NSString
+        disk = NSString(string: buffer as String)
+        diskFile = text
+    }
+
+    private static func coordinates(of fileText: String, separator: String) -> String {
+        separator == "\n" ? fileText : fileText.replacingOccurrences(of: "\r\n", with: "\n")
+    }
+
+    /// `saved` in the buffer's coordinates, or nil when folding it would make a
+    /// different file look the same. Folding is only exact for a file that uses
+    /// the same break throughout: under CRLF, a saved text with a lone `\n` or
+    /// `\r` in it would fold onto a pure-CRLF buffer and call it clean. Under LF
+    /// nothing is folded, so the comparison is literal and always exact.
+    private static func representable(_ saved: String, separator: String) -> NSString? {
+        guard separator == "\r\n" else { return saved as NSString }
+        let savedSeparator = lineSeparator(of: saved)
+        let hasBreaks = saved.utf16.contains(0x0A) || saved.utf16.contains(0x0D)
+        guard savedSeparator == "\r\n" || !hasBreaks else { return nil }
+        return coordinates(of: saved, separator: separator) as NSString
     }
 
     func apply(generation: Int, seq incoming: Int, length expected: Int, changes: [Change]) -> Outcome {

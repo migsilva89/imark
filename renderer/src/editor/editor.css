@@ -1,25 +1,39 @@
-/* The Live editor page. Spike-level: enough to see a document and edit it.
-   Theme variables, text size and width come in M1, shared with style.css. */
+/* The Live editor page. M1: the document as highlighted Markdown source, in the
+   preview's own colours, text size and column width — the tokens are shared
+   (tokens.css), and Swift sets the same `data-theme` / `data-width` / text size
+   on this page as on the preview, from the same settings. */
+
+@import '../tokens.css';
 
 :root {
   color-scheme: light dark;
-  --editor-bg: #ffffff;
-  --editor-fg: #1f2328;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --editor-bg: #1e1e1e;
-    --editor-fg: #d4d4d4;
-  }
+/* The scheme follows the palette's face, so the caret, selection and scrollbar
+   that WebKit draws itself do not stay light on a dark theme. */
+:root[data-theme$='-dark'],
+:root[data-theme='dark'] {
+  color-scheme: dark;
+}
+
+:root[data-theme$='-light'],
+:root[data-theme='light'] {
+  color-scheme: light;
 }
 
 html,
 body {
   margin: 0;
   height: 100%;
-  background: var(--editor-bg);
-  color: var(--editor-fg);
+  /* Unpainted until Swift sets a theme, as in the preview: the window shows
+     through instead of a white flash before a dark document. */
+  background: transparent;
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+
+html[data-theme] {
+  background: var(--bg);
 }
 
 #editor {
@@ -28,6 +42,8 @@ body {
 
 #editor .cm-editor {
   height: 100%;
+  background: transparent;
+  color: var(--text);
 }
 
 #editor .cm-editor.cm-focused {
@@ -35,11 +51,42 @@ body {
 }
 
 #editor .cm-scroller {
-  font: 15px/1.6 -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+  font-family: var(--font-body);
+  font-size: var(--size-body);
+  line-height: 1.7;
 }
 
 #editor .cm-content {
-  max-width: 46rem;
+  box-sizing: border-box;
+  max-width: var(--measure);
   margin: 0 auto;
-  padding: 2rem 1.5rem;
+  /* The same sides as the preview's body, so switching modes does not move the
+     column; the top is smaller because this view already starts below the
+     toolbar. */
+  padding: calc(var(--step) * 6) calc(var(--step) * 12) calc(var(--step) * 24) calc(var(--step) * 8);
+  caret-color: var(--accent);
+}
+
+#editor .cm-cursor {
+  border-left-color: var(--accent);
+}
+
+#editor .cm-activeLine {
+  background: color-mix(in srgb, var(--accent-soft) 35%, transparent);
+}
+
+#editor .cm-selectionBackground,
+#editor .cm-focused .cm-selectionBackground,
+#editor .cm-content ::selection {
+  background: color-mix(in srgb, var(--accent) 28%, transparent) !important;
+}
+
+/* Matches from the app's find bar. The current one is the one Return moves. */
+#editor .cm-imark-match {
+  background: color-mix(in srgb, #f5c518 35%, transparent);
+  border-radius: 2px;
+}
+
+#editor .cm-imark-match-current {
+  background: color-mix(in srgb, #f5a318 70%, transparent);
 }
