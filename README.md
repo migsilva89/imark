@@ -132,6 +132,27 @@ the file goes to something built for it. Imark runs nothing on your machine and
 asks nothing of your accounts; when you come back, the reader is where you left
 it, and the notes are still in the file.
 
+## Live Preview editing
+
+The pencil opens the editor you chose in *Preferences → Editor style*: **Live
+Preview**, which is the default, or **Source**, the plain text view above. Live
+Preview is the document as the reading view draws it — headings in the preview's
+type, tables, formulas, diagrams, images and footnotes in place, comment notes as
+cards — except that the line your caret is on shows its Markdown, so you edit
+text and not a rendering. A diagram opens in the same full-window viewer as in
+the reading view when you click it; a double-click, or arrowing onto it, shows
+its source.
+
+`⇧⌘E` trades one editor for the other while you edit, with the buffer, the caret
+and anything unsaved carried across. The choice lasts for that window until
+editing ends; the next time starts from the setting again.
+
+Nothing the page draws is ever written to the file: saving what you opened,
+untouched, gives back the same bytes. That is also why one kind of file falls
+back to the source editor — a file that mixes `\r\n` with bare `\n` line endings,
+or uses a bare `\r`. Live Preview cannot write those back as it found them, so
+Imark opens them as source and says so.
+
 ## Comments
 
 <p align="center">
@@ -279,7 +300,7 @@ and tells you the rest were left alone.
 | `⌘'` / `⌘⇧'` | Next / previous comment | `⌘Z` | Undo the last change |
 | `⌘E` | Reading or editing | `⌘S` | Save the file |
 | `⌘X` / `⌘C` / `⌘V` | Cut, copy, paste | `⇧⌘Z` | Redo your typing |
-| `⌘/` | This table, in the app | | |
+| `⌘/` | This table, in the app | `⇧⌘E` | Live Preview or source, while editing |
 
 `⌘/` opens the same list inside the app, built by reading the menu bar rather
 than from a copy of this table — which is also how it stays right on keyboards
@@ -363,3 +384,26 @@ inside the app: **Imark › About Imark** shows it.
 
 Imark itself is [MIT](LICENSE) — use it, change it, redistribute it, just keep
 the copyright notice.
+
+### Interface languages
+
+The app and Quick Look preview support English and Simplified Chinese. They
+follow the preferred language in macOS. To choose a language just for Imark, use
+System Settings → General → Language & Region → Applications, add Imark, and
+choose English or Simplified Chinese. Quit and reopen Imark after changing it.
+Documents, comments, file names, and agent command formats keep their original
+content.
+
+Translations live in `Support/Localizations/{en,zh-Hans}.lproj/Localizable.strings`
+for native controls and `renderer/src/locales/zh-Hans.json` for the rendered page.
+Keep format placeholders unchanged. The build script copies the native resources
+into both the app and the Quick Look extension.
+
+For an Intel Mac build, run `IMARK_ARCH=x86_64 ./build.sh --no-install` after
+installing renderer dependencies with `(cd renderer && npm ci)`. The app is
+written to `dist/Imark.app`. To check the language resources and renderer:
+
+```bash
+python3 Support/test-localization-resources.py
+swift Support/test-localization.swift
+```

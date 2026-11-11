@@ -165,6 +165,7 @@ public final class RendererView: NSView {
             "scroll": scroll.map { $0 as Any } ?? NSNull(),
             "anchor": anchor ?? "",
             "theme": palette,
+            "language": Bundle.main.preferredLocalizations.first ?? "en",
             // Carried in the payload rather than sent separately: a standalone
             // call lands before the page is ready and is silently dropped.
             "preview": previewMode,
@@ -185,6 +186,22 @@ public final class RendererView: NSView {
     /// Back and Forward inside one document: a place, not a heading.
     public func scrollTo(offset: Double) {
         call("window.imark.scrollToOffset", offset)
+    }
+
+    /// The file line, counted from zero, of the block at the top of the page,
+    /// for an editor to open on. Nil when the page cannot say: not loaded yet,
+    /// or gone.
+    public func topLine(_ done: @escaping (Int?) -> Void) {
+        guard isReady else { return done(nil) }
+        webView.evaluateJavaScript("window.imark.topLine()") { value, _ in
+            done((value as? NSNumber)?.intValue)
+        }
+    }
+
+    /// Puts the block holding a file line (counted from zero) at the top of the
+    /// page, at once: coming back from an editor is not a jump to glide.
+    public func scrollTo(line: Int) {
+        call("window.imark.scrollToLine", line)
     }
 
     public func markMissingWikiLinks(_ targets: [String]) {

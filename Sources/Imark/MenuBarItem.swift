@@ -49,7 +49,7 @@ final class MenuBarItem {
         menu.removeAllItems()
 
         let open = menu.addItem(
-            withTitle: "Open…",
+            withTitle: NSLocalizedString("Open…", comment: ""),
             action: #selector(AppDelegate.openDocument(_:)),
             keyEquivalent: ""
         )
@@ -62,7 +62,7 @@ final class MenuBarItem {
 
         if !recents.isEmpty {
             menu.addItem(.separator())
-            let header = menu.addItem(withTitle: "Recent", action: nil, keyEquivalent: "")
+            let header = menu.addItem(withTitle: NSLocalizedString("Recent", comment: ""), action: nil, keyEquivalent: "")
             header.isEnabled = false
             for url in recents {
                 let entry = menu.addItem(
@@ -78,14 +78,14 @@ final class MenuBarItem {
 
         menu.addItem(.separator())
         let settings = menu.addItem(
-            withTitle: "Settings…",
+            withTitle: NSLocalizedString("Settings…", comment: ""),
             action: #selector(AppDelegate.showSettings(_:)),
             keyEquivalent: ""
         )
         settings.target = NSApp.delegate
 
         let quit = menu.addItem(
-            withTitle: "Quit Imark",
+            withTitle: NSLocalizedString("Quit Imark", comment: ""),
             action: #selector(NSApplication.terminate(_:)),
             keyEquivalent: ""
         )

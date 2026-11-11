@@ -154,13 +154,13 @@ final class SelectionPopover {
         // button nobody was going to press. What is left is what only exists
         // here or is genuinely faster from a selection.
         var actions: [(symbol: String, tip: String, action: Selector)] = [
-            ("character.book.closed", "Translate", #selector(Target.translate)),
+            ("character.book.closed", NSLocalizedString("Translate", comment: ""), #selector(Target.translate)),
             // Named rather than "Search the web": you chose the engine, so the
             // button can say where the press is about to take you.
-            ("globe", "Search \(Settings.searchEngine.label)", #selector(Target.searchWeb)),
+            ("globe", String(format: NSLocalizedString("Search %@", comment: ""), String(describing: Settings.searchEngine.label)), #selector(Target.searchWeb)),
         ]
         if showsCommentingControls {
-            actions.insert(("bubble.left", "Comment", #selector(Target.comment)), at: 0)
+            actions.insert(("bubble.left", NSLocalizedString("Comment", comment: ""), #selector(Target.comment)), at: 0)
         }
 
         let buttons = actions.map { spec -> NSButton in
@@ -303,16 +303,16 @@ final class SelectionPopover {
     /// on device, and the result goes in the popover rather than another window.
     private func translateSelection() {
         guard #available(macOS 26.0, *) else {
-            return confirm("Translation needs macOS 26 or later")
+            return confirm(NSLocalizedString("Translation needs macOS 26 or later", comment: ""))
         }
         let source = text
-        confirm("Translating…", then: false)
+        confirm(NSLocalizedString("Translating…", comment: ""), then: false)
 
         Task { @MainActor in
             let recognizer = NLLanguageRecognizer()
             recognizer.processString(source)
             guard let detected = recognizer.dominantLanguage else {
-                return confirm("Couldn't tell what language that is")
+                return confirm(NSLocalizedString("Couldn't tell what language that is", comment: ""))
             }
             do {
                 let session = TranslationSession(
@@ -324,7 +324,7 @@ final class SelectionPopover {
             } catch {
                 // Almost always a language pair that has not been downloaded;
                 // saying so beats a generic failure nobody can act on.
-                confirm("No offline translation for \(detected.rawValue). Add the language in System Settings › Translation.")
+                confirm(String(format: NSLocalizedString("No offline translation for %@. Add the language in System Settings › Translation.", comment: ""), String(describing: detected.rawValue)))
             }
         }
     }
@@ -334,7 +334,7 @@ final class SelectionPopover {
         label.font = .systemFont(ofSize: 13)
         label.preferredMaxLayoutWidth = 260
 
-        let head = NSTextField(labelWithString: "Translation")
+        let head = NSTextField(labelWithString: NSLocalizedString("Translation", comment: ""))
         head.font = .systemFont(ofSize: 11, weight: .semibold)
         head.textColor = .secondaryLabelColor
 
@@ -387,7 +387,7 @@ final class SelectionPopover {
         // Nothing was quoted: this came from the `+` in the margin and is about
         // the block as a whole. Empty quotation marks would read as a bug.
         let heading = subject.isEmpty
-            ? "On this block"
+            ? NSLocalizedString("On this block", comment: "")
             : "“\(subject.prefix(80))\(subject.count > 80 ? "…" : "")”"
         let quoted = NSTextField(labelWithString: heading)
         quoted.font = .systemFont(ofSize: 11)
@@ -410,7 +410,7 @@ final class SelectionPopover {
         scroll.heightAnchor.constraint(equalToConstant: 84).isActive = true
         scroll.widthAnchor.constraint(equalToConstant: 290).isActive = true
 
-        let hint = NSTextField(labelWithString: "↵ save · ⇧↵ line · esc")
+        let hint = NSTextField(labelWithString: NSLocalizedString("↵ save · ⇧↵ line · esc", comment: ""))
         hint.font = .systemFont(ofSize: 10)
         hint.textColor = .tertiaryLabelColor
 
@@ -430,12 +430,12 @@ final class SelectionPopover {
         // Deliberately not the default button: a Return key equivalent is
         // consumed by the window before the text view ever sees it, and a
         // composer where Return saves instead of starting a line is useless.
-        let save = NSButton(title: prefill.isEmpty ? "Comment" : "Save",
+        let save = NSButton(title: prefill.isEmpty ? NSLocalizedString("Comment", comment: "") : NSLocalizedString("Save", comment: ""),
                             target: target, action: #selector(Target.saveComment))
         save.bezelStyle = .rounded
         save.controlSize = .small
 
-        let cancel = NSButton(title: "Cancel", target: target, action: #selector(Target.cancelComment))
+        let cancel = NSButton(title: NSLocalizedString("Cancel", comment: ""), target: target, action: #selector(Target.cancelComment))
         cancel.bezelStyle = .rounded
         cancel.controlSize = .small
 

@@ -132,11 +132,25 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
 
         buildToolbar()
 
+        content.documentPath = url.path
         content.onMessage = { [weak self] in self?.handle($0) }
-        content.editor.onEdit = { [weak self] in self?.editorChanged() }
-        content.editor.onSave = { [weak self] in self?.saveDocument(nil) }
+        content.onOpenLink = { [weak self] link in
+            // Only an editor on screen follows links; one still answering from
+            // behind the preview has nothing to say.
+            guard let self, self.editMode else { return }
+            guard let message = Self.liveLinkMessage(link, from: self.url) else { return NSSound.beep() }
+            self.handle(message)
+        }
+        // Through the content controller rather than onto `content.editor`: there
+        // are two editors, and the Live one is not built until it is first used.
+        content.onEditorEdit = { [weak self] in self?.editorChanged() }
+        content.onEditorSave = { [weak self] in self?.saveDocument(nil) }
         content.onFindClosed = { [weak self] in
-            self?.window?.makeFirstResponder(self?.content.renderer)
+            guard let self else { return }
+            // Back to whatever was being searched: the find bar is the Live
+            // editor's while it is up.
+            if self.editMode { self.content.editor.focus() }
+            else { self.window?.makeFirstResponder(self.content.renderer) }
         }
         selectionPopover.onSaveComment = { [weak self] body, colour in
             self?.saveComment(body, colour: colour)
@@ -193,6 +207,8 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
             forward.removeAll()
         }
         url = target
+        previewLine = nil
+        content.documentPath = target.path
         scrollOffset = offset
         window?.title = target.lastPathComponent
         window?.representedURL = target
@@ -238,7 +254,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
 
         guard let source = try? String(contentsOf: url, encoding: .utf8) else {
             content.renderer.render(
-                markdown: "# Can't read this file\n\n`\(url.path)`\n\nIt exists, but it isn't UTF-8 text.",
+                markdown: String(format: NSLocalizedString("# Can't read this file\n\n`%@`\n\nIt exists, but it isn't UTF-8 text.", comment: ""), String(describing: url.path)),
                 path: url.path
             )
             return
@@ -247,7 +263,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
 
         if text.utf8.count > Self.sizeLimit {
             let prefix = String(decoding: Array(text.utf8.prefix(Self.sizeLimit)), as: UTF8.self)
-            text = prefix + "\n\n---\n\n> **Truncated.** Above 5 MB Imark shows only the beginning."
+            text = prefix + NSLocalizedString("\n\n---\n\n> **Truncated.** Above 5 MB Imark shows only the beginning.", comment: "")
         }
 
         stamp = Comments.Stamp(of: url)
@@ -259,13 +275,17 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         //
         // Only when there is nothing unsaved: the caller checked that before
         // reloading at all, and this is the second lock on the same door.
-        if editMode, !content.editor.isDirty { content.editor.load(source) }
+        //
+        // A reload, so the editor keeps its caret line and its top line: a file
+        // somebody else is saving every few seconds should not throw the view
+        // back to the top each time.
+        if editMode, !content.editor.isDirty { content.reloadEditor(source) }
         content.renderer.render(markdown: text, path: url.path, scroll: offset, anchor: anchor)
     }
 
     private func showVanished() {
         content.renderer.render(
-            markdown: "# This file no longer exists\n\n`\(url.path)`",
+            markdown: String(format: NSLocalizedString("# This file no longer exists\n\n`%@`", comment: ""), String(describing: url.path)),
             path: url.path
         )
     }
@@ -383,8 +403,54 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
             refreshCommentsButton()
             if found.isEmpty { commentsList.dismiss() }
 
-        case .ready, .rendered, .find:
+        case .rendered:
+            // Back from editing: the block the editor had at its top goes to
+            // the top of the page.
+            if let line = previewLine, !editMode {
+                previewLine = nil
+                content.renderer.scrollTo(line: line)
+            }
+
+        case .ready, .find:
             break
+        }
+    }
+
+    /// What a ⌘-click in the Live editor asks for, as the message the preview's
+    /// own links produce, so both go through one path in the window.
+    ///
+    /// The preview's page resolves a relative href while it renders; the editor
+    /// shows the text as written, so it is resolved here, the same way: against
+    /// the folder holding the document, with `?query` dropped (it is for a web
+    /// server) and the `#heading` kept apart, still percent-encoded, which is how
+    /// `openLocal` expects it. Nil when there is nowhere to go — a link to a
+    /// heading in this document, which the editor does not scroll to yet, or an
+    /// href that is not a URL at all. The open document itself is the same: a link
+    /// to it, with or without a heading, goes nowhere while it is being edited.
+    static func liveLinkMessage(_ link: LiveEditorView.Link, from document: URL) -> RendererMessage? {
+        switch link {
+        case .wiki(let target):
+            return .openWiki(target)
+
+        case .href(let href):
+            if href.range(of: "^[A-Za-z][A-Za-z0-9+.-]*:", options: .regularExpression) != nil {
+                guard let url = URL(string: href) else { return nil }
+                return .openExternal(url)
+            }
+            let hash = href.firstIndex(of: "#")
+            var path = String(hash.map { href[..<$0] } ?? href[...])
+            let anchor = hash.map { String(href[href.index(after: $0)...]) } ?? ""
+            if let query = path.firstIndex(of: "?") { path = String(path[..<query]) }
+            guard !path.isEmpty else { return nil }
+            path = path.removingPercentEncoding ?? path
+            let file = path.hasPrefix("/")
+                ? URL(fileURLWithPath: path)
+                : URL(fileURLWithPath: path, relativeTo: document.deletingLastPathComponent())
+            // The document being edited is not a destination: `openLocal` on it
+            // would scroll the preview, which is hidden, or reload it out of
+            // edit mode.
+            if file.standardizedFileURL == document.standardizedFileURL { return nil }
+            return .openLocal(path: file.standardizedFileURL.path, anchor: anchor.isEmpty ? nil : anchor)
         }
     }
 
@@ -414,12 +480,12 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     private func confirmOpening(_ target: URL, with app: URL) {
         guard let window else { return NSSound.beep() }
         let alert = NSAlert()
-        alert.messageText = "Open this link in \(FileManager.default.displayName(atPath: app.path))?"
+        alert.messageText = String(format: NSLocalizedString("Open this link in %@?", comment: ""), String(describing: FileManager.default.displayName(atPath: app.path)))
         alert.informativeText = target.absoluteString
-            + "\n\nThe link comes from the document, and opening it hands it to another app."
+            + NSLocalizedString("\n\nThe link comes from the document, and opening it hands it to another app.", comment: "")
         alert.alertStyle = .warning
-        alert.addButton(withTitle: "Open")
-        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: NSLocalizedString("Open", comment: ""))
+        alert.addButton(withTitle: NSLocalizedString("Cancel", comment: ""))
         // Return is not the way to agree to something a document asked for.
         alert.buttons[0].keyEquivalent = ""
         alert.buttons[1].keyEquivalent = "\r"
@@ -431,6 +497,9 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
 
     /// Starts a note about the document rather than about anything in it.
     func beginFileNote() {
+        // A note is written straight into the file, and with a buffer open the
+        // file is the buffer's to write (docs/LIVE-PREVIEW.md §1, invariant 2).
+        guard !editMode else { return NSSound.beep() }
         selection = nil
         editingNote = nil
         composingFileNote = true
@@ -448,17 +517,21 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     /// it goes through an atomic replace and refuses to write over a file that
     /// moved underneath it.
     func saveComment(_ body: String, colour: NoteColour) {
+        // The composer is put away when editing starts; this is the second lock.
+        // A write here would move `stamp` under the buffer, and the buffer's next
+        // save would then pass the staleness check over the note it never saw.
+        guard !editMode else { return selectionPopover.dismiss() }
         if let range = editingNote {
             return updateComment(body, colour: colour, at: range)
         }
         let fileNote = composingFileNote
         composingFileNote = false
         guard fileNote || selection?.block != nil else {
-            selectionPopover.reportCommentFailure("Couldn't tell where that selection came from")
+            selectionPopover.reportCommentFailure(NSLocalizedString("Couldn't tell where that selection came from", comment: ""))
             return
         }
         do {
-            snapshot("Comment")
+            snapshot(NSLocalizedString("Comment", comment: ""))
             let index = try Comments.insert(
                 quote: fileNote ? "" : (selection?.text ?? ""),
                 body: body,
@@ -484,13 +557,16 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         } catch {
             undoStack.discardLast()
             selectionPopover.reportCommentFailure(
-                (error as? LocalizedError)?.errorDescription ?? "Couldn't save the comment"
+                (error as? LocalizedError)?.errorDescription ?? NSLocalizedString("Couldn't save the comment", comment: "")
             )
         }
     }
 
     /// Edit and delete, asked for from the note's own card.
     private func perform(_ command: NoteCommand) {
+        // The page is behind the editor while it is open, and a delete is a
+        // write to the file under the buffer.
+        guard !editMode else { return }
         switch command.kind {
         case .edit:
             editingNote = command.lines
@@ -504,27 +580,28 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
 
         case .delete:
             do {
-                snapshot("Delete Comment")
+                snapshot(NSLocalizedString("Delete Comment", comment: ""))
                 try Comments.remove(lines: command.lines, from: url, expecting: stamp)
                 finishWrite()
             } catch {
                 undoStack.discardLast()
-                report(error, doing: "delete that comment")
+                report(error, doing: NSLocalizedString("delete that comment", comment: ""))
             }
         }
     }
 
     private func updateComment(_ body: String, colour: NoteColour, at range: ClosedRange<Int>) {
         editingNote = nil
+        guard !editMode else { return selectionPopover.dismiss() }
         do {
-            snapshot("Edit Comment")
+            snapshot(NSLocalizedString("Edit Comment", comment: ""))
             try Comments.update(lines: range, body: body, colour: colour, in: url, expecting: stamp)
             selectionPopover.dismiss()
             finishWrite()
         } catch {
             undoStack.discardLast()
             selectionPopover.reportCommentFailure(
-                (error as? LocalizedError)?.errorDescription ?? "Couldn't save the comment"
+                (error as? LocalizedError)?.errorDescription ?? NSLocalizedString("Couldn't save the comment", comment: "")
             )
         }
     }
@@ -536,12 +613,12 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         // The page is behind the editor while it is open.
         guard !editMode else { return }
         do {
-            snapshot(checked ? "Check Item" : "Uncheck Item")
+            snapshot(checked ? NSLocalizedString("Check Item", comment: "") : NSLocalizedString("Uncheck Item", comment: ""))
             try Comments.setTask(line: line, checked: checked, in: url, expecting: stamp)
             finishWrite()
         } catch {
             undoStack.discardLast()
-            report(error, doing: checked ? "check that item" : "uncheck that item")
+            report(error, doing: checked ? NSLocalizedString("check that item", comment: "") : NSLocalizedString("uncheck that item", comment: ""))
         }
     }
 
@@ -550,6 +627,15 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     /// ⌘E, and the menu item that carries the tick.
     @objc func toggleEditMode(_ sender: Any?) {
         setEditMode(!editMode)
+    }
+
+    /// ⇧⌘E: Live Preview and source trade places while editing, the buffer and
+    /// its unsaved changes going across with it. For this window, until editing
+    /// ends; the setting is what the next session starts in.
+    @objc func toggleEditorStyle(_ sender: Any?) {
+        guard editMode else { return NSSound.beep() }
+        content.switchEditorStyle()
+        editorChanged()
     }
 
     /// The switch in the toolbar: reading on the left, the pencil on the right.
@@ -567,15 +653,23 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         guard on != editMode else { return }
         if on {
             guard let text = try? String(contentsOf: url, encoding: .utf8) else {
-                return report(Comments.Failure.unreadable, doing: "edit this file")
+                return report(Comments.Failure.unreadable, doing: NSLocalizedString("edit this file", comment: ""))
             }
             stamp = Comments.Stamp(of: url)
-            content.editor.load(text)
+            // The style is picked here, and so is the fallback: a file with mixed
+            // line breaks opens in the source editor whatever the setting says.
+            content.beginEditing(text)
+            previewLine = nil
+            openEditorOnPreviewLine()
         } else {
+            // Asked before the question below: Don't Save loads the file back
+            // into the editor, which puts it at the top.
+            let line = content.editor.topLine
             // The same question the window asks on the way out, and the segment
             // has already moved under the pointer — putting it back is what makes
             // staying mean staying.
             guard mayLeaveDocument() else { return refreshEditButton() }
+            previewLine = line
         }
 
         editMode = on
@@ -583,6 +677,24 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         commentsList.dismiss()
         applyEditMode()
         if !on { load() }
+    }
+
+    /// The editor's top line, waiting for the preview to finish the render that
+    /// leaving editing starts. Applied on that render's `rendered`, not before:
+    /// a render ends by putting the page back where it was, and would undo a
+    /// scroll made while it was still drawing.
+    private var previewLine: Int?
+
+    /// The editor opens on the line the preview was showing at its top, with
+    /// the caret on it. The page answers after the editor already has the file,
+    /// so editing starts at once and moves there a moment later — unless the
+    /// window has moved on by then.
+    private func openEditorOnPreviewLine() {
+        let document = url
+        content.renderer.topLine { [weak self] line in
+            guard let self, let line, self.editMode, self.url == document else { return }
+            self.content.editor.scrollTo(line: line, caret: line)
+        }
     }
 
     /// Puts the mode on screen: which of the two views is showing, which row of
@@ -620,15 +732,19 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     @discardableResult
     private func saveDocument() -> Bool {
         guard editMode, content.editor.isDirty else { return true }
+        guard content.editor.textIsCurrent else {
+            report(Comments.Failure.editorCatchingUp, doing: NSLocalizedString("save this file", comment: ""))
+            return false
+        }
         // Read before snapshotting. The snapshot is what ⌘Z restores, and a file
         // that cannot be read snapshots as an empty string — so a save on a
         // vanished file, followed by ⌘Z, emptied the document.
         guard (try? String(contentsOf: url, encoding: .utf8)) != nil else {
-            report(Comments.Failure.fileChanged, doing: "save this file")
+            report(Comments.Failure.fileChanged, doing: NSLocalizedString("save this file", comment: ""))
             return false
         }
         do {
-            snapshot("Edit")
+            snapshot(NSLocalizedString("Edit", comment: ""))
             try Comments.save(content.editor.text, to: url, expecting: stamp)
             content.editor.markSaved()
             lastWrite = Date()
@@ -639,7 +755,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
             return true
         } catch {
             undoStack.discardLast()
-            report(error, doing: "save this file")
+            report(error, doing: NSLocalizedString("save this file", comment: ""))
             return false
         }
     }
@@ -649,18 +765,18 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     @objc func revertDocument(_ sender: Any?) {
         guard editMode, content.editor.isDirty else { return }
         let alert = NSAlert()
-        alert.messageText = "Throw away your changes?"
-        alert.informativeText = "The file on disk goes back into the editor. This cannot be undone."
+        alert.messageText = NSLocalizedString("Throw away your changes?", comment: "")
+        alert.informativeText = NSLocalizedString("The file on disk goes back into the editor. This cannot be undone.", comment: "")
         alert.alertStyle = .warning
-        alert.addButton(withTitle: "Throw Away")
-        alert.addButton(withTitle: "Keep Editing")
+        alert.addButton(withTitle: NSLocalizedString("Throw Away", comment: ""))
+        alert.addButton(withTitle: NSLocalizedString("Keep Editing", comment: ""))
         guard alert.runModal() == .alertFirstButtonReturn else { return }
 
         guard let text = try? String(contentsOf: url, encoding: .utf8) else {
-            return report(Comments.Failure.unreadable, doing: "read this file again")
+            return report(Comments.Failure.unreadable, doing: NSLocalizedString("read this file again", comment: ""))
         }
         stamp = Comments.Stamp(of: url)
-        content.editor.load(text)
+        content.loadEditor(text)
         refreshEditedDot()
         refreshSaveButtons()
     }
@@ -671,12 +787,12 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     /// editing, opening another document, closing the window.
     func askAboutUnsaved() -> UnsavedAnswer {
         let alert = NSAlert()
-        alert.messageText = "Save your changes to \(url.lastPathComponent)?"
-        alert.informativeText = "You have edits that are not in the file yet."
+        alert.messageText = String(format: NSLocalizedString("Save your changes to %@?", comment: ""), String(describing: url.lastPathComponent))
+        alert.informativeText = NSLocalizedString("You have edits that are not in the file yet.", comment: "")
         alert.alertStyle = .warning
-        alert.addButton(withTitle: "Save")
-        alert.addButton(withTitle: "Don't Save")
-        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: NSLocalizedString("Save", comment: ""))
+        alert.addButton(withTitle: NSLocalizedString("Don't Save", comment: ""))
+        alert.addButton(withTitle: NSLocalizedString("Cancel", comment: ""))
         switch alert.runModal() {
         case .alertFirstButtonReturn: return .save
         case .alertSecondButtonReturn: return .discard
@@ -694,7 +810,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     private func discardBuffer() {
         guard let text = try? String(contentsOf: url, encoding: .utf8) else { return }
         stamp = Comments.Stamp(of: url)
-        content.editor.load(text)
+        content.loadEditor(text)
         refreshEditedDot()
         refreshSaveButtons()
     }
@@ -732,7 +848,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
 
     private func report(_ error: Error, doing what: String) {
         let alert = NSAlert()
-        alert.messageText = "Couldn't \(what)"
+        alert.messageText = String(format: NSLocalizedString("Couldn't %@", comment: ""), String(describing: what))
         alert.informativeText = (error as? LocalizedError)?.errorDescription
             ?? error.localizedDescription
         alert.alertStyle = .warning
@@ -755,7 +871,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
             lastWrite = Date()
             load()
         } catch {
-            report(error, doing: "undo that")
+            report(error, doing: NSLocalizedString("undo that", comment: ""))
         }
     }
 
@@ -849,14 +965,17 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
             // Named after what it will actually put back, so the menu never
             // offers a vague "Undo" that might mean something else.
             if editMode {
-                item.title = "Undo Typing"
+                item.title = NSLocalizedString("Undo Typing", comment: "")
                 return content.editor.canUndo
             }
-            item.title = undoStack.last.map { "Undo \($0.what)" } ?? "Undo"
+            item.title = undoStack.last.map { String(format: NSLocalizedString("Undo %@", comment: ""), String(describing: $0.what)) } ?? NSLocalizedString("Undo", comment: "")
             return !undoStack.isEmpty
         case #selector(toggleEditMode(_:)):
             item.state = editMode ? .on : .off
             return true
+        case #selector(toggleEditorStyle(_:)):
+            item.state = editMode && content.isLiveActive ? .on : .off
+            return editMode
         case #selector(goBackInHistory(_:)):
             return !back.isEmpty
         case #selector(goForwardInHistory(_:)):
@@ -943,14 +1062,14 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
             panel.nameFieldStringValue = self.url.deletingPathExtension().lastPathComponent
                 + "-comments." + (self.url.pathExtension.isEmpty ? "md" : self.url.pathExtension)
             panel.directoryURL = self.url.deletingLastPathComponent()
-            panel.message = "The comments become blockquotes. Your document is not changed."
+            panel.message = NSLocalizedString("The comments become blockquotes. Your document is not changed.", comment: "")
             panel.beginSheetModal(for: window) { response in
                 guard response == .OK, let target = panel.url else { return }
                 do {
                     try text.write(to: target, atomically: true, encoding: .utf8)
                     NSWorkspace.shared.activateFileViewerSelecting([target])
                 } catch {
-                    self.report(error, doing: "export the comments")
+                    self.report(error, doing: NSLocalizedString("export the comments", comment: ""))
                 }
             }
         }
@@ -1002,6 +1121,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         content.renderer.setWidth(Settings.width.rawValue)
         content.renderer.setFrontMatter(Settings.showsFrontMatter)
         content.renderer.setCommentingControls(Settings.showsCommentingControls)
+        content.applyEditorSettings()
         selectionPopover.setCommentingControls(Settings.showsCommentingControls)
         appliedCommentingControls = Settings.showsCommentingControls
         refreshThemeButton()

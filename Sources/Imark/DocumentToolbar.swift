@@ -28,7 +28,7 @@ extension DocumentWindowController: NSToolbarDelegate {
         // The system's own item arrives with a label and no tooltip, so it is the
         // one button in the row that answers nothing when you hover it.
         if let sidebar = toolbar.items.first(where: { $0.itemIdentifier == .toggleSidebar }) {
-            sidebar.toolTip = "Show or Hide Sidebar (⌘\\)"
+            sidebar.toolTip = NSLocalizedString("Show or Hide Sidebar (⌘\\)", comment: "")
         }
     }
 
@@ -96,9 +96,9 @@ extension DocumentWindowController: NSToolbarDelegate {
 
         let on = reviewingComments
         let symbol = on ? "bubble.left.and.bubble.right.fill" : "bubble.left.and.bubble.right"
-        let image = NSImage(systemSymbolName: symbol, accessibilityDescription: "Comments")
+        let image = NSImage(systemSymbolName: symbol, accessibilityDescription: NSLocalizedString("Comments", comment: ""))
         item.image = on ? image?.withSymbolConfiguration(.init(paletteColors: [.imarkAccent])) : image
-        item.toolTip = on ? "Hide All Comments (⇧⌘C)" : "Show All Comments (⇧⌘C)"
+        item.toolTip = on ? NSLocalizedString("Hide All Comments (⇧⌘C)", comment: "") : NSLocalizedString("Show All Comments (⇧⌘C)", comment: "")
     }
 
     /// Which side of the switch is lit. A tinted glyph says "on" only to somebody
@@ -139,15 +139,15 @@ extension DocumentWindowController: NSToolbarDelegate {
     ) -> NSToolbarItem? {
         switch identifier {
         case .find:
-            return button(identifier, symbol: "magnifyingglass", label: "Find",
-                          tip: "Find in Document (⌘F)",
+            return button(identifier, symbol: "magnifyingglass", label: NSLocalizedString("Find", comment: ""),
+                          tip: NSLocalizedString("Find in Document (⌘F)", comment: ""),
                           action: #selector(performFind(_:)))
 
         case .commentFile:
             // Next to Comments, which shows the ones that exist: one names the
             // subject, the other adds to it.
-            return button(identifier, symbol: "text.bubble", label: "Comment on Document",
-                          tip: "Comment on the whole document",
+            return button(identifier, symbol: "text.bubble", label: NSLocalizedString("Comment on Document", comment: ""),
+                          tip: NSLocalizedString("Comment on the whole document", comment: ""),
                           action: #selector(commentOnDocument(_:)))
 
         case .editMode:
@@ -157,8 +157,8 @@ extension DocumentWindowController: NSToolbarDelegate {
             // Two segments rather than one pencil that lights up. Reading is
             // where this app lives, so it is a state worth naming on screen
             // instead of being the absence of the other one.
-            let eye = NSImage(systemSymbolName: "eye", accessibilityDescription: "Reading")!
-            let pencil = NSImage(systemSymbolName: "pencil", accessibilityDescription: "Editing")!
+            let eye = NSImage(systemSymbolName: "eye", accessibilityDescription: NSLocalizedString("Reading", comment: ""))!
+            let pencil = NSImage(systemSymbolName: "pencil", accessibilityDescription: NSLocalizedString("Editing", comment: ""))!
             let control = NSSegmentedControl(
                 images: [eye, pencil],
                 trackingMode: .selectOne,
@@ -167,38 +167,38 @@ extension DocumentWindowController: NSToolbarDelegate {
             )
             control.segmentStyle = .texturedRounded
             control.selectedSegment = editMode ? 1 : 0
-            control.setToolTip("Reading — nothing here changes the file", forSegment: 0)
-            control.setToolTip("Editing — the file as text, and ⌘S writes it (⌘E)", forSegment: 1)
+            control.setToolTip(NSLocalizedString("Reading — nothing here changes the file", comment: ""), forSegment: 0)
+            control.setToolTip(NSLocalizedString("Editing — the file as text, and ⌘S writes it (⌘E)", comment: ""), forSegment: 1)
             let item = NSToolbarItem(itemIdentifier: identifier)
             item.view = control
-            item.label = "Mode"
-            item.toolTip = "Reading or editing (⌘E)"
+            item.label = NSLocalizedString("Mode", comment: "")
+            item.toolTip = NSLocalizedString("Reading or editing (⌘E)", comment: "")
             return item
 
         case .save:
-            return button(identifier, symbol: "arrow.down.doc", label: "Save",
-                          tip: "Write your changes to the file (⌘S)",
+            return button(identifier, symbol: "arrow.down.doc", label: NSLocalizedString("Save", comment: ""),
+                          tip: NSLocalizedString("Write your changes to the file (⌘S)", comment: ""),
                           action: #selector(saveDocument(_:)))
 
         case .revert:
-            return button(identifier, symbol: "arrow.uturn.backward", label: "Revert",
-                          tip: "Throw away your changes and read the file again",
+            return button(identifier, symbol: "arrow.uturn.backward", label: NSLocalizedString("Revert", comment: ""),
+                          tip: NSLocalizedString("Throw away your changes and read the file again", comment: ""),
                           action: #selector(revertDocument(_:)))
 
         case .comments:
             // "Comments" alone names the subject, not the action, and left
             // people pressing it to find out. The tip says what happens.
-            return button(identifier, symbol: "bubble.left.and.bubble.right", label: "Comments",
-                          tip: "Show All Comments (⇧⌘C)",
+            return button(identifier, symbol: "bubble.left.and.bubble.right", label: NSLocalizedString("Comments", comment: ""),
+                          tip: NSLocalizedString("Show All Comments (⇧⌘C)", comment: ""),
                           action: #selector(toggleAllComments(_:)))
 
         case .shortcuts:
             // Target left nil so it walks the responder chain to the app
             // delegate: the panel belongs to the app, not to one document.
             let item = NSToolbarItem(itemIdentifier: identifier)
-            item.image = NSImage(systemSymbolName: "keyboard", accessibilityDescription: "Keyboard Shortcuts")
-            item.label = "Shortcuts"
-            item.toolTip = "Keyboard Shortcuts (⌘/)"
+            item.image = NSImage(systemSymbolName: "keyboard", accessibilityDescription: NSLocalizedString("Keyboard Shortcuts", comment: ""))
+            item.label = NSLocalizedString("Shortcuts", comment: "")
+            item.toolTip = NSLocalizedString("Keyboard Shortcuts (⌘/)", comment: "")
             item.action = #selector(AppDelegate.showShortcuts(_:))
             return item
 
@@ -207,9 +207,9 @@ extension DocumentWindowController: NSToolbarDelegate {
             // is the one place in the window it says so. Target nil, like the
             // shortcuts: the page belongs to the app, not to one document.
             let item = NSToolbarItem(itemIdentifier: identifier)
-            item.image = NSImage(systemSymbolName: "cup.and.saucer", accessibilityDescription: "Buy me a coffee")
-            item.label = "Buy me a coffee"
-            item.toolTip = "Imark is free, and stays free. If it saves you time, buy me a coffee"
+            item.image = NSImage(systemSymbolName: "cup.and.saucer", accessibilityDescription: NSLocalizedString("Buy me a coffee", comment: ""))
+            item.label = NSLocalizedString("Buy me a coffee", comment: "")
+            item.toolTip = NSLocalizedString("Imark is free, and stays free. If it saves you time, buy me a coffee", comment: "")
             item.action = #selector(AppDelegate.buyCoffee(_:))
             return item
 
@@ -217,14 +217,14 @@ extension DocumentWindowController: NSToolbarDelegate {
             // The share glyph promises a share sheet and opens the print panel
             // instead. Saying so is the cheap half of the fix; the icon is the
             // other half and belongs with whatever sharing ends up being.
-            return button(identifier, symbol: "square.and.arrow.up", label: "Export",
-                          tip: "Print or Save as PDF (⌘P)",
+            return button(identifier, symbol: "square.and.arrow.up", label: NSLocalizedString("Export", comment: ""),
+                          tip: NSLocalizedString("Print or Save as PDF (⌘P)", comment: ""),
                           action: #selector(printDocument(_:)))
 
         case .theme:
             let item = NSToolbarItem(itemIdentifier: identifier)
             item.view = ThemeButton(target: self, action: #selector(cycleTheme(_:)))
-            item.label = "Appearance"
+            item.label = NSLocalizedString("Appearance", comment: "")
             return item
 
         case .openIn:
@@ -235,9 +235,9 @@ extension DocumentWindowController: NSToolbarDelegate {
             let preferred = Editors.preferred(from: editors)
             item.image = preferred.map(icon(for:))
                 ?? NSImage(systemSymbolName: "square.and.pencil", accessibilityDescription: nil)
-            item.label = "Open in"
-            item.toolTip = preferred.map { "Open in \($0.lastPathComponent.replacingOccurrences(of: ".app", with: ""))" }
-                ?? "Open in editor"
+            item.label = NSLocalizedString("Open in", comment: "")
+            item.toolTip = preferred.map { String(format: NSLocalizedString("Open in %@", comment: ""), String(describing: $0.lastPathComponent.replacingOccurrences(of: ".app", with: ""))) }
+                ?? NSLocalizedString("Open in editor", comment: "")
             item.menu = editorsMenu()
             item.showsIndicator = !editors.isEmpty
             if preferred != nil {
@@ -253,9 +253,9 @@ extension DocumentWindowController: NSToolbarDelegate {
             // "Send Back", not GitHub's "Request Changes": this is a document,
             // not a diff, and the button is not filing a review — it is handing
             // the document back to whoever wrote it, with your notes on it.
-            return reviewButton(identifier, title: "Send Back",
+            return reviewButton(identifier, title: NSLocalizedString("Send Back", comment: ""),
                                 symbol: "arrow.uturn.backward",
-                                tip: "Send your notes back and hold the work",
+                                tip: NSLocalizedString("Send your notes back and hold the work", comment: ""),
                                 tint: NoteColour.red.colour,
                                 action: #selector(sendReviewBack(_:)))
 
@@ -263,8 +263,8 @@ extension DocumentWindowController: NSToolbarDelegate {
             // The only filled button in the app. It is the one place where a
             // button does something outside this window, and the row would
             // otherwise read as five equal ways of looking at a document.
-            return reviewButton(identifier, title: "Approve", symbol: "checkmark",
-                                tip: "Approve and let the agent continue",
+            return reviewButton(identifier, title: NSLocalizedString("Approve", comment: ""), symbol: "checkmark",
+                                tip: NSLocalizedString("Approve and let the agent continue", comment: ""),
                                 tint: .imarkApprove,
                                 action: #selector(approveReview(_:)), filled: true)
 
@@ -293,7 +293,7 @@ extension DocumentWindowController: NSToolbarDelegate {
         // said instead of inviting you to say it twice.
         if Review.decision(for: url) != nil {
             button.isEnabled = false
-            button.title = filled ? "Approved" : "Sent Back"
+            button.title = filled ? NSLocalizedString("Approved", comment: "") : NSLocalizedString("Sent Back", comment: "")
         }
 
         let item = NSToolbarItem(itemIdentifier: identifier)
@@ -326,7 +326,7 @@ extension DocumentWindowController: NSToolbarDelegate {
         let menu = NSMenu()
         let editors = Editors.installed(for: url)
         if editors.isEmpty {
-            let empty = NSMenuItem(title: "No editors found", action: nil, keyEquivalent: "")
+            let empty = NSMenuItem(title: NSLocalizedString("No editors found", comment: ""), action: nil, keyEquivalent: "")
             empty.isEnabled = false
             menu.addItem(empty)
         }
@@ -344,7 +344,7 @@ extension DocumentWindowController: NSToolbarDelegate {
         // else does this file go", and the Finder is an answer to that.
         menu.addItem(.separator())
         let reveal = menu.addItem(
-            withTitle: "Reveal in Finder",
+            withTitle: NSLocalizedString("Reveal in Finder", comment: ""),
             action: #selector(revealInFinder(_:)),
             keyEquivalent: ""
         )
@@ -352,7 +352,7 @@ extension DocumentWindowController: NSToolbarDelegate {
         reveal.target = self
         // The other half of "where it lives": the path itself, for pasting into
         // a terminal or a chat with an agent. Same command as ⌥⌘C.
-        let copyPath = menu.addItem(withTitle: "Copy Path", action: #selector(copyPath(_:)), keyEquivalent: "")
+        let copyPath = menu.addItem(withTitle: NSLocalizedString("Copy Path", comment: ""), action: #selector(copyPath(_:)), keyEquivalent: "")
         copyPath.image = NSImage(systemSymbolName: "doc.on.clipboard", accessibilityDescription: nil)
         copyPath.target = self
         return menu
@@ -376,11 +376,10 @@ extension DocumentWindowController: NSToolbarDelegate {
         // nothing about what to change, which is the one outcome nobody wants.
         guard noteCount > 0 else {
             let alert = NSAlert()
-            alert.messageText = "Send it back with no notes?"
-            alert.informativeText = "You haven't commented on anything. "
-                + "The agent will be told to revise without being told what to change."
-            alert.addButton(withTitle: "Send Back Anyway")
-            alert.addButton(withTitle: "Cancel")
+            alert.messageText = NSLocalizedString("Send it back with no notes?", comment: "")
+            alert.informativeText = NSLocalizedString("You haven't commented on anything. The agent will be told to revise without being told what to change.", comment: "")
+            alert.addButton(withTitle: NSLocalizedString("Send Back Anyway", comment: ""))
+            alert.addButton(withTitle: NSLocalizedString("Cancel", comment: ""))
             guard alert.runModal() == .alertFirstButtonReturn else { return }
             return finishReview(.requestChanges)
         }
@@ -399,14 +398,13 @@ extension DocumentWindowController: NSToolbarDelegate {
         guard Review.isReview(url), Review.decision(for: url) == nil else { return true }
 
         let alert = NSAlert()
-        alert.messageText = "Finish this review?"
-        alert.informativeText = "Something is waiting for your answer, and closing "
-            + "the window doesn't give it one."
+        alert.messageText = NSLocalizedString("Finish this review?", comment: "")
+        alert.informativeText = NSLocalizedString("Something is waiting for your answer, and closing the window doesn't give it one.", comment: "")
         // First is the default and the one Escape lands on: the safe way out of a
         // dialogue nobody asked for is back to the document.
-        alert.addButton(withTitle: "Keep Reviewing")
-        alert.addButton(withTitle: "Approve")
-        alert.addButton(withTitle: "Send Back")
+        alert.addButton(withTitle: NSLocalizedString("Keep Reviewing", comment: ""))
+        alert.addButton(withTitle: NSLocalizedString("Approve", comment: ""))
+        alert.addButton(withTitle: NSLocalizedString("Send Back", comment: ""))
 
         switch alert.runModal() {
         case .alertSecondButtonReturn: finishReview(.approve)
@@ -432,7 +430,7 @@ extension DocumentWindowController: NSToolbarDelegate {
             }
         } catch {
             let alert = NSAlert(error: error)
-            alert.messageText = "Imark couldn't record that decision."
+            alert.messageText = NSLocalizedString("Imark couldn't record that decision.", comment: "")
             alert.runModal()
         }
     }

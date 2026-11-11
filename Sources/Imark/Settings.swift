@@ -19,9 +19,9 @@ enum Settings {
 
         var label: String {
             switch self {
-            case .system: return "Match System"
-            case .light: return "Light"
-            case .dark: return "Dark"
+            case .system: return NSLocalizedString("Match System", comment: "")
+            case .light: return NSLocalizedString("Light", comment: "")
+            case .dark: return NSLocalizedString("Dark", comment: "")
             }
         }
 
@@ -63,11 +63,11 @@ enum Settings {
 
         var label: String {
             switch self {
-            case .classic: return "Classic"
-            case .warm: return "Warm"
-            case .cool: return "Cool"
-            case .forest: return "Forest"
-            case .contrast: return "High Contrast"
+            case .classic: return NSLocalizedString("Classic", comment: "")
+            case .warm: return NSLocalizedString("Warm", comment: "")
+            case .cool: return NSLocalizedString("Cool", comment: "")
+            case .forest: return NSLocalizedString("Forest", comment: "")
+            case .contrast: return NSLocalizedString("High Contrast", comment: "")
             }
         }
 
@@ -108,12 +108,32 @@ enum Settings {
 
         var label: String {
             switch self {
-            case .narrow: return "Narrow"
-            case .normal: return "Normal"
-            case .wide: return "Wide"
-            case .full: return "Full width"
+            case .narrow: return NSLocalizedString("Narrow", comment: "")
+            case .normal: return NSLocalizedString("Normal", comment: "")
+            case .wide: return NSLocalizedString("Wide", comment: "")
+            case .full: return NSLocalizedString("Full width", comment: "")
             }
         }
+    }
+
+    /// Which editor editing mode opens in. Live is CodeMirror in a web view, set
+    /// in the preview's own type and colours; Source is the plain text view that
+    /// came first, and is also where a file goes that Live cannot write back
+    /// byte for byte (mixed line breaks, see docs/LIVE-PREVIEW.md §6).
+    enum EditorStyle: String, CaseIterable {
+        case live, source
+
+        var label: String {
+            switch self {
+            case .live: return NSLocalizedString("Live Preview", comment: "")
+            case .source: return NSLocalizedString("Source", comment: "")
+            }
+        }
+    }
+
+    static var editorStyle: EditorStyle {
+        get { EditorStyle(rawValue: store.string(forKey: "editorStyle") ?? "") ?? .live }
+        set { store.set(newValue.rawValue, forKey: "editorStyle"); announce() }
     }
 
     static let textScaleRange = 12.0...24.0

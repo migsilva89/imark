@@ -73,36 +73,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let one = report.kept.count == 1
         var lines = [
             one
-                ? "Imark \(Updates.current) has newer instructions for your coding agents. This "
-                    + "file has changes of your own in it, so Imark left it exactly as it was:"
-                : "Imark \(Updates.current) has newer instructions for your coding agents. These "
-                    + "files have changes of your own in them, so Imark left them exactly as "
-                    + "they were:",
+                ? String(format: NSLocalizedString("Imark %@ has newer instructions for your coding agents. This file has changes of your own in it, so Imark left it exactly as it was:", comment: ""), String(describing: Updates.current))
+                : String(format: NSLocalizedString("Imark %@ has newer instructions for your coding agents. These files have changes of your own in them, so Imark left them exactly as they were:", comment: ""), String(describing: Updates.current)),
             "",
             list(report.kept),
             "",
             one
-                ? "Your agent goes on reading your version, so it is following the older "
-                    + "instructions. Imark's own copy is inside the app, in "
-                    + "Contents/Resources/agent, if you want to bring your changes across."
-                : "Your agent goes on reading your versions, so it is following the older "
-                    + "instructions. Imark's own copies are inside the app, in "
-                    + "Contents/Resources/agent, if you want to bring your changes across.",
+                ? NSLocalizedString("Your agent goes on reading your version, so it is following the older instructions. Imark's own copy is inside the app, in Contents/Resources/agent, if you want to bring your changes across.", comment: "")
+                : NSLocalizedString("Your agent goes on reading your versions, so it is following the older instructions. Imark's own copies are inside the app, in Contents/Resources/agent, if you want to bring your changes across.", comment: ""),
         ]
         if !report.updated.isEmpty {
             lines += [
                 "",
                 report.updated.count == 1
-                    ? "The other file was still Imark's own, untouched, so it was brought up to date."
-                    : "The other files were still Imark's own, untouched, so they were brought "
-                        + "up to date.",
+                    ? NSLocalizedString("The other file was still Imark's own, untouched, so it was brought up to date.", comment: "")
+                    : NSLocalizedString("The other files were still Imark's own, untouched, so they were brought up to date.", comment: ""),
             ]
         }
 
         let alert = NSAlert()
         alert.messageText = report.kept.count == 1
-            ? "One agent file was left as you had it"
-            : "\(report.kept.count) agent files were left as you had them"
+            ? NSLocalizedString("One agent file was left as you had it", comment: "")
+            : String(format: NSLocalizedString("%@ agent files were left as you had them", comment: ""), String(describing: report.kept.count))
         alert.informativeText = lines.joined(separator: "\n")
         alert.runModal()
     }
@@ -229,36 +221,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .replacingOccurrences(of: home, with: "~")
 
         let alert = NSAlert()
-        alert.messageText = "Install the imark command?"
+        alert.messageText = NSLocalizedString("Install the imark command?", comment: "")
         alert.informativeText = [
-            "This links:",
+            NSLocalizedString("This links:", comment: ""),
             "",
             shown,
             "",
-            "`imark notes.md` then opens a document in the copy of Imark you are "
-                + "already running, and brings it forward if it is open. Deleting "
-                + "that one link undoes it.",
+            NSLocalizedString("`imark notes.md` then opens a document in the copy of Imark you are already running, and brings it forward if it is open. Deleting that one link undoes it.", comment: ""),
             CommandLineTool.mayNeedPathSetup
-                ? "\nIf your terminal cannot find it, add \(directory) to PATH "
-                    + "and open a new terminal."
+                ? String(format: NSLocalizedString("\nIf your terminal cannot find it, add %@ to PATH and open a new terminal.", comment: ""), String(describing: directory))
                 : "",
         ].joined(separator: "\n")
-        alert.addButton(withTitle: "Install")
-        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: NSLocalizedString("Install", comment: ""))
+        alert.addButton(withTitle: NSLocalizedString("Cancel", comment: ""))
         guard alert.runModal() == .alertFirstButtonReturn else { return }
 
         do {
             try CommandLineTool.install()
             let done = NSAlert()
-            done.messageText = "The imark command is installed."
+            done.messageText = NSLocalizedString("The imark command is installed.", comment: "")
             done.informativeText = CommandLineTool.mayNeedPathSetup
-                ? "Try `imark notes.md` in a terminal. If it cannot find the command, "
-                    + "add \(directory) to PATH and open a new terminal."
-                : "Try `imark notes.md` in a terminal."
+                ? String(format: NSLocalizedString("Try `imark notes.md` in a terminal. If it cannot find the command, add %@ to PATH and open a new terminal.", comment: ""), String(describing: directory))
+                : NSLocalizedString("Try `imark notes.md` in a terminal.", comment: "")
             done.runModal()
         } catch {
             let failure = NSAlert()
-            failure.messageText = "Imark couldn't install the command."
+            failure.messageText = NSLocalizedString("Imark couldn't install the command.", comment: "")
             failure.informativeText = (error as? LocalizedError)?.errorDescription ?? "\(error)"
             failure.runModal()
         }
@@ -268,11 +256,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         MarkdownType.makeImarkDefault { ok in
             let alert = NSAlert()
             alert.messageText = ok
-                ? "Imark is now the default for .md"
-                : "Couldn't change the default app"
+                ? NSLocalizedString("Imark is now the default for .md", comment: "")
+                : NSLocalizedString("Couldn't change the default app", comment: "")
             alert.informativeText = ok
-                ? "Double-clicking a markdown file in the Finder opens it here."
-                : "Use Get Info on a .md file → Open with → Change All."
+                ? NSLocalizedString("Double-clicking a markdown file in the Finder opens it here.", comment: "")
+                : NSLocalizedString("Use Get Info on a .md file → Open with → Change All.", comment: "")
             alert.alertStyle = ok ? .informational : .warning
             alert.runModal()
         }

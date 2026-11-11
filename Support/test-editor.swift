@@ -55,14 +55,20 @@ enum EditorTest {
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let app = NSApplication.shared
         app.setActivationPolicy(.prohibited)
+        // These are the source editor's tests: they type into its NSTextView. The
+        // Live editor is the default style and has its own suite
+        // (Support/test-live-editor.swift).
+        Settings.editorStyle = .source
 
         countingLines()
         modifiedLines()
         try theEditorFollowsTheFile()
         try aSaveWillNotLandOnSomebodyElsesWork()
         try typingIsUndoneByTyping()
+        try aSaveKeepsTheByteOrderMark()
+        try aRecomposedLetterIsAnEdit()
 
-        try? FileManager.default.removeItem(at: folder)
+        try?FileManager.default.removeItem(at: folder)
         print(failures == 0 ? "\nall good" : "\n\(failures) failing")
         exit(failures == 0 ? 0 : 1)
     }
@@ -185,6 +191,72 @@ enum EditorTest {
               read(url))
         check("and the text typed here is still on screen",
               window.content.editor.text.contains("with my change"))
+        window.close()
+        spin(0.3)
+    }
+
+    /// Foundation drops a byte order mark while decoding, so the buffer never holds
+    /// one — and a save of the buffer used to write the file back three bytes short.
+    /// A file comes back from a save as it was, but for the change.
+    static func aSaveKeepsTheByteOrderMark() throws {
+        print("▸ a save keeps the byte order mark")
+        let mark = Data([0xEF, 0xBB, 0xBF])
+
+        func saved(_ original: String, withMark: Bool, as name: String, edit: (String) -> String)
+            -> (bytes: Data, text: String) {
+            let url = folder.appendingPathComponent(name)
+            try! ((withMark ? mark : Data()) + Data(original.utf8)).write(to: url)
+            let window = open(url)
+            window.toggleEditMode(nil)
+            spin(0.5)
+            let edited = edit(window.content.editor.text)
+            type(edited, into: window)
+            spin(0.3)
+            window.saveDocument(nil)
+            spin(0.6)
+            window.close()
+            spin(0.3)
+            return ((try? Data(contentsOf: url)) ?? Data(), edited)
+        }
+
+        let withMark = saved("# Four\n\nBefore.\n", withMark: true, as: "bom.md") { $0 + "After.\n" }
+        check("the mark is still the first three bytes",
+              withMark.bytes.prefix(3) == mark, "\(Array(withMark.bytes.prefix(3)))")
+        check("and the rest is the edited text",
+              withMark.bytes.dropFirst(3) == Data(withMark.text.utf8),
+              String(decoding: withMark.bytes.dropFirst(3), as: UTF8.self))
+
+        let trivial = saved("# Five\n", withMark: true, as: "bom-trivial.md") { $0 + "\n" }
+        check("a one-character change keeps it too",
+              trivial.bytes.prefix(3) == mark && trivial.bytes.dropFirst(3) == Data(trivial.text.utf8),
+              "\(Array(trivial.bytes.prefix(3)))")
+
+        let plain = saved("# Six\n\nNo mark.\n", withMark: false, as: "plain.md") { $0 + "After.\n" }
+        check("a file without one does not gain one",
+              plain.bytes == Data(plain.text.utf8), "\(Array(plain.bytes.prefix(3)))")
+    }
+
+    /// `é` written as one code point and as `e` plus a combining accent are the
+    /// same to Swift's `==` and different bytes in the file. Changing one into the
+    /// other is an edit: compared as `String`s, the buffer said it had nothing
+    /// unsaved, ⌘S did nothing and closing the window lost the change.
+    static func aRecomposedLetterIsAnEdit() throws {
+        print("▸ a recomposed letter is an edit")
+        let url = fixture("Cafe\u{301}\n", named: "recomposed.md")
+        let window = open(url)
+        window.toggleEditMode(nil)
+        spin(0.5)
+        check("the editor opened clean", !window.content.editor.isDirty)
+
+        type("Caf\u{E9}\n", into: window)
+        spin(0.3)
+        check("one code point for two counts as unsaved", window.content.editor.isDirty)
+
+        window.saveDocument(nil)
+        spin(0.6)
+        check("and the save writes it",
+              (try? Data(contentsOf: url)) == Data("Caf\u{E9}\n".utf8),
+              "\(Array((try? Data(contentsOf: url)) ?? Data()))")
         window.close()
         spin(0.3)
     }

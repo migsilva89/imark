@@ -86,7 +86,7 @@ final class CommentsList {
         // The quote is what the note is about, so it leads. An orphan says so
         // in its place rather than showing a phrase that is no longer there.
         let heading = NSTextField(labelWithString: note.orphan
-            ? "Quote no longer in the document"
+            ? NSLocalizedString("Quote no longer in the document", comment: "")
             : "“\(note.quote)”")
         heading.font = .systemFont(ofSize: 12, weight: .medium)
         heading.textColor = note.orphan ? .tertiaryLabelColor : .labelColor

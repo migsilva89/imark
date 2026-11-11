@@ -147,8 +147,8 @@ enum AgentSetup {
 
         var errorDescription: String? {
             switch self {
-            case .missingResources: "This copy of Imark is missing the agent files."
-            case .cannotWrite(let path): "Imark couldn't write to \(path)."
+            case .missingResources: NSLocalizedString("This copy of Imark is missing the agent files.", comment: "")
+            case .cannotWrite(let path): String(format: NSLocalizedString("Imark couldn't write to %@.", comment: ""), String(describing: path))
             }
         }
     }

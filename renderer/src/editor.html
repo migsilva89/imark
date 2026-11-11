@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- The same policy as index.html. CodeMirror injects its base theme at
+         runtime (style-mod: a constructed stylesheet, or a <style> element),
+         which 'unsafe-inline' in style-src allows; nothing else may load. -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; img-src imark: data:; style-src 'unsafe-inline' imark://app; font-src data: imark:; script-src imark://app; form-action 'none'; base-uri 'none';"
+    />
+    <link rel="stylesheet" href="imark://app/editor.css" />
+    <title>Imark Editor</title>
+  </head>
+  <body>
+    <div id="editor"></div>
+    <script src="imark://app/editor.js"></script>
+  </body>
+</html>

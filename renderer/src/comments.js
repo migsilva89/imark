@@ -1,3 +1,5 @@
+import { t, currentLanguage } from './i18n.js'
+
 // Comments live inside the document, as HTML comments:
 //
 //   <!-- imark quote="exequível" by="john" at="2026-08-02T14:31Z"
@@ -301,7 +303,7 @@ export function attachComments(root, comments) {
       if (note.resolved) dot.classList.add('is-resolved')
       dot.dataset.note = note.id
       if (note.colour) dot.dataset.color = note.colour
-      dot.setAttribute('aria-label', 'Comment on the document')
+      dot.setAttribute('aria-label', t('Comment on the document'))
       const stacked = panel.querySelectorAll('.note-dot').length
       if (stacked) dot.style.top = `${2 + stacked * 17}px`
       panel.appendChild(dot)
@@ -379,7 +381,7 @@ export function attachComments(root, comments) {
     if (note.resolved) dot.classList.add('is-resolved')
     dot.dataset.note = note.id
     if (note.colour) dot.dataset.color = note.colour
-    dot.setAttribute('aria-label', lost ? 'Comment with a missing quote' : 'Comment')
+    dot.setAttribute('aria-label', lost ? t('Comment with a missing quote') : t('Comment'))
     // Down the holder to the item, row or cell the quote is in. A list of
     // twenty items used to put every dot at the top of the list, which said a
     // note existed somewhere in there and left you to click all of them.
@@ -421,16 +423,16 @@ function buildCard(note, orphan) {
   head.textContent = [
     note.by,
     formatDate(note.at),
-    note.resolved ? `resolved ${formatDate(note.resolved)}` : '',
-  ].filter(Boolean).join(' · ') || 'Note'
+    note.resolved ? t('resolved {date}', { date: formatDate(note.resolved) }) : '',
+  ].filter(Boolean).join(' · ') || t('Note')
   card.appendChild(head)
 
   if (orphan) {
     const warning = document.createElement('p')
     warning.className = 'note-orphan'
     warning.textContent = note.quote
-      ? `The quoted text is gone: “${note.quote}”`
-      : 'This note has no quote.'
+      ? t('The quoted text is gone: “{quote}”', { quote: note.quote })
+      : t('This note has no quote.')
     card.appendChild(warning)
   }
 
@@ -466,8 +468,8 @@ function cardActions(note) {
     const button = document.createElement('button')
     button.type = 'button'
     button.className = `note-action note-${command}`
-    button.title = `${label} this note`
-    button.setAttribute('aria-label', `${label} this note`)
+    button.title = t(`${label} this note`)
+    button.setAttribute('aria-label', t(`${label} this note`))
     button.innerHTML =
       `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor"` +
       ` stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">` +
@@ -497,7 +499,7 @@ function formatDate(raw) {
   if (!raw) return ''
   const date = new Date(raw)
   if (Number.isNaN(date.getTime())) return raw
-  return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
+  return date.toLocaleDateString(currentLanguage(), { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
 /* ------------------------------------------------------------- interaction */
@@ -647,7 +649,7 @@ export function buildNoteRail() {
 
   const rail = document.createElement('nav')
   rail.className = 'note-rail'
-  rail.setAttribute('aria-label', 'Comments')
+  rail.setAttribute('aria-label', t('Comments'))
 
   const tops = placeMarks(all)
 
@@ -658,7 +660,7 @@ export function buildNoteRail() {
     mark.className = dot.classList.contains('orphan') ? 'note-mark orphan' : 'note-mark'
     if (note?.colour) mark.dataset.color = note.colour
     mark.style.top = `${tops[index]}px`
-    mark.setAttribute('aria-label', note?.quote || 'Comment')
+    mark.setAttribute('aria-label', note?.quote || t('Comment'))
 
     // Hovering shows the note without going there; clicking goes there.
     mark.addEventListener('mouseenter', () => showTip(note, mark))
@@ -797,12 +799,12 @@ function showTip(note, mark) {
 
   tip.replaceChildren()
   const who = document.createElement('em')
-  who.textContent = note.by || 'Note'
+  who.textContent = note.by || t('Note')
   tip.appendChild(who)
 
   const quote = document.createElement('strong')
   quote.textContent = note.orphan
-    ? 'Quote no longer in the document'
+    ? t('Quote no longer in the document')
     : `“${note.quote}”`
   tip.appendChild(quote)
 

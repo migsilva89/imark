@@ -37,7 +37,7 @@ final class ShortcutsPanel: NSWindowController {
             backing: .buffered,
             defer: false
         )
-        panel.title = "Keyboard Shortcuts"
+        panel.title = NSLocalizedString("Keyboard Shortcuts", comment: "")
         panel.isFloatingPanel = true
         panel.hidesOnDeactivate = false
 
@@ -83,9 +83,9 @@ final class ShortcutsPanel: NSWindowController {
 
         // Not menu items, so the menu cannot tell us about them. The only two
         // that live purely in the sidebar's key handling.
-        stack.addArrangedSubview(header("Outline"))
-        stack.addArrangedSubview(row(keys: "↑ ↓", title: "Move through the outline"))
-        stack.addArrangedSubview(row(keys: "← →", title: "Fold or unfold a section"))
+        stack.addArrangedSubview(header(NSLocalizedString("Outline", comment: "")))
+        stack.addArrangedSubview(row(keys: "↑ ↓", title: NSLocalizedString("Move through the outline", comment: "")))
+        stack.addArrangedSubview(row(keys: "← →", title: NSLocalizedString("Fold or unfold a section", comment: "")))
     }
 
     /// macOS adds Dictation and Emoji & Symbols to any Edit menu it finds, more

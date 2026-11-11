@@ -23,7 +23,13 @@ enum NoteColour: String, CaseIterable {
     }
 
     var label: String {
-        self == .standard ? "Default" : rawValue.capitalized
+        switch self {
+        case .standard: return NSLocalizedString("Default", comment: "")
+        case .amber: return NSLocalizedString("Amber", comment: "")
+        case .green: return NSLocalizedString("Green", comment: "")
+        case .blue: return NSLocalizedString("Blue", comment: "")
+        case .red: return NSLocalizedString("Red", comment: "")
+        }
     }
 
     var colour: NSColor {
