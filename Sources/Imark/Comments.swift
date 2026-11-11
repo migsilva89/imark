@@ -28,12 +28,16 @@ enum Comments {
         case fileChanged
         case unreadable
         case notATask
+        /// The Live editor is re-reading its own text from the page; see
+        /// `DocumentEditor.textIsCurrent`.
+        case editorCatchingUp
 
         var errorDescription: String? {
             switch self {
             case .fileChanged: "This file changed on disk since Imark opened it."
             case .unreadable: "Imark can't read this file as UTF-8 text."
             case .notATask: "That line of the file is not a task any more."
+            case .editorCatchingUp: "The editor is still catching up with your last edit. Try again in a moment."
             }
         }
     }

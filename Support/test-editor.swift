@@ -55,6 +55,10 @@ enum EditorTest {
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let app = NSApplication.shared
         app.setActivationPolicy(.prohibited)
+        // These are the source editor's tests: they type into its NSTextView. The
+        // Live editor is the default style and has its own suite
+        // (Support/test-live-editor.swift).
+        Settings.editorStyle = .source
 
         countingLines()
         modifiedLines()
@@ -62,6 +66,7 @@ enum EditorTest {
         try aSaveWillNotLandOnSomebodyElsesWork()
         try typingIsUndoneByTyping()
         try aSaveKeepsTheByteOrderMark()
+        try aRecomposedLetterIsAnEdit()
 
         try?FileManager.default.removeItem(at: folder)
         print(failures == 0 ? "\nall good" : "\n\(failures) failing")
@@ -229,6 +234,31 @@ enum EditorTest {
         let plain = saved("# Six\n\nNo mark.\n", withMark: false, as: "plain.md") { $0 + "After.\n" }
         check("a file without one does not gain one",
               plain.bytes == Data(plain.text.utf8), "\(Array(plain.bytes.prefix(3)))")
+    }
+
+    /// `é` written as one code point and as `e` plus a combining accent are the
+    /// same to Swift's `==` and different bytes in the file. Changing one into the
+    /// other is an edit: compared as `String`s, the buffer said it had nothing
+    /// unsaved, ⌘S did nothing and closing the window lost the change.
+    static func aRecomposedLetterIsAnEdit() throws {
+        print("▸ a recomposed letter is an edit")
+        let url = fixture("Cafe\u{301}\n", named: "recomposed.md")
+        let window = open(url)
+        window.toggleEditMode(nil)
+        spin(0.5)
+        check("the editor opened clean", !window.content.editor.isDirty)
+
+        type("Caf\u{E9}\n", into: window)
+        spin(0.3)
+        check("one code point for two counts as unsaved", window.content.editor.isDirty)
+
+        window.saveDocument(nil)
+        spin(0.6)
+        check("and the save writes it",
+              (try? Data(contentsOf: url)) == Data("Caf\u{E9}\n".utf8),
+              "\(Array((try? Data(contentsOf: url)) ?? Data()))")
+        window.close()
+        spin(0.3)
     }
 
     /// ⌘Z while the file is open as text means the typing, not the app's own undo
