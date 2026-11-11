@@ -54,6 +54,18 @@ final class LiveEditorView: NSView, DocumentEditor {
 
     static let page = URL(string: "imark://app/editor.html")!
 
+    /// Above this many bytes a file is edited in the source editor instead,
+    /// whatever the setting says (docs/LIVE-PREVIEW.md §5). Picked by one rule:
+    /// a keystroke, through to the mirror, has to fit in two frames (33 ms).
+    /// Measured with `IMARK_TIMINGS=1` in `Support/test-live-editor.swift`, on
+    /// generated Markdown with headings, lists, tables and code, a keystroke
+    /// costs about 13 ms at 512 KB, 24 ms at 1 MB and 114 ms at 5 MB. It grows
+    /// with the file because the Live Preview's block pass reads the whole
+    /// document on every edit; with it off, a key is 2 ms in the page at 1 MB.
+    /// Opening is quick at every size (well under a second). Past a megabyte a
+    /// Markdown file is generated rather than written anyway.
+    static let largeFileThreshold = 1_024 * 1_024
+
     /// Absolute path of the file being edited. The page resolves a relative image
     /// against its folder, as the preview does (`imark://file/...`); it has no
     /// other way to know where the document lives.
@@ -77,6 +89,9 @@ final class LiveEditorView: NSView, DocumentEditor {
     private var queued: [(script: String, arguments: [String: Any])] = []
     /// From the page's `history` messages. The menu asks synchronously.
     private var history = (canUndo: false, canRedo: false)
+    /// From the page's `topLine` messages, for the same reason: leaving editing
+    /// and ⇧⌘E ask on their way out and cannot wait for the page to answer.
+    private var place = (top: 0, caret: 0)
 
     private var theme = Settings.Palette.classic.face(dark: false)
     private var textScale = Settings.defaultTextScale
@@ -150,7 +165,31 @@ final class LiveEditorView: NSView, DocumentEditor {
         history = (false, false)
         // Finds and the like were for the document being replaced.
         queued.removeAll()
+        place = (0, 0)
         sendDocument()
+    }
+
+    /// The page keeps the place itself (`keepLine`): it knows where its caret
+    /// and its top line are, and Swift's copy of them may be a message behind.
+    func reload(_ text: String) {
+        guard let separator = LiveMirror.lineSeparator(of: text) else {
+            preconditionFailure("mixed line breaks belong in the source editor")
+        }
+        mirror.load(text, lineSeparator: separator, saved: text)
+        hasDocument = true
+        history = (false, false)
+        queued.removeAll()
+        sendDocument(keepingPlace: true)
+    }
+
+    var topLine: Int { place.top }
+    var caretLine: Int { place.caret }
+
+    func scrollTo(line: Int, caret: Int) {
+        // Taken as the answer at once, so a question asked before the page has
+        // moved gets the line it is about to be on.
+        place = (max(0, line), max(0, caret))
+        call("window.imarkEditor.scrollToLine(line, caret)", ["line": line, "caret": caret])
     }
 
     func markSaved() {
@@ -230,9 +269,9 @@ final class LiveEditorView: NSView, DocumentEditor {
     /// The mirror's document, under its current generation. The text keeps the
     /// file's own breaks: with the CRLF facet set, CodeMirror splits only on
     /// `\r\n`, and a `\n`-joined text would arrive as one line.
-    private func sendDocument() {
+    private func sendDocument(keepingPlace: Bool = false) {
         guard isReady, hasDocument else { return }
-        evaluate("window.imarkEditor.load(args)", ["args": [
+        var args: [String: Any] = [
             "generation": mirror.generation,
             "text": mirror.text,
             "lineSeparator": mirror.lineSeparator,
@@ -242,7 +281,12 @@ final class LiveEditorView: NSView, DocumentEditor {
             "language": language,
             "path": documentPath,
             "frontMatter": frontMatter,
-        ] as [String: Any]])
+            "keepLine": keepingPlace,
+        ]
+        // What the file holds, for the gutter of changed lines, when it is not
+        // the buffer: a buffer handed over unsaved, or one outliving its page.
+        if mirror.isDirty { args["saved"] = mirror.savedText }
+        evaluate("window.imarkEditor.load(args)", ["args": args])
     }
 
     private func call(_ script: String, _ arguments: [String: Any] = [:]) {
@@ -308,6 +352,11 @@ final class LiveEditorView: NSView, DocumentEditor {
 
         case "history":
             history = (body["canUndo"] as? Bool ?? false, body["canRedo"] as? Bool ?? false)
+
+        case "topLine":
+            if let top = (body["line"] as? NSNumber)?.intValue, let caret = (body["caret"] as? NSNumber)?.intValue {
+                place = (top, caret)
+            }
 
         case "save":
             onSave?()

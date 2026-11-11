@@ -88,6 +88,13 @@ enum LiveEditorTest {
         try theFrontMatterCardFollowsTheSwitch()
         try aMirrorCatchingUpIsNeitherSavedNorSwitched()
         linksFromTheEditorGoWhereThePreviewsGo()
+        // M4
+        try thePlaceSurvivesARoundTripThroughTheEditor()
+        try aReloadKeepsTheCaretLine()
+        try switchingStylesKeepsTheCaretLine()
+        try aLargeFileIsEditedAsSource()
+        try theGutterMarksTheEditedLines()
+        if ProcessInfo.processInfo.environment["IMARK_TIMINGS"] != nil { timesLargeDocuments() }
 
         try? FileManager.default.removeItem(at: folder)
         print(failures == 0 ? "\nall good" : "\n\(failures) failing")
@@ -892,5 +899,371 @@ enum LiveEditorTest {
         check("and nothing is left unsaved", until { !window.content.editor.isDirty })
         if let sheet = window.window?.attachedSheet { window.window?.endSheet(sheet) }
         finish(window)
+    }
+
+    // MARK: - M4: keeping the place
+
+    /// Long enough to scroll, with the two things that shift a line count: front
+    /// matter at the top, which the preview draws as a card with no lines of its
+    /// own, and CRLF breaks. Every paragraph is one line, so a block's first line
+    /// is the only line it has.
+    static func longDocument(crlf: Bool = true, sections: Int = 80) -> String {
+        var lines = ["---", "title: Long", "tags: [a, b]", "---", ""]
+        for i in 1...sections {
+            lines += ["## Section \(i)", "", "Paragraph \(i) has a few words in it, enough to read as prose.", "",
+                      "- item \(i)a", "- item \(i)b", "", "Closing \(i).", ""]
+        }
+        return lines.joined(separator: crlf ? "\r\n" : "\n")
+    }
+
+    /// The file line (from zero) a line of `text` is on.
+    static func line(of needle: String, in text: String) -> Int {
+        let lines = text.components(separatedBy: text.contains("\r\n") ? "\r\n" : "\n")
+        return lines.firstIndex(of: needle) ?? -1
+    }
+
+    static func previewTop(_ window: DocumentWindowController) -> Int? {
+        var answer: Int?
+        var done = false
+        window.content.renderer.topLine { answer = $0; done = true }
+        _ = until(3) { done }
+        return answer
+    }
+
+    /// What the page itself has as its top line and caret line, from the last
+    /// `topLine` it posted, and measured fresh.
+    static func pagePlace(_ window: DocumentWindowController) -> [Int]? {
+        js(window, """
+            const s = window.imarkEditor.__spike, v = s.view
+            const top = v.lineBlockAtHeight(v.scrollDOM.getBoundingClientRect().top + 1 - v.documentTop)
+            return [s.placed.line, s.placed.caret, v.state.doc.lineAt(top.from).number - 1,
+                    v.state.doc.lineAt(v.state.selection.main.head).number - 1]
+            """) as? [Int]
+    }
+
+    static func thePlaceSurvivesARoundTripThroughTheEditor() throws {
+        print("▸ preview → editor → preview keeps the place")
+        let text = longDocument()
+        let url = fixture(text, named: "place.md")
+        let window = open(url)
+        _ = until { (previewTop(window) ?? -1) == 0 }
+        window.content.renderer.scrollTo(offset: 2_400)
+        check("the preview has moved down", until { (previewTop(window) ?? 0) > 20 }, "\(previewTop(window) ?? -1)")
+        let reading = previewTop(window) ?? -1
+
+        guard startEditing(window, expecting: text) else { return check("the page has the file", false) }
+        check("the editor opens with the preview's top line at its top, the caret on it",
+              until { pagePlace(window) == [reading, reading, reading, reading] },
+              "preview \(reading), page \(pagePlace(window) ?? [])")
+        check("and Swift knows it", window.content.editor.topLine == reading && window.content.editor.caretLine == reading)
+
+        window.toggleEditMode(nil)
+        check("back in the preview, the same block is at the top",
+              until { previewTop(window) == reading }, "\(previewTop(window) ?? -1) for \(reading)")
+
+        // The other way: moved in the editor, the preview follows.
+        guard startEditing(window, expecting: text) else { return check("the page has the file again", false) }
+        let target = line(of: "Paragraph 47 has a few words in it, enough to read as prose.", in: text)
+        _ = until { (pagePlace(window)?[2] ?? -1) == reading }
+        window.content.editor.scrollTo(line: target, caret: target)
+        check("the editor moved to the paragraph", until { pagePlace(window) == [target, target, target, target] },
+              "\(target): \(pagePlace(window) ?? [])")
+        window.toggleEditMode(nil)
+        check("the preview opens on the paragraph the editor had at its top",
+              until { previewTop(window) == target }, "\(previewTop(window) ?? -1) for \(target)")
+
+        // At the very top, the front matter card: the top, both ways.
+        window.content.renderer.scrollTo(line: 0)
+        _ = until { previewTop(window) == 0 }
+        guard startEditing(window, expecting: text) else { return check("the page has the file a third time", false) }
+        check("from the top of the preview, the editor is at the top", until { pagePlace(window) == [0, 0, 0, 0] },
+              "\(pagePlace(window) ?? [])")
+        finish(window)
+
+        // The source editor, where a file over the threshold always goes.
+        Settings.editorStyle = .source
+        defer { Settings.editorStyle = .live }
+        let other = fixture(text, named: "place-source.md")
+        let source = open(other)
+        _ = until { (previewTop(source) ?? -1) == 0 }
+        source.content.renderer.scrollTo(offset: 3_000)
+        check("source: the preview has moved down", until { (previewTop(source) ?? 0) > 20 })
+        let shown = previewTop(source) ?? -1
+        source.toggleEditMode(nil)
+        check("source: the editor opens with the preview's top line at its top, the caret on it",
+              until { source.content.editor.topLine == shown && source.content.editor.caretLine == shown },
+              "preview \(shown), editor \(source.content.editor.topLine), \(source.content.editor.caretLine)")
+        let elsewhere = line(of: "Paragraph 21 has a few words in it, enough to read as prose.", in: text)
+        source.content.editor.scrollTo(line: elsewhere, caret: elsewhere)
+        source.toggleEditMode(nil)
+        check("source: the preview opens on the paragraph the editor had at its top",
+              until { previewTop(source) == elsewhere }, "\(previewTop(source) ?? -1) for \(elsewhere)")
+        finish(source)
+    }
+
+    static func aReloadKeepsTheCaretLine() throws {
+        print("▸ a reload after an outside change keeps the caret line")
+        let text = longDocument()
+        let url = fixture(text, named: "reload-place.md")
+        let window = open(url)
+        guard startEditing(window, expecting: text) else { return check("the page has the file", false) }
+        let top = line(of: "## Section 30", in: text)
+        let caret = top + 2
+        window.content.editor.scrollTo(line: top, caret: caret)
+        _ = until { pagePlace(window) == [top, caret, top, caret] }
+        // Somebody else changes a line near the top; the line count stays.
+        let theirs = text.replacingOccurrences(of: "Paragraph 1 has", with: "Paragraph one has")
+        try theirs.write(to: url, atomically: true, encoding: .utf8)
+        check("their save reached the editor", until(4) { window.content.editor.text == theirs && samePage(window, theirs) })
+        check("the caret is on its line and the view on its top line",
+              until { pagePlace(window) == [top, caret, top, caret] }, "\(top), \(caret): \(pagePlace(window) ?? [])")
+        check("and Swift knows it", window.content.editor.caretLine == caret && window.content.editor.topLine == top)
+        finish(window)
+
+        // The source editor does the same.
+        Settings.editorStyle = .source
+        defer { Settings.editorStyle = .live }
+        let other = fixture(text, named: "reload-place-source.md")
+        let source = open(other)
+        source.toggleEditMode(nil)
+        _ = until { source.content.editor.text == text }
+        // The preview's answer to where it was comes a moment after editing
+        // starts, and moves the editor to its top line.
+        spin(0.5)
+        source.content.editor.scrollTo(line: top, caret: caret)
+        check("source: placed", source.content.editor.caretLine == caret && source.content.editor.topLine == top,
+              "\(source.content.editor.topLine), \(source.content.editor.caretLine)")
+        try theirs.write(to: other, atomically: true, encoding: .utf8)
+        check("source: their save reached the editor", until(4) { source.content.editor.text == theirs })
+        check("source: the caret is on its line and the view on its top line",
+              source.content.editor.caretLine == caret && source.content.editor.topLine == top,
+              "\(source.content.editor.topLine), \(source.content.editor.caretLine)")
+        finish(source)
+    }
+
+    static func switchingStylesKeepsTheCaretLine() throws {
+        print("▸ ⇧⌘E keeps the caret line both ways")
+        let text = longDocument()
+        let url = fixture(text, named: "switch-place.md")
+        let window = open(url)
+        guard startEditing(window, expecting: text) else { return check("the page has the file", false) }
+        let top = line(of: "## Section 40", in: text)
+        window.content.editor.scrollTo(line: top, caret: top + 4)
+        _ = until { pagePlace(window) == [top, top + 4, top, top + 4] }
+
+        window.toggleEditorStyle(nil)
+        check("in source", !window.content.isLiveActive)
+        check("Live → source: the caret line and the top line come across",
+              window.content.editor.caretLine == top + 4 && window.content.editor.topLine == top,
+              "\(window.content.editor.topLine), \(window.content.editor.caretLine)")
+
+        let back = line(of: "## Section 12", in: text)
+        window.content.editor.scrollTo(line: back, caret: back + 2)
+        window.toggleEditorStyle(nil)
+        check("in Live", window.content.isLiveActive)
+        check("source → Live: the caret line and the top line come across",
+              until { pagePlace(window) == [back, back + 2, back, back + 2] }, "\(back): \(pagePlace(window) ?? [])")
+        finish(window)
+    }
+
+    /// Realistic Markdown of about `bytes` bytes: headings, prose, lists, a
+    /// table and a code block now and then, so the Live Preview has its usual
+    /// work to do on every screen.
+    static func markdown(bytes: Int) -> String {
+        var out = "# A long document\n\n"
+        var i = 0
+        while out.utf8.count < bytes {
+            i += 1
+            out += "## Section \(i)\n\nSome **bold** and *italic* prose with `code` and a [link](https://example.com/\(i)) in it, long enough to wrap once or twice at the usual width of the window.\n\n"
+            out += "- first item \(i)\n- second item with ==mark==\n  - nested\n\n"
+            if i % 5 == 0 { out += "| a | b |\n|---|---|\n| \(i) | x |\n\n" }
+            if i % 7 == 0 { out += "```swift\nlet value = \(i)\nprint(value)\n```\n\n" }
+        }
+        return out
+    }
+
+    static func aLargeFileIsEditedAsSource() throws {
+        print("▸ a file over the threshold is edited as source")
+        let text = markdown(bytes: LiveEditorView.largeFileThreshold + 4_096)
+        let url = fixture(text, named: "large.md")
+        let window = open(url)
+        let note = NSLocalizedString("Large file · editing as source", comment: "")
+        window.toggleEditMode(nil)
+        check("editing, in the source editor", window.editMode && !window.content.isLiveActive
+                && window.content.editor === window.content.sourceEditor && !window.content.sourceEditor.isHidden)
+        check("with the note in the status bar", window.content.statusNote == note, window.content.statusNote)
+        check("and the file in it", (window.content.editor.text as NSString).isEqual(to: text))
+        check("no Live editor was built for it", window.content.liveEditor == nil)
+
+        window.content.setStatus(path: url)
+        window.toggleEditorStyle(nil)
+        check("⇧⌘E into Live is refused", !window.content.isLiveActive && window.content.editor === window.content.sourceEditor)
+        check("with the same note", window.content.statusNote == note, window.content.statusNote)
+        finish(window)
+
+        // A small file still opens in Live, and a buffer typed past the line in
+        // the source editor stays there on ⇧⌘E.
+        let small = fixture("small\n", named: "small.md")
+        let other = open(small)
+        guard startEditing(other, expecting: "small\n") else { return check("the small file opens in Live", false) }
+        other.toggleEditorStyle(nil)
+        other.content.sourceEditor.load(text, saved: "small\n")
+        other.content.setStatus(path: small)
+        other.toggleEditorStyle(nil)
+        check("a buffer grown past the line stays in source", !other.content.isLiveActive)
+        check("with the note", other.content.statusNote == note, other.content.statusNote)
+        other.content.sourceEditor.load("small\n")
+        finish(other)
+    }
+
+    static func gutterMarks(_ window: DocumentWindowController) -> [Int]? {
+        js(window, "return window.imarkEditor.__spike.changedLines") as? [Int]
+    }
+
+    static func drawnMarks(_ window: DocumentWindowController) -> Int? {
+        js(window, "return document.querySelectorAll('.cm-imark-changes .cm-imark-changed-bar').length") as? Int
+    }
+
+    static func theGutterMarksTheEditedLines() throws {
+        print("▸ the gutter marks the lines that differ from the file")
+        let original = "alpha\r\nbravo\r\ncharlie\r\ndelta\r\necho\r\n"
+        let url = fixture(original, named: "gutter.md")
+        let window = open(url)
+        guard startEditing(window, expecting: original) else { return check("the page has the file", false) }
+        check("nothing is marked in a file just opened", until { gutterMarks(window) == [] && drawnMarks(window) == 0 })
+
+        // "bravo" → "bravo!" on line 1, and a new line after "delta".
+        edit(window, from: 11, insert: "!")
+        edit(window, from: 26, insert: "\nnew")
+        _ = until { window.content.editor.text == "alpha\r\nbravo!\r\ncharlie\r\ndelta\r\nnew\r\necho\r\n" }
+        check("exactly the edited and the inserted line are marked", until { gutterMarks(window) == [1, 4] },
+              "\(gutterMarks(window) ?? [])")
+        check("and two bars are drawn", until { drawnMarks(window) == 2 }, "\(drawnMarks(window) ?? -1)")
+        // The source editor's look: two points of the accent at the left edge,
+        // two points in from the line's top and bottom — and the text column
+        // where it was, the gutter taking no room.
+        let geometry = js(window, """
+            const bar = document.querySelector('.cm-imark-changed-bar')
+            const line = window.imarkEditor.__spike.view.domAtPos(window.imarkEditor.__spike.view.state.doc.line(2).from).node
+            const row = (line.nodeType === 1 ? line : line.parentElement).closest('.cm-line').getBoundingClientRect()
+            const b = bar.getBoundingClientRect()
+            const scroller = document.querySelector('.cm-scroller').getBoundingClientRect()
+            const content = document.querySelector('.cm-content').getBoundingClientRect()
+            return [b.width, b.left - scroller.left, b.top - row.top, row.bottom - b.bottom,
+                    Math.round(content.left - scroller.left), Math.round(scroller.right - content.right),
+                    getComputedStyle(bar).backgroundColor === getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()
+                      || getComputedStyle(bar).backgroundColor]
+            """) as? [Any] ?? []
+        let numbers = geometry.prefix(6).compactMap { ($0 as? NSNumber)?.doubleValue }
+        check("the bar is 2 wide at the left edge, inset 2 from the line's top and bottom",
+              numbers.count == 6 && numbers[0] == 2 && numbers[1] == 0 && numbers[2] == 2 && numbers[3] == 2,
+              "\(geometry)")
+        check("and the column is centred as it was, the gutter taking no room",
+              numbers.count == 6 && abs(numbers[4] - numbers[5]) <= 1, "\(geometry)")
+
+        window.saveDocument(nil)
+        check("saved", until { !window.content.editor.isDirty })
+        check("a save clears them", until { gutterMarks(window) == [] && drawnMarks(window) == 0 },
+              "\(gutterMarks(window) ?? [])")
+
+        // A buffer handed across unsaved keeps its marks: the page is told what
+        // the file holds, not only what the buffer does.
+        edit(window, from: 0, insert: "ALPHA ")
+        _ = until { window.content.editor.isDirty }
+        window.toggleEditorStyle(nil)
+        window.toggleEditorStyle(nil)
+        check("after ⇧⌘E there and back the edited line is still marked",
+              until { window.content.isLiveActive && gutterMarks(window) == [0] && drawnMarks(window) == 1 },
+              "\(gutterMarks(window) ?? [])")
+        finish(window)
+    }
+
+    // MARK: - Timings (IMARK_TIMINGS=1)
+
+    /// How long Live takes to open a large document and to take a keystroke in
+    /// it, which is what `LiveEditorView.largeFileThreshold` was picked from.
+    /// A bare editor in a window, so the threshold itself is not in the way.
+    static func timesLargeDocuments() {
+        print("▸ timings")
+        for kilobytes in [512, 1_024, 5_120] {
+            let megabytes = Double(kilobytes) / 1_024
+            let text = markdown(bytes: kilobytes * 1_024)
+            let length = (text as NSString).length
+            let window = NSWindow(contentRect: NSRect(x: -6_000, y: 0, width: 900, height: 800),
+                                  styleMask: [.titled], backing: .buffered, defer: false)
+            let live = LiveEditorView(frame: NSRect(x: 0, y: 0, width: 900, height: 800))
+            window.contentView = live
+            window.orderFront(nil)
+            // What the window does on every edit: ask whether anything is unsaved.
+            live.onEdit = { _ = live.isDirty }
+            spin(1.5)
+            let run = { (body: String) -> Any? in
+                var value: Any?
+                var done = false
+                live.webView.callAsyncJavaScript(body, arguments: [:], in: nil, in: .page) { result in
+                    if case .success(let v) = result { value = v }
+                    done = true
+                }
+                _ = until(60) { done }
+                return value
+            }
+            let start = Date()
+            live.load(text)
+            _ = until(60) { (run("return window.imarkEditor.__spike.view.state.doc.length") as? Int) == length }
+            let loaded = Date().timeIntervalSince(start)
+            // The first screen laid out, decorations and all. Forced: the frame
+            // callbacks CodeMirror measures from do not run in a window nobody
+            // can see.
+            _ = run("const v = window.imarkEditor.__spike.view; if (v.measure) v.measure(); return 0")
+            let drawn = Date().timeIntervalSince(start)
+
+            // Fifty keystrokes in the middle, each a transaction measured in the
+            // page through its DOM update and a forced measure, then the whole
+            // run through to the mirror having all of them.
+            let keys = 50
+            let typing = Date()
+            let perKey = run("""
+                const v = window.imarkEditor.__spike.view
+                const at = v.state.doc.line(Math.floor(v.state.doc.lines / 2)).from
+                v.dispatch({ selection: { anchor: at }, effects: v.constructor.scrollIntoView(at, { y: 'center' }) })
+                if (v.measure) v.measure()
+                const times = []
+                for (let i = 0; i < \(keys); i++) {
+                    const t = performance.now()
+                    v.dispatch({ changes: { from: at + i, insert: 'x' }, selection: { anchor: at + i + 1 }, userEvent: 'input.type' })
+                    if (v.measure) v.measure()
+                    times.push(performance.now() - t)
+                }
+                times.sort((a, b) => a - b)
+                return [times[Math.floor(times.length / 2)], times[times.length - 1]]
+                """) as? [Double] ?? []
+            _ = until(60) { (live.text as NSString).length == length + keys }
+            let throughMirror = Date().timeIntervalSince(typing)
+            // The same keys with the Live Preview's decorations off, to tell its
+            // share from CodeMirror's own.
+            let plain = run("""
+                const s = window.imarkEditor.__spike, v = s.view
+                s.setDecorations(false)
+                if (v.measure) v.measure()
+                const at = v.state.selection.main.head
+                const times = []
+                for (let i = 0; i < \(keys); i++) {
+                    const t = performance.now()
+                    v.dispatch({ changes: { from: at + i, insert: 'y' }, selection: { anchor: at + i + 1 }, userEvent: 'input.type' })
+                    if (v.measure) v.measure()
+                    times.push(performance.now() - t)
+                }
+                s.setDecorations(true)
+                times.sort((a, b) => a - b)
+                return times[Math.floor(times.length / 2)]
+                """) as? Double ?? -1
+            print(String(format: "TIME %.1f MB: keystroke in page with the decorations off, median %.1f ms", megabytes, plain))
+            print(String(format: "TIME %.1f MB: page has it %.0f ms, first screen %.0f ms; keystroke in page median %.1f ms, worst %.1f ms; %d keystrokes through the mirror %.0f ms (%.1f ms each)",
+                         megabytes, loaded * 1000, drawn * 1000, perKey.first ?? -1, perKey.last ?? -1,
+                         keys, throughMirror * 1000, throughMirror * 1000 / Double(keys)))
+            window.orderOut(nil)
+            window.contentView = nil
+            spin(0.3)
+        }
     }
 }

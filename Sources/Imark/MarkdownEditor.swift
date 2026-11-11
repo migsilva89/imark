@@ -110,6 +110,108 @@ final class MarkdownEditorView: NSView, DocumentEditor {
         textView.scroll(.zero)
     }
 
+    func reload(_ text: String) {
+        let place = (top: topLine, caret: caretLine)
+        load(text)
+        scrollTo(line: place.top, caret: place.caret)
+    }
+
+    // MARK: - Lines
+
+    /// The line holding a UTF-16 offset, from zero. Breaks are counted as the
+    /// preview and the Live editor count them — `\r\n`, a lone `\r` and `\n` are
+    /// one each — and nothing else: `lineRange(for:)` also breaks at U+2028 and
+    /// U+0085, which markdown-it and CodeMirror do not, and a Swift `Character`
+    /// folds `\r\n` into one that is not a newline.
+    static func line(at offset: Int, in source: NSString) -> Int {
+        let end = min(max(0, offset), source.length)
+        var line = 0
+        var i = 0
+        while i < end {
+            let unit = source.character(at: i)
+            if unit == 0x0A {
+                line += 1
+            } else if unit == 0x0D {
+                if i + 1 < source.length, source.character(at: i + 1) == 0x0A {
+                    // The `\n` of a `\r\n` is the same break; an offset between
+                    // the two is still on the line the `\r` ends.
+                    if i + 1 >= end { break }
+                    i += 1
+                }
+                line += 1
+            }
+            i += 1
+        }
+        return line
+    }
+
+    /// Where a line starts, as a UTF-16 offset; the end of the text past its
+    /// last line.
+    static func offset(ofLine target: Int, in source: NSString) -> Int {
+        guard target > 0 else { return 0 }
+        var line = 0
+        var i = 0
+        while i < source.length {
+            let unit = source.character(at: i)
+            i += 1
+            if unit == 0x0D, i < source.length, source.character(at: i) == 0x0A { i += 1 }
+            if unit == 0x0A || unit == 0x0D {
+                line += 1
+                if line == target { return i }
+            }
+        }
+        return source.length
+    }
+
+    var caretLine: Int {
+        Self.line(at: textView.selectedRange().location, in: textView.string as NSString)
+    }
+
+    var topLine: Int {
+        guard let layout = textView.layoutManager, let container = textView.textContainer else { return 0 }
+        // One point under the top edge, in the container's coordinates.
+        let point = NSPoint(x: 0, y: max(0, textView.visibleRect.minY - textView.textContainerInset.height + 1))
+        let glyph = layout.glyphIndex(for: point, in: container)
+        let index = layout.characterIndexForGlyph(at: glyph)
+        return Self.line(at: index, in: textView.string as NSString)
+    }
+
+    func scrollTo(line: Int, caret: Int) {
+        let source = textView.string as NSString
+        textView.setSelectedRange(NSRange(location: Self.offset(ofLine: caret, in: source), length: 0))
+        guard let layout = textView.layoutManager, let container = textView.textContainer else { return }
+        let start = Self.offset(ofLine: line, in: source)
+        guard source.length > 0, line > 0 else {
+            textView.scroll(.zero)
+            gutter.needsDisplay = true
+            return
+        }
+        // Laid out up to the line first: the rect of a line not laid out yet is
+        // a guess, and `scrollRangeToVisible` would only bring it into view
+        // somewhere, not to the top.
+        layout.ensureLayout(forCharacterRange: NSRange(location: 0, length: min(source.length, start + 1)))
+        let y: CGFloat
+        if start >= source.length {
+            y = layout.usedRect(for: container).maxY
+        } else {
+            let glyphs = layout.glyphRange(forCharacterRange: NSRange(location: start, length: 0), actualCharacterRange: nil)
+            y = layout.lineFragmentRect(forGlyphAt: glyphs.location, effectiveRange: nil).minY
+        }
+        // A screen's worth below it laid out too, and the text view as tall as
+        // what is laid out: its frame follows the layout manager later, and a
+        // scroll before then is clamped to wherever its frame happens to end.
+        let visible = textView.visibleRect.height
+        layout.ensureLayout(forBoundingRect: NSRect(x: 0, y: y, width: container.size.width, height: visible), in: container)
+        let needed = layout.usedRect(for: container).maxY + 2 * textView.textContainerInset.height
+        if textView.frame.height < needed {
+            textView.setFrameSize(NSSize(width: textView.frame.width, height: needed))
+        }
+        // The line's top at the top of the view. The first line keeps the
+        // inset above it, which is the `guard` above.
+        textView.scroll(NSPoint(x: 0, y: y + textView.textContainerInset.height))
+        gutter.needsDisplay = true
+    }
+
     /// After a save: the buffer has not changed, but the file has caught up with
     /// it, so the bars in the gutter go away.
     func markSaved() {

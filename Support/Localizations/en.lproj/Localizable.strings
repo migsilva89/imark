@@ -235,5 +235,6 @@
 "Editor style" = "Editor style";
 "Which editor Editing Mode opens in. ⇧⌘E switches while editing." = "Which editor Editing Mode opens in. ⇧⌘E switches while editing.";
 "Mixed line endings · editing as source" = "Mixed line endings · editing as source";
+"Large file · editing as source" = "Large file · editing as source";
 "The editor restarted · your text is still here" = "The editor restarted · your text is still here";
 "The editor is still catching up with your last edit. Try again in a moment." = "The editor is still catching up with your last edit. Try again in a moment.";

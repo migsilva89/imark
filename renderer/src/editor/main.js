@@ -45,6 +45,7 @@ import { inlineExtensions } from './inline.js'
 import { livePreview } from './live.js'
 import { restyle } from './blocks.js'
 import { setDocumentPath } from './doc-path.js'
+import { changedLinesGutter, changedLinesOf, setBaseline } from './gutter.js'
 import './editor.css'
 
 const handler = () => window.webkit?.messageHandlers?.imarkEditor
@@ -137,7 +138,55 @@ const mirror = EditorView.updateListener.of((update) => {
     }
   }
   if (update.transactions.length) reportHistory(update.state)
+  // A keystroke reports the caret's line against the top line already known,
+  // rather than forcing the page to lay itself out again on every key. The
+  // top line is read from the layout on the update CodeMirror makes once it
+  // has measured the edit (`geometryChanged` is true for any edit as well,
+  // which is why the edit is asked about first).
+  if (update.docChanged || update.selectionSet) reportPlace(update.view, placed.line)
+  else if (update.geometryChanged || update.viewportChanged) reportPlace(update.view)
 })
+
+// --- Where the reader is (§3.3 `topLine`). Swift asks synchronously, on the way
+// back to the preview and on ⇧⌘E, so the page tells it whenever either line
+// moves rather than waiting to be asked: the first line showing at the top of
+// the editor, and the line the caret is on. Both count the file's lines from
+// zero, which are CodeMirror's lines here — the CRLF facet splits on `\r\n`
+// only, and the front matter is in the document like any other text.
+
+let placed = { line: -1, caret: -1 }
+
+/// The line at the top edge of the editor. A block drawn as one widget (a
+/// table, a diagram) answers with its first line, the line the preview's block
+/// for it starts on.
+function topLineOf(view) {
+  const scroller = view.scrollDOM.getBoundingClientRect()
+  // One pixel in, so a line that ends exactly at the edge is not the answer.
+  const block = view.lineBlockAtHeight(scroller.top + 1 - view.documentTop)
+  return view.state.doc.lineAt(block.from).number - 1
+}
+
+function reportPlace(view, knownTop) {
+  const next = {
+    line: knownTop >= 0 ? knownTop : topLineOf(view),
+    caret: view.state.doc.lineAt(view.state.selection.main.head).number - 1,
+  }
+  if (next.line === placed.line && next.caret === placed.caret) return
+  placed = next
+  post('topLine', next)
+}
+
+/// Puts `line` (counted from zero) at the top of the editor and the caret at the
+/// start of `caret`, which is the same line unless said otherwise. Clamped to
+/// the document, so a line from a longer version of it lands on the last one.
+function scrollToLine(line, caret = line) {
+  const doc = view.state.doc
+  const lineAt = (n) => doc.line(Math.min(Math.max(0, Math.trunc(n) || 0), doc.lines - 1) + 1)
+  view.dispatch({
+    selection: { anchor: lineAt(caret).from },
+    effects: EditorView.scrollIntoView(lineAt(line).from, { y: 'start', yMargin: 0 }),
+  })
+}
 
 // --- Find (§3.4). The app's own find bar drives this, the same bar the preview
 // uses, so CodeMirror's search panel never opens. Its highlighter only paints
@@ -258,6 +307,7 @@ function extensions(lineSeparator) {
       autocorrect: 'off',
       autocapitalize: 'off',
     }),
+    changedLinesGutter,
     mirror,
   ]
   if (lineSeparator === '\r\n') list.push(EditorState.lineSeparator.of('\r\n'))
@@ -268,6 +318,9 @@ const view = new EditorView({
   state: EditorState.create({ doc: '', extensions: extensions('\n') }),
   parent: document.getElementById('editor'),
 })
+// Scrolling alone is not an update CodeMirror reports, so the top line is
+// watched from the scroller as well. Only a line that moved is posted.
+view.scrollDOM.addEventListener('scroll', () => reportPlace(view), { passive: true })
 
 // WebKit keeps its own undo stack for the contenteditable. CodeMirror's history
 // is the only one that may act, so a native undo/redo (from WebKit's own ⌘Z
@@ -328,6 +381,12 @@ function setWidth(width) {
 }
 
 function load(args) {
+  // A reload of the same file after somebody else saved it (`keepLine`): the
+  // caret stays on its line and the view on its top line, rather than both going
+  // back to the start of the document every time the file is saved elsewhere.
+  const kept = args.keepLine === true
+    ? { line: topLineOf(view), caret: view.state.doc.lineAt(view.state.selection.main.head).number - 1 }
+    : null
   generation = args.generation
   seq = 0
   setLanguage(args.language)
@@ -340,6 +399,20 @@ function load(args) {
   // `text` arrives with its original line breaks. With the CRLF facet set,
   // CodeMirror splits only on `\r\n`; a `\n`-joined text would be one line.
   view.setState(EditorState.create({ doc: args.text, extensions: extensions(lineSeparator) }))
+  // What the file holds, for the changed-lines gutter. Sent only when it is not
+  // the buffer itself: a buffer handed over from the source editor with unsaved
+  // changes, or brought back after the page died.
+  if (typeof args.saved === 'string') view.dispatch({ effects: setBaseline.of(args.saved) })
+  placed = { line: -1, caret: -1 }
+  if (kept) {
+    scrollToLine(kept.line, kept.caret)
+  } else {
+    // Another document, or this one read afresh, starts at its top. The
+    // scroller is the same element across documents and would otherwise stay
+    // as far down as the last one was.
+    view.scrollDOM.scrollTop = 0
+    reportPlace(view)
+  }
   // A new document starts with nothing found in it, whatever the last one had.
   findQuery = null
   findMatches = []
@@ -349,10 +422,11 @@ function load(args) {
 }
 
 /// The saved baseline lives in Swift, which is what answers "is anything
-/// unsaved". Kept here too for the gutter of changed lines that M4 adds.
+/// unsaved". Kept here too, for the gutter of changed lines.
 let savedDoc = null
 function markSaved() {
   savedDoc = view.state.doc
+  view.dispatch({ effects: setBaseline.of(view.state.doc) })
 }
 
 function resync() {
@@ -385,6 +459,9 @@ const spike = {
   get seq() { return seq },
   get generation() { return generation },
   get savedDoc() { return savedDoc },
+  /// The lines the gutter marks, counted from zero.
+  get changedLines() { return changedLinesOf(view.state) },
+  get placed() { return placed },
   setHistoryKeymap(on) {
     view.dispatch({ effects: keys.reconfigure(on ? [keymap.of(historyKeymap), baseKeys] : baseKeys) })
   },
@@ -405,6 +482,7 @@ window.imarkEditor = {
   undo,
   redo,
   focus,
+  scrollToLine,
   find,
   findStep,
   findClear,

@@ -170,6 +170,22 @@ final class ContentViewController: NSViewController {
         place(text, saved: text)
     }
 
+    /// The file again, after it changed on disk under an editor with nothing
+    /// unsaved in it. Keeps the caret's line and the top line, so following a
+    /// file somebody else is saving does not throw the view back to the top on
+    /// every save. A file that has outgrown the editor it was in moves across,
+    /// still on its lines.
+    func reloadEditor(_ text: String) {
+        guard willBeLive(text) == isLiveActive else {
+            let kept = (top: editor.topLine, caret: editor.caretLine)
+            place(text, saved: text)
+            // As for ⇧⌘E: laid out at the width it is shown at first.
+            view.layoutSubtreeIfNeeded()
+            return editor.scrollTo(line: kept.top, caret: kept.caret)
+        }
+        editor.reload(text)
+    }
+
     /// ⇧⌘E. The buffer moves across as it is, unsaved changes and all, and stays
     /// unsaved: the other editor is told what the file holds as well as what the
     /// buffer does. Undo history does not survive the move.
@@ -184,19 +200,39 @@ final class ContentViewController: NSViewController {
         // so the gate is asked of the buffer, not of the file it came from.
         guard willBeLive(text) != wasLive else {
             prefersLive = wasLive
-            return LiveEditorView.isAvailable ? noteMixedBreaks() : NSSound.beep()
+            guard LiveEditorView.isAvailable else { return NSSound.beep() }
+            return note(liveRefusal(text) ?? .mixedBreaks)
         }
+        // The caret stays on its line and the view on its top line: the two
+        // editors count lines the same way.
+        let kept = (top: editor.topLine, caret: editor.caretLine)
         place(text, saved: saved)
         showEditor(true)
+        // On screen and laid out first: the source editor measures its lines
+        // at the width it is shown at.
+        view.layoutSubtreeIfNeeded()
+        editor.scrollTo(line: kept.top, caret: kept.caret)
+    }
+
+    /// Why a file cannot go into the Live editor, if it cannot.
+    private enum LiveRefusal { case mixedBreaks, tooLarge }
+
+    private func liveRefusal(_ text: String) -> LiveRefusal? {
+        // Bytes as the file has them, which is what the threshold was measured
+        // in, and asked first: it is the cheaper question.
+        if text.utf8.count > LiveEditorView.largeFileThreshold { return .tooLarge }
+        if LiveMirror.lineSeparator(of: text) == nil { return .mixedBreaks }
+        return nil
     }
 
     private func willBeLive(_ text: String) -> Bool {
-        prefersLive && LiveEditorView.isAvailable && LiveMirror.lineSeparator(of: text) != nil
+        prefersLive && LiveEditorView.isAvailable && liveRefusal(text) == nil
     }
 
     private func place(_ text: String, saved: String) {
-        let live = willBeLive(text)
-        if prefersLive, LiveEditorView.isAvailable, !live { noteMixedBreaks() }
+        let refusal = prefersLive && LiveEditorView.isAvailable ? liveRefusal(text) : nil
+        let live = prefersLive && LiveEditorView.isAvailable && refusal == nil
+        if let refusal { note(refusal) }
         let findWasInEditor = findsInEditor
         if live, liveEditor == nil { buildLiveEditor() }
         liveIsActive = live
@@ -208,12 +244,16 @@ final class ContentViewController: NSViewController {
         }
     }
 
-    /// The Live editor writes a file back exactly as it read it, and a file
-    /// mixing `\r\n` with lone `\n`, or using a bare `\r`, is one it cannot
-    /// (docs/LIVE-PREVIEW.md §6). Such a file is edited as source instead, and
-    /// this says why the editor is not the one the setting asked for.
-    private func noteMixedBreaks() {
-        flash(NSLocalizedString("Mixed line endings · editing as source", comment: ""))
+    /// Says why the editor is not the one the setting asked for. The Live
+    /// editor writes a file back exactly as it read it, and a file mixing
+    /// `\r\n` with lone `\n`, or using a bare `\r`, is one it cannot
+    /// (docs/LIVE-PREVIEW.md §6); a file past `largeFileThreshold` is one it
+    /// would edit too slowly (§5).
+    private func note(_ refusal: LiveRefusal) {
+        switch refusal {
+        case .mixedBreaks: flash(NSLocalizedString("Mixed line endings · editing as source", comment: ""))
+        case .tooLarge: flash(NSLocalizedString("Large file · editing as source", comment: ""))
+        }
     }
 
     private func buildLiveEditor() {
@@ -240,6 +280,10 @@ final class ContentViewController: NSViewController {
     }
 
     func flashNote(_ message: String) { flash(message) }
+
+    /// What the status bar's right-hand side says right now: the folder, or a
+    /// note flashed over it. For the tests.
+    var statusNote: String { statusRight.stringValue }
 
     // MARK: - Find
 

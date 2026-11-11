@@ -1314,6 +1314,30 @@ window.imark = {
       document.documentElement.dataset.width = width
     })
   },
+  /// The file line (from zero) of the block at the top of the window, under the
+  /// toolbar, for the editor to open on. The innermost block that starts at or
+  /// above that edge; in the gap after one, the line after it. Zero at the top.
+  topLine() {
+    if (window.scrollY <= 0) return 0
+    const edge = topInset() + 1
+    let found = null
+    for (const block of content().querySelectorAll('[data-line]')) {
+      const box = block.getBoundingClientRect()
+      if (!box.height) continue
+      if (box.top > edge) break
+      found = { range: lineRange(block), past: box.bottom <= edge }
+    }
+    if (!found?.range) return 0
+    return found.past ? found.range.end : found.range.start
+  },
+  /// The editor's top line, on the way back: the block holding it goes to the
+  /// top, at once, as a place rather than a jump.
+  scrollToLine(line) {
+    const block = blockAtLine(Math.max(0, Math.trunc(line) || 0) + 1)
+    stopGlide()
+    if (!block || block === content()) return window.scrollTo(0, 0)
+    window.scrollTo(0, reachable(block.getBoundingClientRect().top + window.scrollY - topInset()))
+  },
   setFrontMatter,
   setCommentingControls,
   setPreview(on) {
