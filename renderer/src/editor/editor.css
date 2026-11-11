@@ -3,6 +3,7 @@
    (tokens.css), and Swift sets the same `data-theme` / `data-width` / text size
    on this page as on the preview, from the same settings. */
 
+@import 'katex/dist/katex.min.css';
 @import '../tokens.css';
 
 :root {
@@ -198,7 +199,7 @@ html[data-theme] {
   color: var(--secondary);
 }
 
-/* Front matter: plain monospace until M3 draws its card. */
+/* Front matter while its source shows (the card is below). */
 #editor .cm-line.cm-live-frontmatter {
   font-family: var(--font-mono);
   font-size: 13.5px;
@@ -276,4 +277,257 @@ html[data-theme] {
 /* Acted on: still the record of what was asked, but no longer asking. */
 #editor .cm-live-note-resolved {
   opacity: 0.6;
+}
+
+/* ------------------------------------------------- the preview's blocks (M3b)
+   Tables, formulas, diagrams, diffs and the front-matter card are the
+   preview's own HTML (shared/markdown.js through markdown-it), so these are the
+   preview's rules from style.css, copied under `.cm-live-md` and no further:
+   that stylesheet selects bare elements (`table`, `code`, `img`) and could not
+   be loaded into a page whose own DOM is CodeMirror's. A block widget is
+   measured by its box, so the space around one is padding, never margin. */
+
+#editor .cm-live-md {
+  padding: calc(var(--step) * 2) 0;
+  font-family: var(--font-body);
+  line-height: 1.7;
+  cursor: default;
+}
+
+#editor .cm-live-md > :first-child { margin-top: 0; }
+#editor .cm-live-md > :last-child { margin-bottom: 0; }
+#editor .cm-live-md p { margin: 0; }
+
+#editor .cm-live-md a {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+#editor .cm-live-md code {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  background: var(--code-bg);
+  padding: 2px 5px;
+  border-radius: 5px;
+}
+
+#editor .cm-live-md mark {
+  background: var(--accent-soft);
+  color: inherit;
+  border-radius: 3px;
+  padding: 0 3px;
+}
+
+#editor .cm-live-md img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius);
+}
+
+/* tables */
+
+#editor .cm-live-md table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14.5px;
+  display: block;
+  overflow-x: auto;
+  margin: 0;
+}
+
+#editor .cm-live-md th,
+#editor .cm-live-md td {
+  padding: calc(var(--step) * 2) calc(var(--step) * 3);
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+
+#editor .cm-live-md th {
+  font-weight: 600;
+  color: var(--secondary);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-bottom-width: 1.5px;
+}
+
+/* math */
+
+#editor .cm-live-md .katex { font-size: 1.05em; }
+#editor .cm-live-md .katex-display { overflow-x: auto; overflow-y: hidden; padding: 4px 0; }
+#editor .cm-live-md .katex-block { display: block; }
+#editor .cm-live-md .katex-error { color: var(--note-red); }
+
+#editor .cm-live-math-inline {
+  display: inline;
+  padding: 0;
+  line-height: inherit;
+}
+
+/* The source of a formula while the caret is in it. */
+#editor .cm-live-mathsrc {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  color: var(--secondary);
+}
+
+/* diff */
+
+#editor .cm-live-md .code-wrap { position: relative; }
+
+#editor .cm-live-md .diff-block {
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  line-height: 1.55;
+  padding: calc(var(--step) * 2) 0;
+}
+
+#editor .cm-live-md .diff-row {
+  display: grid;
+  grid-template-columns: 3.5ch 3.5ch 1fr;
+  gap: calc(var(--step) * 2);
+  padding: 0 calc(var(--step) * 3);
+  min-width: max-content;
+}
+
+#editor .cm-live-md .diff-row code {
+  background: none;
+  padding: 0;
+  white-space: pre;
+}
+
+#editor .cm-live-md .diff-num {
+  user-select: none;
+  -webkit-user-select: none;
+  text-align: right;
+  color: var(--secondary);
+  opacity: 0.55;
+}
+
+#editor .cm-live-md .diff-add { background: color-mix(in srgb, var(--note-green) 13%, transparent); }
+#editor .cm-live-md .diff-del { background: color-mix(in srgb, var(--note-red) 13%, transparent); }
+#editor .cm-live-md .diff-add code::first-letter { color: var(--note-green); font-weight: 600; }
+#editor .cm-live-md .diff-del code::first-letter { color: var(--note-red); font-weight: 600; }
+#editor .cm-live-md .diff-hunk { background: var(--accent-soft); color: var(--secondary); }
+#editor .cm-live-md .diff-meta code { color: var(--secondary); }
+
+/* diagrams */
+
+#editor .cm-live-md .mermaid-block {
+  margin: 0;
+  text-align: center;
+  overflow-x: auto;
+  min-height: 3em;
+}
+
+#editor .cm-live-md .mermaid-block svg {
+  display: block;
+  margin: 0 auto;
+  width: calc(var(--size-body) / 16 * var(--natural-width, 0));
+  max-width: none;
+  height: auto;
+}
+
+#editor .cm-live-md .diagram-error {
+  text-align: left;
+  padding: calc(var(--step) * 4);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  color: var(--secondary);
+  font-size: 13px;
+}
+
+#editor .cm-live-md .diagram-error pre {
+  background: none;
+  border: 0;
+  padding: calc(var(--step) * 2) 0 0;
+  margin: 0;
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+
+/* front matter */
+
+#editor .cm-live-md .front-matter {
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: calc(var(--step) * 6) calc(var(--step) * 7);
+}
+
+#editor .cm-live-md .fm-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  line-height: 1.25;
+  font-size: 34px;
+  margin: 0;
+  letter-spacing: -0.022em;
+}
+
+#editor .cm-live-md .fm-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--step) * 2);
+  margin: calc(var(--step) * 4) 0 0;
+}
+
+#editor .cm-live-md .fm-row {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--step) * 1.5);
+  padding: calc(var(--step) * 1.5) calc(var(--step) * 3);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 12.5px;
+}
+
+#editor .cm-live-md .fm-row dt { color: var(--secondary); }
+#editor .cm-live-md .fm-row dt::after { content: ':'; }
+#editor .cm-live-md .fm-row dd { margin: 0; color: var(--text); }
+#editor .cm-live-md .fm-chip + .fm-chip::before { content: ', '; color: var(--secondary); }
+
+/* Put away from the View menu, by the preview's switch. The block is still in
+   the file and a caret that arrives shows it. */
+:root[data-front-matter='hidden'] #editor .cm-live-frontmatter-card { display: none; }
+
+/* images */
+
+#editor .cm-live-image {
+  max-width: 100%;
+  height: auto;
+  vertical-align: middle;
+  border-radius: var(--radius);
+  cursor: default;
+}
+
+/* An image that is not shown (remote, or not found): its words, in a dashed
+   box as the preview's blocked images are. */
+#editor .cm-live-image-blocked {
+  display: inline-block;
+  padding: 0 calc(var(--step) * 2);
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  color: var(--secondary);
+  font-size: 0.85em;
+}
+
+/* footnotes */
+
+#editor .cm-live-footnote {
+  color: var(--accent);
+  font-size: 0.75em;
+  line-height: 0;
+  cursor: default;
+}
+
+#editor .cm-live-footnote-def {
+  color: var(--secondary);
+  opacity: 0.8;
 }

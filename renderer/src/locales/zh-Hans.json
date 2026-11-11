@@ -23,5 +23,8 @@
   "Actual size": "实际大小",
   "Zoom in": "放大",
   "Fit": "适应",
-  "Fit to window": "适应窗口"
+  "Fit to window": "适应窗口",
+  "Double-click to show the source": "双击显示源码",
+  "Image": "图片",
+  "Remote images are not loaded": "不加载网络图片"
 }

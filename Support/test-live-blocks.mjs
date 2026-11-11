@@ -11,13 +11,16 @@
 
 import { EditorState, EditorSelection } from '../renderer/node_modules/@codemirror/state/dist/index.js'
 import { markdown, markdownLanguage } from '../renderer/node_modules/@codemirror/lang-markdown/dist/index.js'
-import { ensureSyntaxTree } from '../renderer/node_modules/@codemirror/language/dist/index.js'
+import { ensureSyntaxTree, syntaxTree as syntaxTreeOf } from '../renderer/node_modules/@codemirror/language/dist/index.js'
 import { history, undo, undoDepth } from '../renderer/node_modules/@codemirror/commands/dist/index.js'
 import { inlineExtensions } from '../renderer/src/editor/inline.js'
 import * as Live from '../renderer/src/editor/live.js'
 import * as Blocks from '../renderer/src/editor/blocks.js'
 import { toggleTask } from '../renderer/src/editor/tasks.js'
 import { notesIn } from '../renderer/src/editor/notes.js'
+import { displayMath } from '../renderer/src/editor/math-block.js'
+import { setDocumentPath, resolveFile, resolveHref } from '../renderer/src/editor/doc-path.js'
+import { createMarkdown, splitFrontMatter, renderFrontMatter } from '../renderer/src/shared/markdown.js'
 
 const { blockRanges, blockDeletion, revealBlock, renderContext, liveBlocks } = Blocks
 
@@ -351,7 +354,10 @@ const apply = (state, spec) => state.update(spec).state
 // --- The render context: the whole document, parsed once per version
 
 {
-  const doc = 'see [x][ref] and a note[^1]\n\n[ref]: http://r.test\n\n[^1]: the note\n'
+  // No footnote reference in it: one that the document defines needs the whole
+  // parse to be numbered, so it is parsed when the blocks are first found
+  // (footnotes, below). Everything else waits until a widget draws.
+  const doc = 'see [x][ref] and a note\n\n[ref]: http://r.test\n\n[^1]: the note\n'
   const s = stateFor(doc, 0)
   const before = Blocks.parseCount()
   const ctx = renderContext(s)
@@ -384,6 +390,288 @@ const apply = (state, spec) => state.update(spec).state
   for (const r of ranges) { if (r.from < end) overlap = true; end = Math.max(end, r.to) }
   check('blocks: no two ranges overlap', !overlap)
   check('blocks: plain data, nothing but numbers, strings and flags', ranges.every((r) => typeof r.from === 'number' && typeof r.type === 'string' && typeof r.source === 'string'))
+}
+
+
+// --- M3b: the widgets of the preview's own blocks
+
+/// The widgets the block field is drawing, in document order.
+const widgetsOf = (state) => {
+  const found = []
+  state.field(Blocks.blockField).decorations.between(0, state.doc.length, (from, to, value) => {
+    found.push({ from, to, widget: value.spec.widget })
+  })
+  return found
+}
+const textOf = (state, items) => texts(state, items)
+
+// --- Tables
+
+{
+  const doc = '# T\n\n| a | b |\n|---|:-:|\n| 1 | **2** |\n\nafter\n'
+  const s = stateFor(doc, 'end')
+  const tables = ofType(s, 'table')
+  check('table: one block, whole lines from the header to the last row', tables.length === 1 && tables[0].source === '| a | b |\n|---|:-:|\n| 1 | **2** |', JSON.stringify(tables.map((t) => t.source)))
+  check('table: a block widget, revealed by lines, not atomic', tables[0].block && tables[0].reveal === 'lines' && !tables[0].atomic && !tables[0].revealed)
+  const html = renderContext(s).render(tables[0].source)
+  check('table: rendered by the preview\'s markdown-it, alignment and inline markup included',
+    html.includes('<table') && html.includes('<strong>2</strong>') && /text-align:center/.test(html), html)
+  for (const [name, caret] of [['header', at(doc, '| a')], ['delimiter row', at(doc, '|---')], ['last row', at(doc, '| 1') + 4], ['its end', at(doc, '**2** |') + 7]]) {
+    check(`table: the caret on the ${name} shows its source`, ofType(stateFor(doc, caret), 'table')[0].revealed)
+  }
+  check('table: and the line after does not', !ofType(stateFor(doc, at(doc, 'after')), 'table')[0].revealed)
+  check('table: the line before does not', !ofType(stateFor(doc, 1), 'table')[0].revealed)
+
+  const nested = '- item\n\n  | a | b |\n  |---|---|\n  | 1 | 2 |\n\n> | a | b |\n> |---|---|\n> | 1 | 2 |\n\n```\n| a | b |\n|---|---|\n```\n\n    | a | b |\n    |---|---|\n\nz'
+  check('table: none inside a list, a quote, a fence or indented code', ofType(stateFor(nested, 'end'), 'table').length === 0, JSON.stringify(ofType(stateFor(nested, 'end'), 'table').map((t) => t.source)))
+  check('table: a line with pipes and no delimiter row is not one', ofType(stateFor('| a | b |\n| c | d |\n\nz', 'end'), 'table').length === 0)
+
+  const crlf = '| a | b |\r\n|---|---|\r\n| 1 | 2 |\r\n\r\nz'
+  const c = stateFor(crlf, 'end', true)
+  const t = ofType(c, 'table')[0]
+  check('table: CRLF — positions are CodeMirror\'s, the source has no \\r', t && t.from === 0 && t.to === 29 && !t.source.includes('\r'), JSON.stringify(t))
+  check('table: CRLF — the caret on a row reveals it', ofType(stateFor(crlf, at(crlf, '| 1'), true), 'table')[0].revealed)
+  const grown = apply(s, { changes: { from: at(doc, '| 1'), insert: '| 0 | 0 |\n' } })
+  const [before, after] = [widgetsOf(s).find((w) => w.widget.constructor.name === 'TableWidget'), widgetsOf(grown).find((w) => w.widget.constructor.name === 'TableWidget')]
+  check('table: a changed table is a different widget, an unchanged one keeps its DOM',
+    !before.widget.eq(after.widget) && before.widget.eq(widgetsOf(apply(s, { changes: { from: 0, insert: 'x' } })).find((w) => w.widget.constructor.name === 'TableWidget').widget))
+}
+
+// --- Display math
+
+{
+  const doc = 'a\n\n$$x^2$$\n\nb\n\n$$\n\\begin{aligned}\n- a &= 1 \\\\\n# b &= 2\n\\end{aligned}\n$$\n\nc\n'
+  const s = stateFor(doc, 'end')
+  const math = ofType(s, 'math')
+  check('math: a one-line and a multi-line formula, the inside not read as Markdown',
+    same(math.map((m) => m.source), ['$$x^2$$', '$$\n\\begin{aligned}\n- a &= 1 \\\\\n# b &= 2\n\\end{aligned}\n$$']), JSON.stringify(math.map((m) => m.source)))
+  check('math: blocks revealed by lines', math.every((m) => m.block && m.reveal === 'lines' && !m.revealed))
+  check('math: the caret anywhere inside the multi-line formula shows it', ofType(stateFor(doc, at(doc, '# b')), 'math')[1].revealed)
+  check('math: the line after does not', !ofType(stateFor(doc, at(doc, 'c\n')), 'math')[1].revealed)
+  const html = renderContext(s).render(math[0].source, { bare: true })
+  check('math: rendered through the preview pipeline (math.js, KaTeX)', html.includes('katex-block') && html.includes('class="katex'), html)
+
+  const found = (text) => displayMath(stateFor(text, 'end')).map((r) => text.slice(r.from, r.to))
+  check('math: text before the opener on the same paragraph — the plugin lets $$ interrupt it', same(found('text\n$$\nx\n$$\n'), ['$$\nx\n$$']))
+  check('math: two $$ on the first line is a sentence, not a block', same(found('$$a$$ and $$b$$\n'), []))
+  check('math: an opener never closed is left as text (the preview would take the rest of the file)', same(found('$$\nx\n\nmore text\n'), []))
+  check('math: the closer may carry text — the plugin ends the formula at the line', same(found('$$\nx\n$$ trailing\n\nz'), ['$$\nx\n$$ trailing']))
+  check('math: $$ in a fence, a list, a quote or indented code is not a block', same(found('```\n$$\nx\n$$\n```\n\n- a\n\n  $$\n  x\n  $$\n\n> $$\n> x\n> $$\n\n    $$\n    x\n    $$\n'), []), JSON.stringify(found('```\n$$\nx\n$$\n```\n')))
+  check('math: up to three spaces of indentation open one', same(found('   $$x$$\n'), ['   $$x$$']))
+  check('math: none in front matter or a note', same(found('---\ntitle: $$x$$\n---\n\n<!-- imark by="a"\n$$x$$\n-->\n'), []), JSON.stringify(found('---\ntitle: $$x$$\n---\n\n<!-- imark by="a"\n$$x$$\n-->\n')))
+
+  const broken = '$$\\frac{1}{$$\n\nz'
+  const b = stateFor(broken, 'end')
+  let html2 = ''
+  let threw = false
+  try { html2 = renderContext(b).render(ofType(b, 'math')[0].source, { bare: true }) } catch { threw = true }
+  check('math: TeX KaTeX cannot read shows the preview\'s error styling and does not throw', !threw && html2.includes('katex-error'), html2)
+
+  const crlf = 'a\r\n\r\n$$\r\nx\r\n$$\r\n\r\nz'
+  const c = stateFor(crlf, 'end', true)
+  const m = ofType(c, 'math')[0]
+  check('math: CRLF — the range is CodeMirror\'s, the source has \\n', m && m.from === 3 && m.source === '$$\nx\n$$' && m.to === 10, JSON.stringify(m))
+  check('math: CRLF — the caret in it reveals', ofType(stateFor(crlf, at(crlf, 'x\r\n$$'), true), 'math')[0].revealed)
+}
+
+// --- Inline math: the delimiter rules are math.js's
+
+{
+  // Each sample is parsed by the preview's markdown-it and by the editor's Lezer
+  // extension, and the formulas each finds must be the same.
+  const { md } = createMarkdown()
+  const previewMath = (text) => {
+    const out = []
+    const walk = (tokens) => {
+      for (const tok of tokens) {
+        if (tok.type === 'math_inline') out.push(`$${tok.content}$`)
+        if (tok.children) walk(tok.children)
+      }
+    }
+    walk(md.parse(text, {}))
+    return out
+  }
+  const editorMath = (text) => {
+    const s = stateFor(text, 'end')
+    const out = []
+    syntaxTreeOf(s).iterate({ enter(ref) { if (ref.name === 'InlineMath') out.push(s.sliceDoc(ref.from, ref.to)) } })
+    return out
+  }
+  const samples = [
+    '$x$', 'a $x$ b', 'cost $5 and $6 today', 'cost $5 and $x$ today', '\\$x\\$', '\\$x$', '$x\\$', 'a$x$b', '$x$b', 'a$x$', '2$x$', '$x$2',
+    '$ x$', '$x $', '$ x $', '($x$)', '$x$.', '$x$,', '$x$_', '_$x$_', '$$', '$$$', '$$$$', '$a$$b$', '$a$ $b$', '$a\nb$', '$a\n\nb$',
+    '`$x$`', '$a `b$` c', '`a` $x$ `b`', 'x $$y$$ z', '$$y$$', '$x_1 + y_2$', '$a*b*c$', '$\\{x\\}$', '[$x$](u)', '**$x$**', '$x$ and $$y$$ and $z$',
+    '$1$', '$1.5$', 'a $$ x $$ $y$', '\\\\$x$', '\\\\\\$x$', 'é$x$', '$x$é', '日本$x$語', '$x$ $', '$', 'a $ b $ c',
+  ]
+  const bad = []
+  for (const text of samples) {
+    const a = previewMath(text)
+    const b = editorMath(text)
+    if (!same(a, b)) bad.push(`${JSON.stringify(text)}: preview ${JSON.stringify(a)} editor ${JSON.stringify(b)}`)
+  }
+  check(`math inline: ${samples.length} samples find exactly the formulas math.js finds`, bad.length === 0, '\n  ' + bad.join('\n  '))
+
+  const doc = 'a $x^2$ b and `$not$` and \\$esc\\$ and $5 or $6\n'
+  const s = stateFor(doc, 'end')
+  const inline = ofType(s, 'math-inline')
+  check('math inline: an inline replace, revealed by range', same(texts(s, inline), ['$x^2$']) && !inline[0].block && inline[0].reveal === 'range')
+  check('math inline: the caret in or beside it shows the source; a space away does not',
+    ofType(stateFor(doc, at(doc, 'x^2') + 1), 'math-inline')[0].revealed && ofType(stateFor(doc, at(doc, '$x^2$')), 'math-inline')[0].revealed
+    && !ofType(stateFor(doc, at(doc, '$x^2$') - 1), 'math-inline')[0].revealed)
+  const html = renderContext(s).render('$x^2$', { bare: true })
+  check('math inline: rendered by KaTeX through the preview', /<span class="katex"/.test(html), html)
+  const bad2 = renderContext(s).render('$\\frac{$', { bare: true })
+  check('math inline: broken TeX shows the error styling and does not throw', bad2.includes('katex-error'), bad2)
+  const decos = Live.liveDecorations(stateFor(doc, 'end'), [{ from: 0, to: doc.length }])
+  check('math inline: nothing is decorated inside a drawn formula', !decos.some((i) => i.from > at(doc, '$x^2$') && i.to <= at(doc, '$x^2$') + 5))
+}
+
+// --- Mermaid and diff fences
+
+{
+  const doc = 'a\n\n```mermaid\ngraph TD\n  A-->B\n```\n\n~~~mermaid theme=x\nflowchart LR\n~~~\n\n```diff\n- old\n+ new\n```\n\n```js\nlet a\n```\n\n- item\n\n  ```mermaid\n  graph TD\n  ```\n\nz\n'
+  const s = stateFor(doc, 'end')
+  const mer = ofType(s, 'mermaid')
+  check('mermaid: top-level mermaid fences, ``` and ~~~, and only those', mer.length === 2 && mer[0].source.startsWith('```mermaid') && mer[1].source.startsWith('~~~mermaid'), JSON.stringify(mer.map((m) => m.source)))
+  check('mermaid: the diagram source is the fence\'s content', mer[0].data.code === 'graph TD\n  A-->B' && mer[1].data.code === 'flowchart LR', JSON.stringify(mer.map((m) => m.data)))
+  check('mermaid: blocks, revealed by lines', mer.every((m) => m.block && m.reveal === 'lines' && !m.revealed))
+  check('mermaid: the caret inside the fence shows it', ofType(stateFor(doc, at(doc, 'A-->B')), 'mermaid')[0].revealed)
+  const diff = ofType(s, 'diff')
+  check('diff: one block, the ```diff fence', diff.length === 1 && diff[0].source === '```diff\n- old\n+ new\n```', JSON.stringify(diff.map((d) => d.source)))
+  check('diff: other languages and fences in a list are left alone', ofType(s, 'mermaid').length === 2 && ofType(s, 'diff').length === 1)
+  const html = renderContext(s).render(diff[0].source, { bare: true })
+  check('diff: rendered by renderDiff, rows tinted', html.includes('diff-block') && html.includes('diff-del') && html.includes('diff-add'), html)
+  check('diff: the caret on the fence shows it', ofType(stateFor(doc, at(doc, '- old')), 'diff')[0].revealed)
+
+  const crlf = '```mermaid\r\ngraph TD\r\n```\r\n\r\n```diff\r\n-a\r\n```\r\n\r\nz'
+  const c = stateFor(crlf, 'end', true)
+  check('mermaid and diff: CRLF — sources have \\n and ranges are CodeMirror\'s',
+    ofType(c, 'mermaid')[0].data.code === 'graph TD' && ofType(c, 'mermaid')[0].to === 23 && ofType(c, 'diff')[0].source === '```diff\n-a\n```', JSON.stringify([ofType(c, 'mermaid'), ofType(c, 'diff')]))
+  const unclosed = '```mermaid\ngraph TD\n'
+  check('mermaid: an unclosed fence is a fence to the end of the file, as in the preview', ofType(stateFor(unclosed, 'end'), 'mermaid').length === 1)
+
+  // The theme is part of what a diagram is: the same source in another palette
+  // is another widget, so a change of theme draws it again.
+  globalThis.document = { documentElement: { dataset: { theme: 'paper-light' } } }
+  const light = widgetsOf(stateFor(doc, 'end')).find((w) => w.widget.constructor.name === 'MermaidWidget').widget
+  const light2 = widgetsOf(stateFor(doc, 'end')).find((w) => w.widget.constructor.name === 'MermaidWidget').widget
+  globalThis.document.documentElement.dataset.theme = 'paper-dark'
+  const dark = widgetsOf(stateFor(doc, 'end')).find((w) => w.widget.constructor.name === 'MermaidWidget').widget
+  delete globalThis.document
+  check('mermaid: the same diagram in the same theme keeps its DOM', light.eq(light2))
+  check('mermaid: a different theme is a different widget', !light.eq(dark))
+  check('mermaid: a height is guessed before the first drawing', light.estimatedHeight > 0)
+}
+
+// --- Images
+
+{
+  setDocumentPath('/Users/me/Notes/doc.md')
+  const doc = 'a ![alt *text*](img/a%20b.png "Title") b ![](../up.png) c ![r][ref] d ![w](https://x.test/p.png) e ![d](data:image/png;base64,AAAA)\n\n[ref]: img/r.png\n'
+  const s = stateFor(doc, 'end')
+  const images = ofType(s, 'image')
+  check('image: each inline image, the reference one left as source',
+    images.length === 4 && images.every((i) => !i.block && i.reveal === 'range' && !i.atomic) && !texts(s, images).some((t) => t.includes('[ref]')), JSON.stringify(texts(s, images)))
+  check('image: alt and title come out of the source', images[0].data.alt === 'alt *text*' && images[0].data.title === 'Title' && images[1].data.alt === '' && images[1].data.title === '')
+  const srcs = widgetsOf(s).filter((w) => w.widget.constructor.name === 'ImageWidget').map((w) => w.widget.src)
+  check('image: src is relative to the document\'s folder, through imark://file',
+    srcs[0] === 'imark://file/Users/me/Notes/img/a%20b.png' && srcs[1] === 'imark://file/Users/me/up.png', JSON.stringify(srcs))
+  check('image: a remote src is kept as written (the widget shows its alt text instead of loading it)', srcs[2] === 'https://x.test/p.png' && srcs[3].startsWith('data:'))
+  check('image: the caret in or beside it shows the source',
+    ofType(stateFor(doc, at(doc, 'alt')), 'image')[0].revealed && ofType(stateFor(doc, at(doc, '![alt')), 'image')[0].revealed
+    && !ofType(stateFor(doc, at(doc, '![alt') - 2), 'image')[0].revealed)
+
+  // The same rules as the preview's: shared/markdown.js is given main.js's
+  // resolveFile, and doc-path.js is a copy of it.
+  const { md } = createMarkdown({ resolveFile })
+  const samples = ['p.png', './p.png', '../p.png', 'a/../b/p.png', '/abs/p.png', 'a b.png', 'a%20b.png', 'a%3Fb.png', 'p.png?raw=true', 'p.png#frag', '#frag', '?plain=1#L3', 'https://x.test/a.png', 'data:image/png;base64,AA', 'imark://file/x', 'é/日本.png', '100%.png', '../../../../../p.png']
+  const bad = []
+  for (const sample of samples) {
+    const html = md.render(`![a](<${sample}>)`)
+    const expected = /src="([^"]*)"/.exec(html)?.[1]?.replace(/&amp;/g, '&')
+    if (expected !== resolveHref(sample)) bad.push(`${sample}: preview ${expected} editor ${resolveHref(sample)}`)
+  }
+  check(`image: ${samples.length} paths resolve exactly as the preview resolves them`, bad.length === 0, '\n  ' + bad.join('\n  '))
+  setDocumentPath('/Other/doc.md')
+  const moved = widgetsOf(stateFor(doc, 'end')).find((w) => w.widget.constructor.name === 'ImageWidget').widget
+  check('image: a widget made for another folder is not equal (the path is part of it)', !moved.eq(widgetsOf(s).find((w) => w.widget.constructor.name === 'ImageWidget').widget))
+  setDocumentPath('')
+}
+
+// --- Footnotes
+
+{
+  const doc = 'one[^b] two[^a] again[^b] third[^b] missing[^zz] `code[^a]`\n\n[^a]: first\n[^b]: second\n  more\n\nx[^a]: not a definition\n'
+  const s = stateFor(doc, 'end')
+  const notes = ofType(s, 'footnote')
+  const captions = notes.map((n) => n.data.caption)
+  check('footnote: numbered by first use, a second use is n:1 — and only defined notes', same(captions, ['[1]', '[2]', '[1:1]', '[1:2]', '[2:1]']), JSON.stringify(captions))
+  const definitions = [at(doc, '[^a]: first'), at(doc, '[^b]: second')]
+  check('footnote: inline, revealed by range; the definitions are not references',
+    notes.every((n) => !n.block && n.reveal === 'range') && !notes.some((n) => definitions.includes(n.from)))
+  // The preview's own numbers for the same document.
+  const html = createMarkdown().renderDocument(doc).html
+  const preview = [...html.matchAll(/<sup class="footnote-ref"><a [^>]*>(\[[^\]]*\])<\/a><\/sup>/g)].map((m) => m[1])
+  check('footnote: the numbers are the ones the preview prints', same(captions, preview), `${JSON.stringify(captions)} vs ${JSON.stringify(preview)}`)
+  check('footnote: the caret in a reference shows the source; away from it does not',
+    ofType(stateFor(doc, at(doc, '[^a]') + 2), 'footnote')[1].revealed && !ofType(stateFor(doc, 'end'), 'footnote')[1].revealed)
+  check('footnote: a [^x] with no definition is not a widget', !texts(s, notes).includes('[^zz]') && texts(s, notes).length === 5)
+
+  // `[^b]` is the first note used in one document and the second in the other:
+  // the same source with another number is another widget, so a note added
+  // above renumbers every reference below it on screen.
+  const doc2 = '[^b] x[^a]\n\n[^a]: A\n[^b]: B\n'
+  const doc3 = '[^a] x[^b]\n\n[^a]: A\n[^b]: B\n'
+  const w2 = widgetsOf(stateFor(doc2, 'end')).map((w) => w.widget)
+  const w3 = widgetsOf(stateFor(doc3, 'end')).map((w) => w.widget)
+  check('footnote: the same source with another number is not the same widget', !w2[0].eq(w3[1]) && !w2[1].eq(w3[0]))
+  check('footnote: the same source and number is', w2[0].eq(w3[0]) === false && w2[0].eq(widgetsOf(stateFor(doc2 + '\nmore', 'end')).map((w) => w.widget)[0]))
+  const decos = Live.liveDecorations(stateFor(doc, 'end'), [{ from: 0, to: doc.length }])
+  check('footnote: definitions get their quiet class, whole', decos.some((i) => i.class === 'cm-live-footnote-def' && i.from === at(doc, '[^a]: first')))
+  check('footnote: and a use that happens to start a paragraph does not', !decos.some((i) => i.class === 'cm-live-footnote-def' && i.from === at(doc, 'x[^a]')))
+}
+
+// --- Front matter
+
+{
+  const doc = '---\ntitle: Hello\ntags: [a, b]\n---\n\n# Real\n'
+  const s = stateFor(doc, 'end')
+  const fm = ofType(s, 'front-matter')
+  check('front matter: one block, from the first --- to the closing one', fm.length === 1 && fm[0].from === 0 && fm[0].source === '---\ntitle: Hello\ntags: [a, b]\n---', JSON.stringify(fm.map((f) => f.source)))
+  check('front matter: a block widget revealed by lines', fm[0].block && fm[0].reveal === 'lines' && !fm[0].revealed)
+  check('front matter: the caret on any of its lines shows the source', [1, 8, 20, at(doc, '---\n\n#')].every((pos) => ofType(stateFor(doc, pos), 'front-matter')[0].revealed))
+  check('front matter: the line after it does not', !ofType(stateFor(doc, at(doc, '# Real')), 'front-matter')[0].revealed)
+  const card = renderFrontMatter(splitFrontMatter(doc).data)
+  check('front matter: the preview\'s card for it', card.includes('class="front-matter"') && card.includes('Hello') && card.includes('fm-chip'), card)
+  check('front matter: broken YAML is Markdown and no card', ofType(stateFor('---\n: : [\n---\n\nbody', 'end'), 'front-matter').length === 0)
+  check('front matter: only at the very top', ofType(stateFor('x\n\n---\ntitle: x\n---\n\nz', 'end'), 'front-matter').length === 0)
+  check('front matter: nothing to show (only imark:) is no card', ofType(stateFor('---\nimark: {a: 1}\n---\n\nz', 'end'), 'front-matter').length === 0)
+  const crlf = '---\r\ntitle: x\r\n---\r\n\r\nbody'
+  const c = stateFor(crlf, 'end', true)
+  check('front matter: CRLF — the range is CodeMirror\'s', ofType(c, 'front-matter')[0]?.to === 16 && ofType(c, 'front-matter')[0].source === '---\ntitle: x\n---', JSON.stringify(ofType(c, 'front-matter')))
+  check('front matter: a note inside it is a value, not a card', ofType(stateFor('---\ntitle: x\nnote: "<!-- imark by=a\\n-->"\n---\n\nz', 'end'), 'note').length === 0)
+}
+
+// --- M3b: the document never changes
+
+{
+  const doc = '---\r\ntitle: T\r\n---\r\n\r\n# H\r\n\r\n| a | b |\r\n|---|---|\r\n| 1 | $x$ |\r\n\r\n$$\r\nx^2\r\n$$\r\n\r\n```mermaid\r\ngraph TD\r\n```\r\n\r\n```diff\r\n-a\r\n+b\r\n```\r\n\r\n![i](p.png) and $y$ and a note[^1]\r\n\r\n[^1]: the note\r\n\r\n<!-- imark by="z"\r\nnote\r\n-->\r\n'
+  let s = stateFor(doc, 0, true)
+  const kinds = new Set(blockRanges(s).map((b) => b.type))
+  let ok = s.sliceDoc() === doc
+  for (let pos = 0; pos <= s.doc.length; pos++) {
+    s = apply(s, { selection: { anchor: pos } })
+    blockRanges(s)
+    widgetsOf(s)
+    ok = ok && s.sliceDoc() === doc
+  }
+  s = apply(s, { selection: { anchor: 0 }, effects: Blocks.restyle.of(null) })
+  check('m3b fidelity: a document with every kind of block — every caret position, a restyle — and sliceDoc() is the file',
+    ok && s.sliceDoc() === doc && ['front-matter', 'table', 'math', 'mermaid', 'diff', 'image', 'footnote', 'math-inline', 'note'].every((k) => kinds.has(k)), [...kinds].join(','))
+  let overlap = false
+  let end = -1
+  for (const r of blockRanges(s)) { if (r.from < end) overlap = true; end = Math.max(end, r.to) }
+  check('m3b fidelity: and no two blocks overlap', !overlap)
 }
 
 // --- Fidelity: moving the selection never changes the document

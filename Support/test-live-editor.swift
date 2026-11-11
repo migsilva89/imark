@@ -82,6 +82,10 @@ enum LiveEditorTest {
         try noCommentIsWrittenUnderABuffer()
         try aTaskBoxTicksTheBufferNotTheFile()
         try aNoteIsACardUntilDoubleClicked()
+        try theWidgetsOfTheReadingViewAreDrawn()
+        try imagesAreFoundBesideTheDocument()
+        try aTableGivesWayToItsSource()
+        try theFrontMatterCardFollowsTheSwitch()
         try aMirrorCatchingUpIsNeitherSavedNorSwitched()
         linksFromTheEditorGoWhereThePreviewsGo()
 
@@ -636,6 +640,180 @@ enum LiveEditorTest {
         window.undoComment(nil)
         check("and one ⌘Z brings it back", until { window.content.editor.text == original && !window.content.editor.isDirty },
               window.content.editor.text.debugDescription)
+        finish(window)
+    }
+
+    // MARK: - M3b: the preview's blocks, in the real web view
+
+    static let widgetDocument = """
+        ---
+        title: A Title
+        tags: [one, two]
+        ---
+
+        # Widgets
+
+        | name | value |
+        |------|:-----:|
+        | **a** | 1 |
+        | b | 2 |
+
+        $$
+        \\sum_{i=1}^{n} i = \\frac{n(n+1)}{2}
+        $$
+
+        Inline $x^2$ and a footnote[^1] and a price of $5 or $6.
+
+        ```mermaid
+        graph TD
+          A --> B
+        ```
+
+        ```diff
+        - old
+        + new
+        ```
+
+        [^1]: The note.
+
+        """
+
+    /// Tables, formulas, diagrams, diffs, footnotes and the front matter are
+    /// drawn by the preview's own pipeline: real DOM, with the preview's classes,
+    /// and not one byte of the document touched.
+    static func theWidgetsOfTheReadingViewAreDrawn() throws {
+        print("▸ tables, formulas, diagrams, diffs, footnotes and front matter in the Live editor")
+        let original = widgetDocument
+        let url = fixture(original, named: "widgets.md")
+        let window = open(url)
+        guard startEditing(window, expecting: original) else { return check("the page has the file", false) }
+        // The caret at the very end, off every widget.
+        js(window, "const v = window.imarkEditor.__spike.view; v.dispatch({selection: {anchor: v.state.doc.length}}); return 0")
+        let count = { (selector: String) -> Int in
+            js(window, "return document.querySelectorAll(selector).length", ["selector": selector]) as? Int ?? -1
+        }
+        check("the table is a real <table> with the preview's cells",
+              until { count(".cm-live-md.cm-live-table table th") == 2 && count(".cm-live-md.cm-live-table table td") == 4 },
+              "\(count(".cm-live-table table"))")
+        check("its markup is the preview's: bold in a cell, alignment on a column",
+              (js(window, "const t = document.querySelector('.cm-live-table table'); return t.querySelector('strong') !== null && /center/.test(t.innerHTML)") as? Bool) == true)
+        check("a display formula is KaTeX markup", until { count(".cm-live-math .katex-display .katex") == 1 }, "\(count(".cm-live-math .katex"))")
+        check("an inline formula sits in the line, and $5 or $6 is not one",
+              until { count(".cm-line .cm-live-math-inline .katex") == 1 }, "\(count(".cm-live-math-inline"))")
+        check("the footnote reference is a superscript with the preview's number",
+              (js(window, "return document.querySelector('sup.cm-live-footnote')?.textContent") as? String) == "[1]")
+        check("the front matter is the preview's card",
+              (js(window, "return document.querySelector('.cm-live-frontmatter-card .fm-title')?.textContent") as? String) == "A Title"
+                && count(".cm-live-frontmatter-card .fm-chip") == 2)
+        check("the mermaid fence is drawn as an SVG, not left as an empty box",
+              until(15) { count(".cm-live-diagram .mermaid-block.is-rendered svg") == 1 }, "\(count(".cm-live-diagram .mermaid-block"))")
+        check("and sized by zoom.js's sizeDiagram",
+              (js(window, "return document.querySelector('.cm-live-diagram svg')?.style.getPropertyValue('--natural-width') !== ''") as? Bool) == true)
+        check("none of it is an edit", !window.content.editor.isDirty && window.content.editor.text == original
+                && bytes(url) == Data(original.utf8))
+        check("and the page's text is the file", samePage(window, original))
+
+        // CodeMirror draws what is on screen; the rest of the page is below.
+        let toEnd = { js(window, "const s = window.imarkEditor.__spike.view.scrollDOM; s.scrollTop = s.scrollHeight; return 0") }
+        toEnd()
+        check("the diff is the preview's diff block",
+              until { toEnd(); return count(".cm-live-diff .diff-block .diff-add") == 1 && count(".cm-live-diff .diff-del") == 1 },
+              "\(count(".cm-live-diff"))")
+
+        // A formula KaTeX cannot read, and a diagram Mermaid cannot read: the
+        // preview's error styling, and the editor goes on.
+        js(window, """
+            const v = window.imarkEditor.__spike.view;
+            v.dispatch({changes: {from: v.state.doc.length, insert: '\\n$$\\\\frac{1}{$$\\n\\n```mermaid\\nnot a diagram at all\\n```\\n'}});
+            return 0
+            """)
+        check("broken TeX shows the preview's error styling", until { toEnd(); return count(".cm-live-math .katex-error") == 1 }, "\(count(".katex-error"))")
+        check("an invalid diagram shows the localized error box",
+              until(15) { toEnd(); return count(".cm-live-diagram .diagram-error") == 1 }, "\(count(".diagram-error"))")
+        finish(window)
+    }
+
+    /// An image is found where the preview finds it: beside the document.
+    static func imagesAreFoundBesideTheDocument() throws {
+        print("▸ images in the Live editor resolve against the document")
+        // A 1x1 PNG, so that the scheme handler's answer can be told from a miss.
+        let png = Data(base64Encoded: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")!
+        try FileManager.default.createDirectory(at: folder.appendingPathComponent("pics"), withIntermediateDirectories: true)
+        try png.write(to: folder.appendingPathComponent("pics/dot.png"))
+        let original = "# Pictures\n\n![a dot](pics/dot.png \"Dot\") and ![remote](https://example.com/x.png) and ![gone](pics/nothing.png)\n\nend\n"
+        let url = fixture(original, named: "images.md")
+        let window = open(url)
+        guard startEditing(window, expecting: original) else { return check("the page has the file", false) }
+        js(window, "const v = window.imarkEditor.__spike.view; v.dispatch({selection: {anchor: v.state.doc.length}}); return 0")
+        let src = { js(window, "return document.querySelector('img.cm-live-image')?.src") as? String }
+        let expected = js(window, "return 'imark://file' + (dir + '/pics/dot.png').split('/').map(encodeURIComponent).join('/')",
+                          ["dir": folder.path]) as? String
+        check("the image's src is the document's folder through imark://file", until { src() != nil && src() == expected },
+              "\(src() ?? "nil") vs \(expected ?? "nil")")
+        check("and the scheme handler serves it", until {
+            (js(window, "const i = document.querySelector('img.cm-live-image'); return !!i && i.complete && i.naturalWidth === 1") as? Bool) == true
+        })
+        check("its alt and title are kept",
+              (js(window, "const i = document.querySelector('img.cm-live-image'); return [i.alt, i.title]") as? [String]) == ["a dot", "Dot"])
+        check("a remote image is not loaded: its alt text stands in, no <img>",
+              until {
+                  (js(window, """
+                      const w = [...document.querySelectorAll('.cm-live-image-blocked')].map((e) => e.textContent);
+                      return w.includes('remote') && ![...document.querySelectorAll('img')].some((i) => i.src.startsWith('http'))
+                      """) as? Bool) == true
+              })
+        check("and so does a local file that is not there",
+              until {
+                  (js(window, "return [...document.querySelectorAll('.cm-live-image-blocked')].map((e) => e.textContent).includes('gone')") as? Bool) == true
+              })
+        check("none of it touches the document", !window.content.editor.isDirty && bytes(url) == Data(original.utf8))
+        finish(window)
+    }
+
+    /// The caret coming onto a table turns it back into its lines.
+    static func aTableGivesWayToItsSource() throws {
+        print("▸ the caret entering a table shows its source")
+        let original = "before\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\nafter\n"
+        let url = fixture(original, named: "table-reveal.md")
+        let window = open(url)
+        guard startEditing(window, expecting: original) else { return check("the page has the file", false) }
+        let tables = { js(window, "return document.querySelectorAll('.cm-live-table table').length") as? Int ?? -1 }
+        let lines = { js(window, "return [...document.querySelectorAll('.cm-line')].map((l) => l.textContent)") as? [String] ?? [] }
+        js(window, "window.imarkEditor.__spike.view.dispatch({selection: {anchor: 0}}); return 0")
+        check("with the caret above, the table is drawn", until { tables() == 1 })
+        check("and its pipes are not on the page", !lines().contains("| a | b |"), "\(lines())")
+        let into = original.distance(from: original.startIndex, to: original.range(of: "| 1")!.lowerBound) + 4
+        js(window, "window.imarkEditor.__spike.view.dispatch({selection: {anchor: pos}}); return 0", ["pos": into])
+        check("the caret in a row turns the table into its lines", until { tables() == 0 && lines().contains("| a | b |") && lines().contains("|---|---|") },
+              "\(lines())")
+        js(window, "const v = window.imarkEditor.__spike.view; v.dispatch({selection: {anchor: v.state.doc.length}}); return 0")
+        check("and it is drawn again when the caret leaves", until { tables() == 1 })
+        check("moving through it changed nothing", !window.content.editor.isDirty && bytes(url) == Data(original.utf8)
+                && samePage(window, original))
+        finish(window)
+    }
+
+    /// View > Front Matter puts the card away in the editor as in the preview.
+    static func theFrontMatterCardFollowsTheSwitch() throws {
+        print("▸ the front matter card follows View > Front Matter")
+        let original = "---\ntitle: Card\n---\n\nbody\n"
+        let url = fixture(original, named: "front-matter-switch.md")
+        Settings.showsFrontMatter = true
+        let window = open(url)
+        guard startEditing(window, expecting: original) else { return check("the page has the file", false) }
+        js(window, "const v = window.imarkEditor.__spike.view; v.dispatch({selection: {anchor: v.state.doc.length}}); return 0")
+        let shown = { js(window, """
+            const c = document.querySelector('.cm-live-frontmatter-card');
+            return c ? getComputedStyle(c).display !== 'none' : false
+            """) as? Bool }
+        check("shown, the card is on the page", until { shown() == true })
+        Settings.showsFrontMatter = false
+        check("put away, it takes no room — and the attribute is the preview's", until {
+            shown() == false && (js(window, "return document.documentElement.dataset.frontMatter") as? String) == "hidden"
+        })
+        Settings.showsFrontMatter = true
+        check("and it comes back", until { shown() == true })
+        check("the document is as it was", !window.content.editor.isDirty && bytes(url) == Data(original.utf8))
         finish(window)
     }
 

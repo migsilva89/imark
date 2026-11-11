@@ -48,8 +48,9 @@ class NoteWidget extends BlockWidget {
     card.className = 'cm-live-note'
     if (colour) card.dataset.color = colour
     if (resolved) card.classList.add('cm-live-note-resolved')
-    // Everything below comes out of somebody's file: text, never markup.
-    card.title = text
+    // Everything below comes out of somebody's file: text, never markup. The
+    // whole note on hover, and how to get at its source, which the card hides.
+    card.title = text ? `${text}\n\n${t('Double-click to show the source')}` : t('Double-click to show the source')
     card.append(balloon(), span('cm-live-note-label', t('Note')))
     if (by) card.append(span('cm-live-note-by', by))
     if (resolved) card.append(span('cm-live-note-resolved-on', t('resolved {date}', { date: resolved })))

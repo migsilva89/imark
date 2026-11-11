@@ -34,6 +34,13 @@ const editor = await esbuild.build({
   format: 'iife',
   target: ['safari17'],
   outdir: OUT,
+  // The formulas' fonts, inside the CSS like the preview's: the page may load
+  // nothing over a URL (editor.html's policy), and a font is only ever data:.
+  loader: {
+    '.woff2': 'dataurl',
+    '.woff': 'dataurl',
+    '.ttf': 'dataurl',
+  },
   legalComments: 'none',
   logLevel: 'warning',
   metafile: true,

@@ -54,6 +54,16 @@ final class LiveEditorView: NSView, DocumentEditor {
 
     static let page = URL(string: "imark://app/editor.html")!
 
+    /// Absolute path of the file being edited. The page resolves a relative image
+    /// against its folder, as the preview does (`imark://file/...`); it has no
+    /// other way to know where the document lives.
+    var documentPath = "" {
+        didSet {
+            guard documentPath != oldValue, hasDocument, isReady else { return }
+            call("window.imarkEditor.setPath(path)", ["path": documentPath])
+        }
+    }
+
     /// Internal rather than private so the Live editor's tests can drive the
     /// page the way the spike does.
     let webView: WKWebView
@@ -72,6 +82,7 @@ final class LiveEditorView: NSView, DocumentEditor {
     private var textScale = Settings.defaultTextScale
     private var width = Settings.Width.normal.rawValue
     private var language = "en"
+    private var frontMatter = Settings.showsFrontMatter
 
     override init(frame frameRect: NSRect) {
         let config = WKWebViewConfiguration()
@@ -183,11 +194,15 @@ final class LiveEditorView: NSView, DocumentEditor {
         textScale = Settings.textScale
         width = Settings.width.rawValue
         language = Bundle.main.preferredLocalizations.first ?? "en"
+        // The preview's own switch (View > Front Matter), so the card is as
+        // hidden here as it is there.
+        frontMatter = Settings.showsFrontMatter
         guard hasDocument, isReady else { return }
         call("window.imarkEditor.setTheme(theme)", ["theme": theme])
         call("window.imarkEditor.setTextScale(scale)", ["scale": textScale])
         call("window.imarkEditor.setWidth(width)", ["width": width])
         call("window.imarkEditor.setLanguage(language)", ["language": language])
+        call("window.imarkEditor.setFrontMatter(shown)", ["shown": frontMatter])
     }
 
     override func viewDidChangeEffectiveAppearance() {
@@ -225,6 +240,8 @@ final class LiveEditorView: NSView, DocumentEditor {
             "textScale": textScale,
             "width": width,
             "language": language,
+            "path": documentPath,
+            "frontMatter": frontMatter,
         ] as [String: Any]])
     }
 

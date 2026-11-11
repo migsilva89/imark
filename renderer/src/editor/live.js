@@ -22,6 +22,13 @@ import { blockRanges, frontMatterEnd, liveBlocks } from './blocks.js'
 // Each registers its kind of block with blocks.js as it loads.
 import './tasks.js'
 import './note-card.js'
+import './front-matter.js'
+import './table.js'
+import './math-block.js'
+import './mermaid-block.js'
+import './diff-block.js'
+import './image.js'
+import './footnote.js'
 
 export { frontMatterEnd }
 
@@ -44,6 +51,9 @@ const emphasis = {
 }
 
 const scheme = /^[a-z][a-z0-9+.-]*:/i
+
+// markdown-it-footnote's block rule: `[^label]:` with no space in the label.
+const FOOTNOTE_DEFINITION = /^ {0,3}\[\^[^\] ]+\]:/
 
 // Link reference definitions of the document, by normalised label. Found once
 // per syntax tree, and only when a reference link asks.
@@ -268,9 +278,40 @@ export function liveDecorations(state, ranges) {
           case 'Comment':
           case 'ProcessingInstructionBlock':
           case 'ProcessingInstruction':
-          case 'LinkReference':
           case 'TaskMarker':
           case 'TableDelimiter':
+            add(from, to, 'mark', 'cm-live-dim')
+            return false
+
+          case 'LinkReference':
+            // `[^1]: word` is a reference definition to Lezer, and a footnote's
+            // definition to everyone else (see Paragraph, below).
+            add(from, to, 'mark', FOOTNOTE_DEFINITION.test(doc.lineAt(from).text) ? 'cm-live-footnote-def' : 'cm-live-dim')
+            return false
+
+          // A footnote's definition stays source, a shade quieter: the
+          // reference in the text is the part that reads as prose, and the
+          // definition is where it points. Lezer reads `[^1]: text` as a
+          // paragraph (it has no footnotes), so the line is found by its shape,
+          // as markdown-it-footnote finds it: it may start inside a paragraph.
+          case 'Paragraph': {
+            for (let line = doc.lineAt(from); ; line = doc.line(line.number + 1)) {
+              if (FOOTNOTE_DEFINITION.test(line.text)) {
+                add(line.from, to, 'mark', 'cm-live-footnote-def')
+                break
+              }
+              if (line.to >= to || line.number >= doc.lines) break
+            }
+            return
+          }
+
+          // Shown as source while the caret is on it, and not otherwise (the
+          // widget stands in): monospace, as a code span is.
+          case 'InlineMath':
+            add(from, to, 'mark', 'cm-live-mathsrc')
+            return false
+
+          case 'FootnoteRef':
             add(from, to, 'mark', 'cm-live-dim')
             return false
 
@@ -343,10 +384,10 @@ export function liveDecorations(state, ranges) {
   const kept = frontMatter ? out.filter((i) => i.from >= frontMatter || i.class === 'cm-live-frontmatter') : out
   kept.sort((a, b) => a.from - b.from || a.to - b.to)
 
-  // Nor is anything under a block widget that is drawn (blocks.js): it is not
-  // on screen, and a hidden stretch inside a replaced block is two replaces
-  // over the same text. Both lists are sorted, and the blocks never overlap.
-  const drawn = blockRanges(state).filter((b) => b.block && !b.revealed)
+  // Nor is anything under a widget that is drawn (blocks.js): it is not on
+  // screen, and a hidden stretch inside a replaced one is two replaces over the
+  // same text. Both lists are sorted, and the widgets never overlap.
+  const drawn = blockRanges(state).filter((b) => !b.revealed)
   if (!drawn.length) return kept
   let next = 0
   return kept.filter((item) => {

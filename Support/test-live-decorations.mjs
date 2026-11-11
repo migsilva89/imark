@@ -210,8 +210,13 @@ const at = (doc, needle, nth = 0) => {
 
 {
   const doc = '---\ntitle: x\ntags: [a, b]\n---\n\n# Real\n\nbody **b**\n'
-  const s = stateFor(doc, doc.length - 3)
+  // M3b draws the block as a card while the caret is elsewhere; these are the
+  // lines as they look with the caret in it, which is also all there is to see
+  // of it with the card put away.
+  const s = stateFor(doc, 1)
   const items = decorate(s)
+  check('front matter: drawn as a card, it has no line styling of its own',
+    decorate(stateFor(doc, doc.length - 3)).every((i) => i.class !== 'cm-live-frontmatter'))
   check('front matter: no rule, no heading style, nothing hidden inside it',
     items.filter((i) => i.from < doc.indexOf('# Real')).every((i) => i.class === 'cm-live-frontmatter'), JSON.stringify(items.slice(0, 6)))
   check('front matter: its lines are plain monospace', items.filter((i) => i.class === 'cm-live-frontmatter').length === 4)
@@ -220,7 +225,7 @@ const at = (doc, needle, nth = 0) => {
   check('front matter: the preview shows broken YAML as Markdown, and so does this',
     styled(stateFor(notYaml, 'end'), 'cm-live-frontmatter').length === 0)
   const crlf = '---\r\ntitle: x\r\n---\r\n\r\nbody'
-  check('front matter: found in a CRLF document', decorate(stateFor(crlf, 'end', true)).filter((i) => i.class === 'cm-live-frontmatter').length === 3)
+  check('front matter: found in a CRLF document', decorate(stateFor(crlf, 1, true)).filter((i) => i.class === 'cm-live-frontmatter').length === 3)
   check('front matter: only at the very top', styled(stateFor('x\n\n---\ntitle: x\n---\n\nz', 'end'), 'cm-live-frontmatter').length === 0)
 }
 
@@ -234,7 +239,10 @@ const at = (doc, needle, nth = 0) => {
   const long = '[[a]] '.repeat(2000) + '[[open\nbroken]]'
   check('wikilink: a long paragraph of them parses', same(styled(away(long), 'cm-live-wikilink').length, 2000))
   // A plain HTML comment: an imark note is drawn as a card since M3.
-  const dim = away('![i](p.png)\n\n<!-- x -->\n\n[r]: http://x.test\n\n- [ ] t\n\n| a | b |\n|---|---|\n| 1 | 2 |')
+  // An image, a task box and a table are drawn since M3; the selection over the
+  // whole document shows every one of them as the source it dims.
+  const all = '![i](p.png)\n\n<!-- x -->\n\n[r]: http://x.test\n\n- [ ] t\n\n| a | b |\n|---|---|\n| 1 | 2 |'
+  const dim = stateFor(all, { from: 0, to: all.length })
   check('dimmed: images, comments, definitions, task markers and table rules are not left unstyled',
     styled(dim, 'cm-live-dim').length >= 5, JSON.stringify(styled(dim, 'cm-live-dim')))
 }
