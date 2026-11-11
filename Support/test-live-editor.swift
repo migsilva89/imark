@@ -80,6 +80,7 @@ enum LiveEditorTest {
         try findGoesToTheEditor()
         try theEditorTakesTheSettings()
         try noCommentIsWrittenUnderABuffer()
+        try aMirrorCatchingUpIsNeitherSavedNorSwitched()
 
         try? FileManager.default.removeItem(at: folder)
         print(failures == 0 ? "\nall good" : "\n\(failures) failing")
@@ -547,6 +548,53 @@ enum LiveEditorTest {
         window.saveComment("a note", colour: .standard)
         spin(0.3)
         check("the file is untouched", bytes(url) == Data("text\n".utf8))
+        finish(window)
+    }
+
+    /// While the mirror waits for the page's `fullText` after a seq mismatch its
+    /// text is missing the latest edits: writing it, or handing it to the other
+    /// editor, would lose them. Both refuse until the reply lands.
+    static func aMirrorCatchingUpIsNeitherSavedNorSwitched() throws {
+        print("▸ a mirror waiting for a resync is neither saved nor switched")
+        let url = fixture("catching up\n", named: "resync.md")
+        let window = open(url)
+        guard startEditing(window, expecting: "catching up\n") else { return check("the page has the file", false) }
+        edit(window, from: 0, insert: "edited ")
+        let edited = "edited catching up\n"
+        check("the mirror has the edit", until { window.content.editor.text == edited && window.content.editor.isDirty })
+        check("and is current", window.content.editor.textIsCurrent)
+
+        // The page's reply is held back, so the mirror stays where the real code
+        // leaves it after a gap: out of step and waiting. A `changes` message with
+        // a seq from the future goes in through the page's own channel.
+        js(window, "window.__realResync = window.imarkEditor.resync; window.imarkEditor.resync = () => {}; return 0")
+        js(window, "webkit.messageHandlers.imarkEditor.postMessage({type: 'changes', generation, seq: 99, length: 0, changes: []}); return 0",
+           ["generation": currentGeneration(window)])
+        check("a gap in the sequence puts the mirror to waiting",
+              until { !window.content.editor.textIsCurrent })
+
+        window.saveDocument(nil)
+        _ = until(3) { window.window?.attachedSheet != nil }
+        check("a save is refused with a sheet", window.window?.attachedSheet != nil)
+        if let sheet = window.window?.attachedSheet { window.window?.endSheet(sheet) }
+        spin(0.3)
+        check("the file is untouched", bytes(url) == Data("catching up\n".utf8))
+        check("and the buffer is still unsaved", window.content.editor.isDirty)
+
+        window.toggleEditorStyle(nil)
+        check("⇧⌘E leaves the Live editor active", window.content.isLiveActive
+                && window.content.liveEditor?.isHidden == false && window.content.sourceEditor.isHidden)
+        check("with the buffer as it was", window.content.editor.text == edited && window.content.editor.isDirty)
+
+        js(window, "window.imarkEditor.resync = window.__realResync; window.imarkEditor.resync(); return 0")
+        check("the page's text lands and the mirror is current",
+              until { window.content.editor.textIsCurrent })
+        check("with the edit in it", window.content.editor.text == edited, window.content.editor.text)
+        window.saveDocument(nil)
+        check("a save now writes the full edited text", until { bytes(url) == Data(edited.utf8) },
+              String(decoding: bytes(url), as: UTF8.self).debugDescription)
+        check("and nothing is left unsaved", until { !window.content.editor.isDirty })
+        if let sheet = window.window?.attachedSheet { window.window?.endSheet(sheet) }
         finish(window)
     }
 }
