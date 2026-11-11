@@ -133,6 +133,13 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         buildToolbar()
 
         content.onMessage = { [weak self] in self?.handle($0) }
+        content.onOpenLink = { [weak self] link in
+            // Only an editor on screen follows links; one still answering from
+            // behind the preview has nothing to say.
+            guard let self, self.editMode else { return }
+            guard let message = Self.liveLinkMessage(link, from: self.url) else { return NSSound.beep() }
+            self.handle(message)
+        }
         // Through the content controller rather than onto `content.editor`: there
         // are two editors, and the Live one is not built until it is first used.
         content.onEditorEdit = { [weak self] in self?.editorChanged() }
@@ -391,6 +398,44 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
 
         case .ready, .rendered, .find:
             break
+        }
+    }
+
+    /// What a ⌘-click in the Live editor asks for, as the message the preview's
+    /// own links produce, so both go through one path in the window.
+    ///
+    /// The preview's page resolves a relative href while it renders; the editor
+    /// shows the text as written, so it is resolved here, the same way: against
+    /// the folder holding the document, with `?query` dropped (it is for a web
+    /// server) and the `#heading` kept apart, still percent-encoded, which is how
+    /// `openLocal` expects it. Nil when there is nowhere to go — a link to a
+    /// heading in this document, which the editor does not scroll to yet, or an
+    /// href that is not a URL at all. The open document itself is the same: a link
+    /// to it, with or without a heading, goes nowhere while it is being edited.
+    static func liveLinkMessage(_ link: LiveEditorView.Link, from document: URL) -> RendererMessage? {
+        switch link {
+        case .wiki(let target):
+            return .openWiki(target)
+
+        case .href(let href):
+            if href.range(of: "^[A-Za-z][A-Za-z0-9+.-]*:", options: .regularExpression) != nil {
+                guard let url = URL(string: href) else { return nil }
+                return .openExternal(url)
+            }
+            let hash = href.firstIndex(of: "#")
+            var path = String(hash.map { href[..<$0] } ?? href[...])
+            let anchor = hash.map { String(href[href.index(after: $0)...]) } ?? ""
+            if let query = path.firstIndex(of: "?") { path = String(path[..<query]) }
+            guard !path.isEmpty else { return nil }
+            path = path.removingPercentEncoding ?? path
+            let file = path.hasPrefix("/")
+                ? URL(fileURLWithPath: path)
+                : URL(fileURLWithPath: path, relativeTo: document.deletingLastPathComponent())
+            // The document being edited is not a destination: `openLocal` on it
+            // would scroll the preview, which is hidden, or reload it out of
+            // edit mode.
+            if file.standardizedFileURL == document.standardizedFileURL { return nil }
+            return .openLocal(path: file.standardizedFileURL.path, anchor: anchor.isEmpty ? nil : anchor)
         }
     }
 

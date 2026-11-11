@@ -36,6 +36,8 @@ final class ContentViewController: NSViewController {
     var onEditorSave: (() -> Void)?
 
     var onMessage: ((RendererMessage) -> Void)?
+    /// A link followed from the Live editor.
+    var onOpenLink: ((LiveEditorView.Link) -> Void)?
     var onFindClosed: (() -> Void)?
     var onShowComments: ((NSView) -> Void)?
 
@@ -223,6 +225,7 @@ final class ContentViewController: NSViewController {
         live.onShowFind = { [weak self] in self?.showFind() }
         live.onFind = { [weak self] count, index in self?.updateCounter(count: count, index: index) }
         live.onNotice = { [weak self] message in self?.flash(message) }
+        live.onOpenLink = { [weak self] link in self?.onOpenLink?(link) }
         liveEditor = live
     }
 
