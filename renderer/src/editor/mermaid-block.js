@@ -14,17 +14,48 @@
 //
 // Zoom: `sizeDiagram` (zoom.js) is applied by diagrams.js to every drawing, so
 // a diagram is at its own size, grown with the text and scrolling sideways when
-// it is wider than the column. The full-window viewer of the reading view is not
-// wired in: a click here puts the caret on the diagram, which shows its source.
+// it is wider than the column. A single click on the drawing opens the reading
+// view's full-window viewer (zoom.js, `openDiagram`, unchanged); a double-click,
+// or the caret arriving by keyboard, shows the source as it does for any block.
+//
+// Mermaid is not in editor.js. The drawing lives in editor-diagrams.js
+// (build.mjs; `window.imarkDiagrams`), a script this file adds to the page the
+// first time a diagram is wanted, so a document without one never fetches it.
 
 import { BlockWidget, registerBlock } from './blocks.js'
 import { lastLineEnd } from './rendered.js'
 import { fenceLanguage } from './diff-block.js'
 
 // Loaded when the first diagram is drawn, so a document without one never pays
-// for Mermaid, and a test with no DOM can load this file.
+// for Mermaid, and a test with no DOM can load this file. The script is the
+// page's own (imark://app, which its CSP allows), and a failed load is tried
+// again with the next diagram.
+const DIAGRAMS_SCRIPT = 'imark://app/editor-diagrams.js'
 let diagrams = null
-const load = () => (diagrams ??= import('../shared/diagrams.js'))
+const load = () =>
+  (diagrams ??= new Promise((resolve, reject) => {
+    const ready = () => {
+      const module = window.imarkDiagrams
+      if (!module) return reject(new Error('editor-diagrams.js defines nothing'))
+      resolve(module)
+    }
+    if (window.imarkDiagrams) return ready()
+    const script = document.createElement('script')
+    script.src = DIAGRAMS_SCRIPT
+    script.onload = ready
+    script.onerror = () => {
+      script.remove()
+      reject(new Error('editor-diagrams.js did not load'))
+    }
+    document.head.append(script)
+  })).catch((error) => {
+    diagrams = null
+    throw error
+  })
+
+// A click opens the viewer once it is clear it is not the first half of a
+// double-click, which shows the source instead.
+const CLICK_DELAY = 300
 
 // How tall each diagram was when it was last drawn, by palette and source.
 const heights = new Map()
@@ -121,6 +152,28 @@ class MermaidWidget extends BlockWidget {
     if (loaded) start(loaded)
     else load().then((module) => { loaded = module; start(module) }, () => {})
     return dom
+  }
+
+  mousedown(event, view, dom) {
+    // The viewer is for a plain click on the drawing itself. Anything else (the
+    // margin around it, an error box, a second click, a modifier) is the
+    // block's ordinary click, which puts the caret on it and shows the source.
+    const drawing = event.target.closest?.('.mermaid-block.is-rendered > svg')
+    const plain = !event.shiftKey && !event.metaKey && !event.altKey && !event.ctrlKey
+    if (event.button !== 0 || !drawing || !plain || event.detail > 1) {
+      clearTimeout(this.opening)
+      return super.mousedown(event, view, dom)
+    }
+    event.preventDefault()
+    const block = drawing.parentElement
+    clearTimeout(this.opening)
+    this.opening = setTimeout(() => {
+      if (block.isConnected && loaded) loaded.openDiagram(block)
+    }, CLICK_DELAY)
+  }
+
+  destroy() {
+    clearTimeout(this.opening)
   }
 }
 

@@ -83,6 +83,7 @@ enum LiveEditorTest {
         try aTaskBoxTicksTheBufferNotTheFile()
         try aNoteIsACardUntilDoubleClicked()
         try theWidgetsOfTheReadingViewAreDrawn()
+        try diagramsLoadOnlyWhenADocumentHasOne()
         try imagesAreFoundBesideTheDocument()
         try aTableGivesWayToItsSource()
         try theFrontMatterCardFollowsTheSwitch()
@@ -716,6 +717,36 @@ enum LiveEditorTest {
               until(15) { count(".cm-live-diagram .mermaid-block.is-rendered svg") == 1 }, "\(count(".cm-live-diagram .mermaid-block"))")
         check("and sized by zoom.js's sizeDiagram",
               (js(window, "return document.querySelector('.cm-live-diagram svg')?.style.getPropertyValue('--natural-width') !== ''") as? Bool) == true)
+
+        // A single click on the drawing opens the reading view's viewer, and the
+        // source stays hidden; a double-click shows the source instead.
+        let viewerOpen = { (js(window, "const v = document.querySelector('.diagram-viewer'); return !!v && !v.hidden && v.querySelector('svg') !== null") as? Bool) == true }
+        let click = { (detail: Int) in
+            js(window, """
+                const svg = document.querySelector('.cm-live-diagram .mermaid-block > svg');
+                for (const type of ['mousedown', 'mouseup', 'click']) {
+                  svg.dispatchEvent(new MouseEvent(type, {bubbles: true, cancelable: true, button: 0, detail}));
+                }
+                return 0
+                """, ["detail": detail])
+        }
+        check("no viewer before a click", !viewerOpen())
+        click(1)
+        check("a click on a drawn diagram opens the zoom viewer", until { viewerOpen() })
+        check("and leaves the diagram drawn, the caret off it",
+              count(".cm-live-diagram .mermaid-block.is-rendered svg") == 1
+                && (js(window, "const v = window.imarkEditor.__spike.view; return v.state.selection.main.head === v.state.doc.length") as? Bool) == true)
+        js(window, "document.querySelector('.diagram-viewer').dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true, cancelable: true})); return 0")
+        check("Escape closes it", until { !viewerOpen() })
+        click(1)
+        click(2)
+        check("a double-click reveals the source instead",
+              until { count(".cm-live-diagram") == 0 && (js(window, "const v = window.imarkEditor.__spike.view; return v.state.doc.sliceString(v.state.selection.main.head, v.state.selection.main.head + 10)") as? String)?.hasPrefix("```mermai") == true },
+              "\(count(".cm-live-diagram"))")
+        _ = until(0.7) { false }
+        check("and the pending single click never opens the viewer", !viewerOpen())
+        js(window, "const v = window.imarkEditor.__spike.view; v.dispatch({selection: {anchor: v.state.doc.length}}); return 0")
+        check("the diagram is drawn again once the caret leaves", until(15) { count(".cm-live-diagram .mermaid-block.is-rendered svg") == 1 })
         check("none of it is an edit", !window.content.editor.isDirty && window.content.editor.text == original
                 && bytes(url) == Data(original.utf8))
         check("and the page's text is the file", samePage(window, original))
@@ -737,6 +768,35 @@ enum LiveEditorTest {
         check("broken TeX shows the preview's error styling", until { toEnd(); return count(".cm-live-math .katex-error") == 1 }, "\(count(".katex-error"))")
         check("an invalid diagram shows the localized error box",
               until(15) { toEnd(); return count(".cm-live-diagram .diagram-error") == 1 }, "\(count(".diagram-error"))")
+        finish(window)
+    }
+
+    /// Mermaid is a script of its own (editor-diagrams.js): a document without a
+    /// diagram never fetches it, and one with a diagram does.
+    static func diagramsLoadOnlyWhenADocumentHasOne() throws {
+        print("▸ editor-diagrams.js loads on the first diagram, not before")
+        let original = "# Plain\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\nInline $x^2$.\n"
+        let url = fixture(original, named: "no-diagrams.md")
+        let window = open(url)
+        guard startEditing(window, expecting: original) else { return check("the page has the file", false) }
+        js(window, "const v = window.imarkEditor.__spike.view; v.dispatch({selection: {anchor: v.state.doc.length}}); return 0")
+        let loaded = { () -> Bool in
+            (js(window, """
+                return window.imarkDiagrams !== undefined
+                  || document.querySelector('script[src$="editor-diagrams.js"]') !== null
+                  || performance.getEntriesByType('resource').some((e) => e.name.endsWith('editor-diagrams.js'))
+                """) as? Bool) == true
+        }
+        check("the table is drawn", until { (js(window, "return document.querySelectorAll('.cm-live-table table').length") as? Int) == 1 })
+        _ = until(1) { false }
+        check("and the diagrams script was never loaded", !loaded())
+        js(window, """
+            const v = window.imarkEditor.__spike.view;
+            v.dispatch({changes: {from: v.state.doc.length, insert: '\\n```mermaid\\ngraph LR\\n  A --> B\\n```\\n'}, selection: {anchor: 0}});
+            return 0
+            """)
+        check("typing a mermaid fence loads it and draws the diagram",
+              until(15) { loaded() && (js(window, "return document.querySelectorAll('.cm-live-diagram .mermaid-block.is-rendered svg').length") as? Int) == 1 })
         finish(window)
     }
 
