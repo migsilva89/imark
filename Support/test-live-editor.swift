@@ -81,6 +81,7 @@ enum LiveEditorTest {
         try theEditorTakesTheSettings()
         try noCommentIsWrittenUnderABuffer()
         try aMirrorCatchingUpIsNeitherSavedNorSwitched()
+        linksFromTheEditorGoWhereThePreviewsGo()
 
         try? FileManager.default.removeItem(at: folder)
         print(failures == 0 ? "\nall good" : "\n\(failures) failing")
@@ -552,6 +553,36 @@ enum LiveEditorTest {
     }
 
     /// While the mirror waits for the page's `fullText` after a seq mismatch its
+    /// ⌘-click in the Live editor reaches the same messages the preview's links
+    /// do. A link to the document being edited goes nowhere: the preview that
+    /// would scroll is hidden, and opening the file again would leave edit mode.
+    static func linksFromTheEditorGoWhereThePreviewsGo() {
+        print("▸ links from the editor")
+        let doc = URL(fileURLWithPath: "/tmp/imark-links/notes/this.md")
+        func message(_ link: LiveEditorView.Link) -> RendererMessage? {
+            DocumentWindowController.liveLinkMessage(link, from: doc)
+        }
+        if case .openLocal(let path, let anchor)? = message(.href("other.md#Some%20Heading")) {
+            check("a relative link resolves beside the document, anchor kept encoded",
+                  path == "/tmp/imark-links/notes/other.md" && anchor == "Some%20Heading", path)
+        } else { check("a relative link opens a local file", false) }
+        if case .openLocal(let path, _)? = message(.href("../up/a%20b.md?plain=1")) {
+            check("dots, percent-encoding and a query are handled", path == "/tmp/imark-links/up/a b.md", path)
+        } else { check("a parent-folder link opens a local file", false) }
+        if case .openExternal(let url)? = message(.href("https://example.com/a")) {
+            check("a URL goes out as external", url.absoluteString == "https://example.com/a")
+        } else { check("a URL is external", false) }
+        if case .openExternal(let url)? = message(.href("mailto:me@x.co")) {
+            check("mailto goes out as external", url.scheme == "mailto")
+        } else { check("mailto is external", false) }
+        if case .openWiki(let name)? = message(.wiki("Page")) {
+            check("a wikilink asks for its target", name == "Page")
+        } else { check("a wikilink opens a wiki target", false) }
+        check("a link to the open document goes nowhere", message(.href("this.md")) == nil)
+        check("a link to a heading in the open document goes nowhere", message(.href("./this.md#h")) == nil)
+        check("a link to a heading in this page goes nowhere", message(.href("#h")) == nil)
+    }
+
     /// text is missing the latest edits: writing it, or handing it to the other
     /// editor, would lose them. Both refuse until the reply lands.
     static func aMirrorCatchingUpIsNeitherSavedNorSwitched() throws {
