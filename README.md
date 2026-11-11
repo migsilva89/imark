@@ -279,7 +279,7 @@ and tells you the rest were left alone.
 | `⌘'` / `⌘⇧'` | Next / previous comment | `⌘Z` | Undo the last change |
 | `⌘E` | Reading or editing | `⌘S` | Save the file |
 | `⌘X` / `⌘C` / `⌘V` | Cut, copy, paste | `⇧⌘Z` | Redo your typing |
-| `⌘/` | This table, in the app | | |
+| `⌘/` | This table, in the app | `⇧⌘E` | Live Preview or source, while editing |
 
 `⌘/` opens the same list inside the app, built by reading the menu bar rather
 than from a copy of this table — which is also how it stays right on keyboards

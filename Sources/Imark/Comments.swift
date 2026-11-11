@@ -28,12 +28,16 @@ enum Comments {
         case fileChanged
         case unreadable
         case notATask
+        /// The Live editor is re-reading its own text from the page; see
+        /// `DocumentEditor.textIsCurrent`.
+        case editorCatchingUp
 
         var errorDescription: String? {
             switch self {
             case .fileChanged: NSLocalizedString("This file changed on disk since Imark opened it.", comment: "")
             case .unreadable: NSLocalizedString("Imark can't read this file as UTF-8 text.", comment: "")
             case .notATask: NSLocalizedString("That line of the file is not a task any more.", comment: "")
+            case .editorCatchingUp: NSLocalizedString("The editor is still catching up with your last edit. Try again in a moment.", comment: "")
             }
         }
     }

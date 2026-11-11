@@ -9,7 +9,7 @@ import AppKit
 /// only and names its colours; Imark has a light face and six themes, so
 /// everything here comes from the system's semantic colours and the app's accent,
 /// and follows the window when the system switches.
-final class MarkdownEditorView: NSView {
+final class MarkdownEditorView: NSView, DocumentEditor {
     /// Called on every keystroke, so the window can find out it has something
     /// unsaved without asking.
     var onEdit: (() -> Void)?
@@ -28,7 +28,11 @@ final class MarkdownEditorView: NSView {
     static let font = NSFont.monospacedSystemFont(ofSize: 12.5, weight: .regular)
 
     var text: String { textView.string }
-    var isDirty: Bool { textView.string != diskText }
+    var savedText: String { diskText }
+    /// Unit by unit. `String !=` treats canonically equivalent text as equal, so
+    /// an `é` retyped from `e` + U+0301 as one code point read as nothing unsaved
+    /// — ⌘S did nothing and closing the window threw the change away.
+    var isDirty: Bool { !(textView.string as NSString).isEqual(to: diskText) }
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -94,11 +98,12 @@ final class MarkdownEditorView: NSView {
         if let boundsObserver { NotificationCenter.default.removeObserver(boundsObserver) }
     }
 
-    /// Puts a file in the editor. `text` is both the buffer and the copy on disk:
-    /// a freshly opened document has nothing unsaved in it.
-    func load(_ text: String) {
+    /// Puts a file in the editor. `saved` is the copy on disk, which is `text`
+    /// itself for a freshly opened document and something older for a buffer
+    /// handed over from the Live editor with unsaved changes in it.
+    func load(_ text: String, saved: String) {
         textView.string = text
-        diskText = text
+        diskText = saved
         textView.undoManager?.removeAllActions()
         refresh()
         textView.setSelectedRange(NSRange(location: 0, length: 0))
@@ -189,7 +194,10 @@ final class MarkdownEditorView: NSView {
     /// ⌘S while the caret is in the buffer. The menu carries it too, but a text
     /// view that has focus swallows key equivalents it recognises first.
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
-        if event.modifierFlags.contains(.command),
+        // Not while hidden: the window asks every view, and with the Live editor
+        // on screen this one would save from the mirror ahead of the page.
+        if !isHiddenOrHasHiddenAncestor,
+           event.modifierFlags.contains(.command),
            event.charactersIgnoringModifiers == "s" {
             onSave?()
             return true

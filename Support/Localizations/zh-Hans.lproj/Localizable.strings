@@ -230,3 +230,10 @@
 "Your edited agent files were kept" = "已保留你修改过的助手文件";
 "That line of the file is not a task any more." = "文件中的该行已不再是任务。";
 "This installs or updates these files, keeping any edits you made:" = "将安装或更新以下文件，并保留你所做的修改：";
+"Live Preview" = "实时预览";
+"Source" = "源码";
+"Editor style" = "编辑器样式";
+"Which editor Editing Mode opens in. ⇧⌘E switches while editing." = "进入编辑模式时使用的编辑器。编辑时按 ⇧⌘E 切换。";
+"Mixed line endings · editing as source" = "换行符混用 · 以源码方式编辑";
+"The editor restarted · your text is still here" = "编辑器已重新启动 · 你的编辑仍然保留";
+"The editor is still catching up with your last edit. Try again in a moment." = "编辑器还在同步你刚才的修改，请稍后再试。";

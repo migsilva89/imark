@@ -19,6 +19,7 @@ final class PreferencesWindowController: NSWindowController, NSWindowDelegate {
     private let commentingControls = NSButton()
     private var swatches: [Swatch] = []
     private let engine = NSPopUpButton()
+    private let editorStyle = NSPopUpButton()
     private let editor = NSPopUpButton()
     private let makeDefault = NSButton()
     /// Shown instead of the button once there is nothing left to press. A
@@ -161,6 +162,14 @@ final class PreferencesWindowController: NSWindowController, NSWindowDelegate {
         engine.target = self
         engine.action = #selector(engineChanged)
 
+        editorStyle.removeAllItems()
+        for value in Settings.EditorStyle.allCases { editorStyle.addItem(withTitle: value.label) }
+        editorStyle.target = self
+        editorStyle.action = #selector(editorStyleChanged)
+        // Said where it is chosen, because the menu's ⇧⌘E only changes the
+        // window you are in, and only until editing ends.
+        editorStyle.toolTip = NSLocalizedString("Which editor Editing Mode opens in. ⇧⌘E switches while editing.", comment: "")
+
         editor.removeAllItems()
         let editors = Editors.installed
         if editors.isEmpty {
@@ -211,6 +220,7 @@ final class PreferencesWindowController: NSWindowController, NSWindowDelegate {
         shortcuts.action = #selector(shortcutsPressed)
 
         return [
+            (NSLocalizedString("Editor style", comment: ""), editorStyle),
             (NSLocalizedString("Search with", comment: ""), engine),
             (NSLocalizedString("Open in", comment: ""), editor),
             (NSLocalizedString("Markdown files", comment: ""), markdown),
@@ -276,6 +286,7 @@ final class PreferencesWindowController: NSWindowController, NSWindowDelegate {
         commentingControls.state = Settings.showsCommentingControls ? .on : .off
         for swatch in swatches { swatch.isPicked = swatch.colour == Settings.noteColour }
 
+        editorStyle.selectItem(at: Settings.EditorStyle.allCases.firstIndex(of: Settings.editorStyle) ?? 0)
         engine.selectItem(at: Settings.SearchEngine.allCases.firstIndex(of: Settings.searchEngine) ?? 0)
         if let preferred = Editors.preferred(from: Editors.installed),
            let index = editor.itemArray.firstIndex(where: { $0.representedObject as? URL == preferred }) {
@@ -328,6 +339,11 @@ final class PreferencesWindowController: NSWindowController, NSWindowDelegate {
     @objc private func colourPicked(_ sender: Swatch) {
         Settings.noteColour = sender.colour
         for swatch in swatches { swatch.isPicked = swatch === sender }
+    }
+
+    @objc private func editorStyleChanged() {
+        guard Settings.EditorStyle.allCases.indices.contains(editorStyle.indexOfSelectedItem) else { return }
+        Settings.editorStyle = Settings.EditorStyle.allCases[editorStyle.indexOfSelectedItem]
     }
 
     @objc private func engineChanged() {

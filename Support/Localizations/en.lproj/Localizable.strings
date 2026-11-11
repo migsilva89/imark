@@ -230,3 +230,10 @@
 "Your edited agent files were kept" = "Your edited agent files were kept";
 "That line of the file is not a task any more." = "That line of the file is not a task any more.";
 "This installs or updates these files, keeping any edits you made:" = "This installs or updates these files, keeping any edits you made:";
+"Live Preview" = "Live Preview";
+"Source" = "Source";
+"Editor style" = "Editor style";
+"Which editor Editing Mode opens in. ⇧⌘E switches while editing." = "Which editor Editing Mode opens in. ⇧⌘E switches while editing.";
+"Mixed line endings · editing as source" = "Mixed line endings · editing as source";
+"The editor restarted · your text is still here" = "The editor restarted · your text is still here";
+"The editor is still catching up with your last edit. Try again in a moment." = "The editor is still catching up with your last edit. Try again in a moment.";

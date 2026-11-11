@@ -43,8 +43,10 @@ final class EditorHost: NSObject, WKScriptMessageHandler {
         let config = WKWebViewConfiguration()
         config.setURLSchemeHandler(SchemeHandler(), forURLScheme: SchemeHandler.scheme)
         // Instrumentation, installed before the page's own script runs. User
-        // scripts are not subject to the page's CSP.
+        // scripts are not subject to the page's CSP. `__imarkEditorHooks` is what
+        // makes the page expose `imarkEditor.__spike`; the app never sets it.
         config.userContentController.addUserScript(WKUserScript(source: """
+            window.__imarkEditorHooks = true;
             window.__csp = [];
             document.addEventListener('securitypolicyviolation', e =>
               window.__csp.push(e.violatedDirective + ' ' + e.blockedURI));

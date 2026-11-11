@@ -116,6 +116,26 @@ enum Settings {
         }
     }
 
+    /// Which editor editing mode opens in. Live is CodeMirror in a web view, set
+    /// in the preview's own type and colours; Source is the plain text view that
+    /// came first, and is also where a file goes that Live cannot write back
+    /// byte for byte (mixed line breaks, see docs/LIVE-PREVIEW.md §6).
+    enum EditorStyle: String, CaseIterable {
+        case live, source
+
+        var label: String {
+            switch self {
+            case .live: return NSLocalizedString("Live Preview", comment: "")
+            case .source: return NSLocalizedString("Source", comment: "")
+            }
+        }
+    }
+
+    static var editorStyle: EditorStyle {
+        get { EditorStyle(rawValue: store.string(forKey: "editorStyle") ?? "") ?? .live }
+        set { store.set(newValue.rawValue, forKey: "editorStyle"); announce() }
+    }
+
     static let textScaleRange = 12.0...24.0
     static let defaultTextScale = 16.0
 

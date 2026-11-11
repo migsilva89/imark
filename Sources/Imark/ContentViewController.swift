@@ -7,7 +7,33 @@ final class ContentViewController: NSViewController {
     let renderer = RendererView(frame: .zero)
     /// The same document as text. Built with the pane rather than on demand so
     /// the switch between reading and editing is instant and keeps its scroll.
-    let editor = MarkdownEditorView(frame: .zero)
+    /// Also where a file goes that the Live editor cannot write back faithfully.
+    let sourceEditor = MarkdownEditorView(frame: .zero)
+    /// The document in CodeMirror. Built the first time this window edits in the
+    /// Live style, not before: a window that only reads should not cost a second
+    /// web content process.
+    private(set) var liveEditor: LiveEditorView?
+    private var liveIsActive = false
+    /// Which style this window is editing in. Taken from the setting each time
+    /// editing starts; ⇧⌘E changes it for this window until editing ends.
+    private var prefersLive = false
+    /// Whether an editor, rather than the page, is on screen.
+    private(set) var isEditing = false
+
+    /// Whichever editor holds the document. The window asks this one, and only
+    /// this one, whether anything is unsaved.
+    var editor: DocumentEditor {
+        if liveIsActive, let liveEditor { return liveEditor }
+        return sourceEditor
+    }
+
+    /// Whether the Live editor is the one holding the document.
+    var isLiveActive: Bool { liveIsActive && liveEditor != nil }
+
+    /// Wired once by the window, for both editors — including the one that does
+    /// not exist yet.
+    var onEditorEdit: (() -> Void)?
+    var onEditorSave: (() -> Void)?
 
     var onMessage: ((RendererMessage) -> Void)?
     var onFindClosed: (() -> Void)?
@@ -36,12 +62,15 @@ final class ContentViewController: NSViewController {
         // Back to front: the document runs the full height and everything else
         // sits over it. The header is what makes that readable — it blurs the
         // text passing underneath so the toolbar has something to stand on.
-        for subview in [renderer, editor, header, findBar, status] {
+        for subview in [renderer, sourceEditor, header, findBar, status] {
             subview.translatesAutoresizingMaskIntoConstraints = false
             view.addSubview(subview)
         }
+        self.status = status
 
-        editor.isHidden = true
+        sourceEditor.isHidden = true
+        sourceEditor.onEdit = { [weak self] in self?.onEditorEdit?() }
+        sourceEditor.onSave = { [weak self] in self?.onEditorSave?() }
 
         header.material = .headerView
         header.blendingMode = .withinWindow
@@ -68,18 +97,25 @@ final class ContentViewController: NSViewController {
             renderer.topAnchor.constraint(equalTo: view.topAnchor),
             renderer.bottomAnchor.constraint(equalTo: status.topAnchor),
 
-            // The editor starts below the toolbar rather than under it: prose
-            // sliding under a blur reads as more page above, but a line of source
-            // disappearing behind glass just looks like a clipped line.
-            editor.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            editor.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            editor.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
-            editor.bottomAnchor.constraint(equalTo: status.topAnchor),
-
             status.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             status.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             status.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             status.heightAnchor.constraint(equalToConstant: 24),
+        ])
+        pin(sourceEditor)
+    }
+
+    private var status: NSView!
+
+    /// The editor starts below the toolbar rather than under it: prose sliding
+    /// under a blur reads as more page above, but a line of source disappearing
+    /// behind glass just looks like a clipped line.
+    private func pin(_ editor: NSView) {
+        NSLayoutConstraint.activate([
+            editor.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            editor.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            editor.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            editor.bottomAnchor.constraint(equalTo: status.topAnchor),
         ])
     }
 
@@ -101,13 +137,101 @@ final class ContentViewController: NSViewController {
         }
     }
 
-    /// Which of the two is on screen. Both are always built; only one is shown,
-    /// so neither has to be rebuilt to come back.
+    /// Which is on screen, the page or the editor. Both stay built; only one is
+    /// shown, so neither has to be rebuilt to come back.
     func showEditor(_ on: Bool) {
-        editor.isHidden = !on
+        let findWasInEditor = findsInEditor
+        isEditing = on
+        sourceEditor.isHidden = !(on && !isLiveActive)
+        liveEditor?.isHidden = !(on && isLiveActive)
         renderer.isHidden = on
+        retargetFind(wasInEditor: findWasInEditor)
         if on { editor.focus() } else { renderer.focus() }
     }
+
+    // MARK: - Which editor
+
+    /// Editing starts: the style comes from the setting, and the file goes into
+    /// whichever editor can hold it.
+    func beginEditing(_ text: String) {
+        prefersLive = Settings.editorStyle == .live
+        loadEditor(text)
+    }
+
+    /// A file, freshly read, into the editor for this window's style — unless
+    /// that is Live and the file is one Live cannot write back as it found it.
+    func loadEditor(_ text: String) {
+        place(text, saved: text)
+    }
+
+    /// ⇧⌘E. The buffer moves across as it is, unsaved changes and all, and stays
+    /// unsaved: the other editor is told what the file holds as well as what the
+    /// buffer does. Undo history does not survive the move.
+    func switchEditorStyle() {
+        guard isEditing else { return }
+        guard editor.textIsCurrent else { return NSSound.beep() }
+        let text = editor.text
+        let saved = editor.savedText
+        let wasLive = isLiveActive
+        prefersLive = !wasLive
+        // Typing Return in the source editor puts a bare `\n` into a CRLF file,
+        // so the gate is asked of the buffer, not of the file it came from.
+        guard willBeLive(text) != wasLive else {
+            prefersLive = wasLive
+            return LiveEditorView.isAvailable ? noteMixedBreaks() : NSSound.beep()
+        }
+        place(text, saved: saved)
+        showEditor(true)
+    }
+
+    private func willBeLive(_ text: String) -> Bool {
+        prefersLive && LiveEditorView.isAvailable && LiveMirror.lineSeparator(of: text) != nil
+    }
+
+    private func place(_ text: String, saved: String) {
+        let live = willBeLive(text)
+        if prefersLive, LiveEditorView.isAvailable, !live { noteMixedBreaks() }
+        let findWasInEditor = findsInEditor
+        if live, liveEditor == nil { buildLiveEditor() }
+        liveIsActive = live
+        editor.load(text, saved: saved)
+        if isEditing {
+            sourceEditor.isHidden = live
+            liveEditor?.isHidden = !live
+            retargetFind(wasInEditor: findWasInEditor)
+        }
+    }
+
+    /// The Live editor writes a file back exactly as it read it, and a file
+    /// mixing `\r\n` with lone `\n`, or using a bare `\r`, is one it cannot
+    /// (docs/LIVE-PREVIEW.md §6). Such a file is edited as source instead, and
+    /// this says why the editor is not the one the setting asked for.
+    private func noteMixedBreaks() {
+        flash(NSLocalizedString("Mixed line endings · editing as source", comment: ""))
+    }
+
+    private func buildLiveEditor() {
+        let live = LiveEditorView(frame: .zero)
+        live.isHidden = true
+        live.translatesAutoresizingMaskIntoConstraints = false
+        // Under the header, the find bar and the status bar, like the source
+        // editor: added on top, it would cover the find bar it is searched from.
+        view.addSubview(live, positioned: .below, relativeTo: header)
+        pin(live)
+        live.onEdit = { [weak self] in self?.onEditorEdit?() }
+        live.onSave = { [weak self] in self?.onEditorSave?() }
+        live.onShowFind = { [weak self] in self?.showFind() }
+        live.onFind = { [weak self] count, index in self?.updateCounter(count: count, index: index) }
+        live.onNotice = { [weak self] message in self?.flash(message) }
+        liveEditor = live
+    }
+
+    /// The settings the preview takes, for the Live editor too.
+    func applyEditorSettings() {
+        liveEditor?.applySettings()
+    }
+
+    func flashNote(_ message: String) { flash(message) }
 
     // MARK: - Find
 
@@ -177,25 +301,52 @@ final class ContentViewController: NSViewController {
         // instead of appending to it.
         searchField.currentEditor()?.selectAll(nil)
         if !searchField.stringValue.isEmpty {
-            renderer.find(searchField.stringValue)
+            runFind(searchField.stringValue)
         }
     }
 
     @objc func closeFind() {
         findHeight.constant = 0
         findBar.isHidden = true
-        renderer.findClear()
+        clearFind(inEditor: findsInEditor)
         counter.stringValue = ""
         onFindClosed?()
     }
 
     @objc private func searchChanged() {
-        renderer.find(searchField.stringValue)
+        runFind(searchField.stringValue)
     }
 
-    @objc func findNext() { renderer.findStep(1) }
+    @objc func findNext() { stepFind(1) }
 
-    @objc func findPrevious() { renderer.findStep(-1) }
+    @objc func findPrevious() { stepFind(-1) }
+
+    /// The find bar searches whatever is on screen. The source editor has the
+    /// system's own find bar and never comes through here; the Live editor has
+    /// none, so while it is up the bar is its.
+    private var findsInEditor: Bool { isEditing && isLiveActive }
+
+    private func runFind(_ query: String) {
+        if findsInEditor { liveEditor?.find(query) } else { renderer.find(query) }
+    }
+
+    private func stepFind(_ delta: Int) {
+        if findsInEditor { liveEditor?.findStep(delta) } else { renderer.findStep(delta) }
+    }
+
+    private func clearFind(inEditor: Bool) {
+        if inEditor { liveEditor?.findClear() } else { renderer.findClear() }
+    }
+
+    /// The view under the find bar changed while it was open. The old one stops
+    /// highlighting and the new one is searched for the same words, so the
+    /// counter keeps describing what is on screen.
+    private func retargetFind(wasInEditor: Bool) {
+        guard !findBar.isHidden, wasInEditor != findsInEditor else { return }
+        clearFind(inEditor: wasInEditor)
+        counter.stringValue = ""
+        if !searchField.stringValue.isEmpty { runFind(searchField.stringValue) }
+    }
 
     private func updateCounter(count: Int, index: Int) {
         counter.stringValue = count == 0

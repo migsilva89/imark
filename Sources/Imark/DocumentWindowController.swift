@@ -133,10 +133,16 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         buildToolbar()
 
         content.onMessage = { [weak self] in self?.handle($0) }
-        content.editor.onEdit = { [weak self] in self?.editorChanged() }
-        content.editor.onSave = { [weak self] in self?.saveDocument(nil) }
+        // Through the content controller rather than onto `content.editor`: there
+        // are two editors, and the Live one is not built until it is first used.
+        content.onEditorEdit = { [weak self] in self?.editorChanged() }
+        content.onEditorSave = { [weak self] in self?.saveDocument(nil) }
         content.onFindClosed = { [weak self] in
-            self?.window?.makeFirstResponder(self?.content.renderer)
+            guard let self else { return }
+            // Back to whatever was being searched: the find bar is the Live
+            // editor's while it is up.
+            if self.editMode { self.content.editor.focus() }
+            else { self.window?.makeFirstResponder(self.content.renderer) }
         }
         selectionPopover.onSaveComment = { [weak self] body, colour in
             self?.saveComment(body, colour: colour)
@@ -259,7 +265,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         //
         // Only when there is nothing unsaved: the caller checked that before
         // reloading at all, and this is the second lock on the same door.
-        if editMode, !content.editor.isDirty { content.editor.load(source) }
+        if editMode, !content.editor.isDirty { content.loadEditor(source) }
         content.renderer.render(markdown: text, path: url.path, scroll: offset, anchor: anchor)
     }
 
@@ -431,6 +437,9 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
 
     /// Starts a note about the document rather than about anything in it.
     func beginFileNote() {
+        // A note is written straight into the file, and with a buffer open the
+        // file is the buffer's to write (docs/LIVE-PREVIEW.md §1, invariant 2).
+        guard !editMode else { return NSSound.beep() }
         selection = nil
         editingNote = nil
         composingFileNote = true
@@ -448,6 +457,10 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     /// it goes through an atomic replace and refuses to write over a file that
     /// moved underneath it.
     func saveComment(_ body: String, colour: NoteColour) {
+        // The composer is put away when editing starts; this is the second lock.
+        // A write here would move `stamp` under the buffer, and the buffer's next
+        // save would then pass the staleness check over the note it never saw.
+        guard !editMode else { return selectionPopover.dismiss() }
         if let range = editingNote {
             return updateComment(body, colour: colour, at: range)
         }
@@ -491,6 +504,9 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
 
     /// Edit and delete, asked for from the note's own card.
     private func perform(_ command: NoteCommand) {
+        // The page is behind the editor while it is open, and a delete is a
+        // write to the file under the buffer.
+        guard !editMode else { return }
         switch command.kind {
         case .edit:
             editingNote = command.lines
@@ -516,6 +532,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
 
     private func updateComment(_ body: String, colour: NoteColour, at range: ClosedRange<Int>) {
         editingNote = nil
+        guard !editMode else { return selectionPopover.dismiss() }
         do {
             snapshot(NSLocalizedString("Edit Comment", comment: ""))
             try Comments.update(lines: range, body: body, colour: colour, in: url, expecting: stamp)
@@ -552,6 +569,15 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         setEditMode(!editMode)
     }
 
+    /// ⇧⌘E: Live Preview and source trade places while editing, the buffer and
+    /// its unsaved changes going across with it. For this window, until editing
+    /// ends; the setting is what the next session starts in.
+    @objc func toggleEditorStyle(_ sender: Any?) {
+        guard editMode else { return NSSound.beep() }
+        content.switchEditorStyle()
+        editorChanged()
+    }
+
     /// The switch in the toolbar: reading on the left, the pencil on the right.
     @objc func chooseMode(_ sender: NSSegmentedControl) {
         setEditMode(sender.selectedSegment == 1)
@@ -570,7 +596,9 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
                 return report(Comments.Failure.unreadable, doing: NSLocalizedString("edit this file", comment: ""))
             }
             stamp = Comments.Stamp(of: url)
-            content.editor.load(text)
+            // The style is picked here, and so is the fallback: a file with mixed
+            // line breaks opens in the source editor whatever the setting says.
+            content.beginEditing(text)
         } else {
             // The same question the window asks on the way out, and the segment
             // has already moved under the pointer — putting it back is what makes
@@ -620,6 +648,10 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     @discardableResult
     private func saveDocument() -> Bool {
         guard editMode, content.editor.isDirty else { return true }
+        guard content.editor.textIsCurrent else {
+            report(Comments.Failure.editorCatchingUp, doing: NSLocalizedString("save this file", comment: ""))
+            return false
+        }
         // Read before snapshotting. The snapshot is what ⌘Z restores, and a file
         // that cannot be read snapshots as an empty string — so a save on a
         // vanished file, followed by ⌘Z, emptied the document.
@@ -660,7 +692,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
             return report(Comments.Failure.unreadable, doing: NSLocalizedString("read this file again", comment: ""))
         }
         stamp = Comments.Stamp(of: url)
-        content.editor.load(text)
+        content.loadEditor(text)
         refreshEditedDot()
         refreshSaveButtons()
     }
@@ -694,7 +726,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     private func discardBuffer() {
         guard let text = try? String(contentsOf: url, encoding: .utf8) else { return }
         stamp = Comments.Stamp(of: url)
-        content.editor.load(text)
+        content.loadEditor(text)
         refreshEditedDot()
         refreshSaveButtons()
     }
@@ -857,6 +889,9 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         case #selector(toggleEditMode(_:)):
             item.state = editMode ? .on : .off
             return true
+        case #selector(toggleEditorStyle(_:)):
+            item.state = editMode && content.isLiveActive ? .on : .off
+            return editMode
         case #selector(goBackInHistory(_:)):
             return !back.isEmpty
         case #selector(goForwardInHistory(_:)):
@@ -1002,6 +1037,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         content.renderer.setWidth(Settings.width.rawValue)
         content.renderer.setFrontMatter(Settings.showsFrontMatter)
         content.renderer.setCommentingControls(Settings.showsCommentingControls)
+        content.applyEditorSettings()
         selectionPopover.setCommentingControls(Settings.showsCommentingControls)
         appliedCommentingControls = Settings.showsCommentingControls
         refreshThemeButton()

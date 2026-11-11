@@ -141,6 +141,16 @@ enum Menu {
             action: #selector(DocumentWindowController.toggleEditMode(_:)),
             keyEquivalent: "e"
         )
+        // Beside the mode it belongs to, on the same letter. Ticked while the
+        // Live editor is the one on screen; ⇧⌘E puts the buffer, unsaved changes
+        // and all, into the other one. (⌘/ was the first idea and is the
+        // shortcuts panel's.)
+        let liveStyle = menu.addItem(
+            withTitle: NSLocalizedString("Live Preview", comment: ""),
+            action: #selector(DocumentWindowController.toggleEditorStyle(_:)),
+            keyEquivalent: "e"
+        )
+        liveStyle.keyEquivalentModifierMask = [.command, .shift]
         menu.addItem(withTitle: NSLocalizedString("Select All", comment: ""), action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
         menu.addItem(.separator())
         menu.addItem(withTitle: NSLocalizedString("Find…", comment: ""), action: #selector(DocumentWindowController.performFind(_:)), keyEquivalent: "f")
