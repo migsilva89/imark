@@ -10,11 +10,20 @@
 // and the selection and returns plain data, so node can test it without a DOM.
 // The ViewPlugin below turns that data into Decorations and decides when to
 // recompute.
+//
+// The block widgets of M3 — task boxes, comment cards, and the rest to come —
+// live in blocks.js and come in through `livePreview()`. Two of them do edit,
+// and each says so where it does: always as a transaction on the buffer.
 
 import { Decoration, EditorView, ViewPlugin, WidgetType } from '@codemirror/view'
 import { syntaxTree } from '@codemirror/language'
 import MarkdownIt from 'markdown-it'
-import { load as parseYaml } from 'js-yaml'
+import { blockRanges, frontMatterEnd, liveBlocks } from './blocks.js'
+// Each registers its kind of block with blocks.js as it loads.
+import './tasks.js'
+import './note-card.js'
+
+export { frontMatterEnd }
 
 // markdown-it's own unescaping of a link destination (backslash escapes and
 // HTML entities), so the editor opens what the preview would.
@@ -32,29 +41,6 @@ const emphasis = {
   StrongEmphasis: { class: 'cm-live-strong', mark: 'EmphasisMark' },
   Strikethrough: { class: 'cm-live-strike', mark: 'StrikethroughMark' },
   Highlight: { class: 'cm-live-mark', mark: 'HighlightMark' },
-}
-
-/// Where a leading front-matter block ends (the end of its closing `---`), or 0.
-/// The preview takes `---` … `---` at the very top as front matter only when the
-/// inside is YAML that reads as an object (shared/markdown.js, splitFrontMatter);
-/// otherwise it is ordinary Markdown, and so it is here. Lezer reads the block as
-/// a rule and a setext heading, which is why it has to be found first.
-export function frontMatterEnd(state) {
-  const doc = state.doc
-  if (doc.lines < 3 || doc.line(1).text !== '---') return 0
-  for (let n = 3; n <= doc.lines; n++) {
-    const line = doc.line(n)
-    if (!line.text.startsWith('---')) continue
-    const yaml = doc.sliceString(doc.line(2).from, doc.line(n - 1).to)
-    try {
-      const data = parseYaml(yaml)
-      if (data && typeof data === 'object') return line.to
-    } catch {
-      /* malformed front matter is shown as-is */
-    }
-    return 0
-  }
-  return 0
 }
 
 const scheme = /^[a-z][a-z0-9+.-]*:/i
@@ -274,6 +260,8 @@ export function liveDecorations(state, ranges) {
             }
             return false
 
+          // A task marker and an imark comment block are drawn as widgets
+          // (blocks.js); this is how they look while their source shows.
           case 'HTMLBlock':
           case 'HTMLTag':
           case 'CommentBlock':
@@ -316,9 +304,13 @@ export function liveDecorations(state, ranges) {
             const list = item?.parent
             if (list?.name === 'OrderedList') {
               add(from, to, 'mark', 'cm-live-number')
-            } else if (list?.name === 'BulletList' && !item.getChild('Task')) {
-              // A task item keeps its `- [ ]` as source until M3 draws the box.
-              if (touches(selection, from, to)) reveal(from, to)
+            } else if (list?.name === 'BulletList') {
+              // Beside a box the preview draws no bullet, so the `- ` goes;
+              // it comes back with the box's source (tasks.js), the two being
+              // one piece of syntax to whoever is editing it.
+              const marker = item.getChild('Task')?.getChild('TaskMarker')
+              if (touches(selection, from, marker ? marker.to : to)) reveal(from, to)
+              else if (marker) hide(from, spaceAfter(to))
               else add(from, to, 'bullet')
             }
             return false
@@ -350,7 +342,18 @@ export function liveDecorations(state, ranges) {
   // a setext heading) is dropped, and the block is left as plain monospace.
   const kept = frontMatter ? out.filter((i) => i.from >= frontMatter || i.class === 'cm-live-frontmatter') : out
   kept.sort((a, b) => a.from - b.from || a.to - b.to)
-  return kept
+
+  // Nor is anything under a block widget that is drawn (blocks.js): it is not
+  // on screen, and a hidden stretch inside a replaced block is two replaces
+  // over the same text. Both lists are sorted, and the blocks never overlap.
+  const drawn = blockRanges(state).filter((b) => b.block && !b.revealed)
+  if (!drawn.length) return kept
+  let next = 0
+  return kept.filter((item) => {
+    while (next < drawn.length && drawn[next].to < item.from) next += 1
+    const block = drawn[next]
+    return !(block && item.from >= block.from && item.to <= block.to)
+  })
 }
 
 /// Where a ⌘-click at `pos` should go, or null: `{href}` for a link, an autolink
@@ -499,6 +502,7 @@ const live = ViewPlugin.fromClass(
 /// ⌘-click on a link; a plain click only places the caret.
 export function livePreview({ openLink }) {
   return [
+    liveBlocks(),
     live,
     EditorView.domEventHandlers({
       mousedown(event, view) {

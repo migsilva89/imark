@@ -204,3 +204,76 @@ html[data-theme] {
   font-size: 13.5px;
   color: var(--secondary);
 }
+
+/* ---------------------------------------------------------- block widgets (M3) */
+
+/* A task box: the preview's look (accent tint, pointer), inline in the line. The
+   preview pulls its box into the margin where the bullet would be; here the
+   `- ` before it is hidden instead, so the box sits where the marker began. */
+#editor .cm-live-task {
+  cursor: pointer;
+  margin: 0 0.35em 0 0;
+  accent-color: var(--accent);
+  vertical-align: baseline;
+}
+
+/* A comment block, as a card: read-only, stepped over whole. Its colour is the
+   note's own, from the same closed set the rail uses. */
+#editor .cm-live-note {
+  --note-here: var(--note);
+  display: flex;
+  align-items: baseline;
+  gap: calc(var(--step) * 2);
+  margin: calc(var(--step) * 1) 0;
+  padding: calc(var(--step) * 1.5) calc(var(--step) * 3);
+  border-left: 3px solid var(--note-here);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--note-here) 9%, transparent);
+  color: var(--secondary);
+  font-size: 0.85em;
+  line-height: 1.5;
+  cursor: default;
+  user-select: none;
+  -webkit-user-select: none;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+#editor .cm-live-note[data-color='amber'] { --note-here: var(--note-amber); }
+#editor .cm-live-note[data-color='green'] { --note-here: var(--note-green); }
+#editor .cm-live-note[data-color='blue'] { --note-here: var(--note-blue); }
+#editor .cm-live-note[data-color='red'] { --note-here: var(--note-red); }
+
+#editor .cm-live-note-icon {
+  flex: none;
+  width: 1em;
+  height: 1em;
+  align-self: center;
+  fill: none;
+  stroke: var(--note-here);
+  stroke-width: 1.4;
+  stroke-linejoin: round;
+}
+
+#editor .cm-live-note-label {
+  flex: none;
+  font-weight: 600;
+  color: var(--note-here);
+}
+
+#editor .cm-live-note-by,
+#editor .cm-live-note-resolved-on {
+  flex: none;
+}
+
+#editor .cm-live-note-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text);
+}
+
+/* Acted on: still the record of what was asked, but no longer asking. */
+#editor .cm-live-note-resolved {
+  opacity: 0.6;
+}
