@@ -39,8 +39,23 @@ protocol DocumentEditor: NSView {
     /// A buffer with unsaved changes in it, handed over from the other editor.
     /// Undo history does not come with it.
     func load(_ text: String, saved: String)
+    /// The same file read again after somebody else saved it, with nothing
+    /// unsaved here: like `load`, but the caret stays on its line and the view
+    /// on its top line, rather than both going back to the start every time the
+    /// file changes on disk.
+    func reload(_ text: String)
     func markSaved()
     func focus()
+
+    /// Where the reader is, in the file's lines counted from zero — the lines
+    /// the preview's `data-line` counts, front matter included and `\r\n` one
+    /// break. The first line showing at the top, and the line the caret is on.
+    /// Synchronous, because leaving editing and ⇧⌘E ask on their way out.
+    var topLine: Int { get }
+    var caretLine: Int { get }
+    /// Puts `line` at the top of the view and the caret at the start of
+    /// `caret`. Clamped to the document.
+    func scrollTo(line: Int, caret: Int)
     func undo()
     func redo()
     func showFind()
