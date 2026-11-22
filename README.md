@@ -132,26 +132,25 @@ the file goes to something built for it. Imark runs nothing on your machine and
 asks nothing of your accounts; when you come back, the reader is where you left
 it, and the notes are still in the file.
 
-## Live Preview editing
+## Live Preview editing (experimental)
 
-The pencil opens the editor you chose in *Preferences → Editor style*: **Live
-Preview**, which is the default, or **Source**, the plain text view above. Live
-Preview is the document as the reading view draws it — headings in the preview's
-type, tables, formulas, diagrams, images and footnotes in place, comment notes as
-cards — except that the line your caret is on shows its Markdown, so you edit
-text and not a rendering. A diagram opens in the same full-window viewer as in
-the reading view when you click it; a double-click, or arrowing onto it, shows
-its source.
+The pencil opens the plain text editor above. *Settings → Editor style* has a
+second one to try: **Live Preview (Experimental)**, which is the document as the
+reading view draws it — headings in the preview's type, tables, formulas,
+diagrams, images and footnotes in place, comment notes as cards — except that
+the line your caret is on shows its Markdown, so you edit text and not a
+rendering. A diagram opens in the same full-window viewer as in the reading view
+when you click it; a double-click, or arrowing onto it, shows its source.
 
 `⇧⌘E` trades one editor for the other while you edit, with the buffer, the caret
 and anything unsaved carried across. The choice lasts for that window until
 editing ends; the next time starts from the setting again.
 
 Nothing the page draws is ever written to the file: saving what you opened,
-untouched, gives back the same bytes. That is also why one kind of file falls
-back to the source editor — a file that mixes `\r\n` with bare `\n` line endings,
-or uses a bare `\r`. Live Preview cannot write those back as it found them, so
-Imark opens them as source and says so.
+untouched, gives back the same bytes. That is also why some files always open
+in the source editor — one that mixes `\r\n` with bare `\n` line endings or
+uses a bare `\r`, which Live Preview could not write back as it found them, and
+one over 1 MB, which it would edit too slowly. Imark says so when it happens.
 
 ## Comments
 

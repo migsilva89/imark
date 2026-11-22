@@ -116,23 +116,24 @@ enum Settings {
         }
     }
 
-    /// Which editor editing mode opens in. Live is CodeMirror in a web view, set
-    /// in the preview's own type and colours; Source is the plain text view that
-    /// came first, and is also where a file goes that Live cannot write back
-    /// byte for byte (mixed line breaks, see docs/LIVE-PREVIEW.md §6).
+    /// Which editor editing mode opens in. Source is the plain text view, and
+    /// the default. Live is CodeMirror in a web view, set in the preview's own
+    /// type and colours; it is experimental, so it is only ever opted into.
+    /// A file Live cannot write back byte for byte (mixed line breaks) or one
+    /// too large for it goes to Source whatever this says.
     enum EditorStyle: String, CaseIterable {
-        case live, source
+        case source, live
 
         var label: String {
             switch self {
-            case .live: return "Live Preview"
             case .source: return "Source"
+            case .live: return "Live Preview (Experimental)"
             }
         }
     }
 
     static var editorStyle: EditorStyle {
-        get { EditorStyle(rawValue: store.string(forKey: "editorStyle") ?? "") ?? .live }
+        get { EditorStyle(rawValue: store.string(forKey: "editorStyle") ?? "") ?? .source }
         set { store.set(newValue.rawValue, forKey: "editorStyle"); announce() }
     }
 
