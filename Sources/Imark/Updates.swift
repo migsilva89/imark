@@ -13,6 +13,13 @@ enum Updates {
     )
     private static var started = false
 
+    /// Sparkle only runs inside Imark.app. A binary run on its own (the test
+    /// suites compile the app's sources into one) has no feed and no key to
+    /// check against, and Sparkle answers that with a modal alert that it could
+    /// not start, which waits for a click nobody makes: test-settings hung on
+    /// it, reached through the Settings window's updates box.
+    private static var isApp: Bool { Bundle.main.bundleURL.pathExtension == "app" }
+
     nonisolated static var current: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0"
     }
@@ -31,7 +38,7 @@ enum Updates {
     /// The previous updater kept its own preference under this key. Move it
     /// once, before Sparkle starts, so somebody who turned checks off stays off.
     static func start() {
-        guard !started else { return }
+        guard !started, isApp else { return }
         started = true
         let defaults = UserDefaults.standard
         if let previous = defaults.object(forKey: "checksForUpdates") as? Bool {
@@ -42,6 +49,7 @@ enum Updates {
     }
 
     static func checkNow() {
+        guard isApp else { return NSSound.beep() }
         start()
         controller.checkForUpdates(nil)
     }
