@@ -15,6 +15,11 @@ import * as plugin from '@vscode/markdown-it-katex'
 // and in the test runner.
 const katexPlugin = plugin.default.default ?? plugin.default
 
+// Mermaid draws the math in a diagram's labels with KaTeX too. mermaid.js is
+// built without a copy of its own (build.mjs) and takes this one, which every
+// page that draws diagrams already carries, the first time a label has math.
+globalThis.imarkKatex ??= katex
+
 /**
  * @param md         markdown-it instance
  * @param options.lines  called with a math block's token, returns the

@@ -60,7 +60,7 @@ enum TaskTest {
         let repo = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
         let built = repo.appendingPathComponent("Resources")
         guard let beside = Bundle.main.resourceURL else { return }
-        for name in ["index.html", "bundle.js", "bundle.css"] {
+        for name in ["index.html", "mermaid.js", "bundle.js", "bundle.css"] {
             let target = beside.appendingPathComponent(name)
             try? FileManager.default.removeItem(at: target)
             try FileManager.default.copyItem(at: built.appendingPathComponent(name), to: target)
