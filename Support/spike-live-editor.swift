@@ -189,11 +189,108 @@ enum Spike {
     static let delegate = SpikeDelegate()
 
     static func check(_ name: String, _ condition: Bool, _ detail: @autoclosure () -> String = "") {
-        if condition {
-            print("OK   \(name)")
+        let line = condition ? "OK   \(name)" : "FAIL \(name)  \(detail())"
+        if let attempt = attempt {
+            attempt.lines.append(line)
+            if !condition { attempt.failures += 1 }
         } else {
-            failures += 1
-            print("FAIL \(name)  \(detail())")
+            if !condition { failures += 1 }
+            print(line)
+        }
+    }
+
+    // MARK: - Input from outside the test
+
+    // The window is key for most of the run, and `spin` hands it whatever the
+    // window server has queued: if somebody types or clicks on this Mac while
+    // a case runs, those keys land in the editor under test. They did, in runs
+    // that failed with "startfechar ae bc" for "startabc", and with "si"
+    // between two composed words. So every key and click `spin` dequeues that
+    // the harness did not make is counted as outside input.
+    //
+    // So is the window losing focus. Marked text sent to a web view that is not
+    // in the key window is not a composition to WebKit: it ends one after every
+    // `setMarkedText`, and the romanisation is committed as text ("zhong wen中文")
+    // or the word lands on a line of its own. No input method types into a
+    // window that is not key, so such a run says nothing about the editor.
+    //
+    // A case that saw either is run again rather than judged. Only a clean
+    // attempt is reported; a case that never gets one fails, saying why.
+
+    /// The key events the harness sent itself, by timestamp, key and type.
+    /// WebKit hands a key the page did not take back to the application, so one
+    /// of them can come round through the queue again.
+    static var synthetic = Set<String>()
+    static var outside: [String] = []
+
+    static func sent(_ event: NSEvent) -> NSEvent {
+        synthetic.insert(fingerprint(event))
+        return event
+    }
+
+    static func fingerprint(_ event: NSEvent) -> String {
+        "\(event.timestamp)|\(event.type.rawValue)|\(event.keyCode)"
+    }
+
+    static func noticeOutsideInput(_ event: NSEvent) {
+        switch event.type {
+        case .keyDown, .keyUp:
+            guard !synthetic.contains(fingerprint(event)) else { return }
+            outside.append("key \((event.characters ?? "").debugDescription)")
+        case .leftMouseDown, .rightMouseDown, .otherMouseDown:
+            outside.append("click")
+        default:
+            return
+        }
+    }
+
+    static func noticeFocusLost(_ why: String) {
+        outside.append(why)
+    }
+
+    final class Attempt {
+        var lines: [String] = []
+        var failures = 0
+    }
+    static var attempt: Attempt?
+
+    /// Runs a case, again if input from outside the test reached the window
+    /// while it ran (up to three times), and reports the first clean attempt.
+    static func guarded(_ name: String, _ body: () -> Void) {
+        let tries = 3
+        for n in 1...tries {
+            outside = []
+            let current = Attempt()
+            attempt = current
+            let center = NotificationCenter.default
+            let observers = [
+                center.addObserver(forName: NSWindow.didResignKeyNotification, object: window, queue: nil) { _ in
+                    if !window.forcedKey { noticeFocusLost("the window stopped being key") }
+                },
+                center.addObserver(forName: NSApplication.didResignActiveNotification, object: nil, queue: nil) { _ in
+                    if !window.forcedKey { noticeFocusLost("another app became active") }
+                },
+            ]
+            body()
+            observers.forEach(center.removeObserver)
+            attempt = nil
+            if outside.isEmpty || n == tries {
+                current.lines.forEach { print($0) }
+                failures += current.failures
+                if !outside.isEmpty {
+                    failures += 1
+                    print("FAIL \(name): input from outside the test reached the window in every attempt "
+                          + "(\(outside.prefix(8).joined(separator: ", "))); run it again without typing or clicking")
+                }
+                return
+            }
+            note("\(name): input from outside the test reached the window "
+                 + "(\(outside.prefix(8).joined(separator: ", "))); running it again")
+            // A moment for whoever it was, and the window back in front.
+            spin(2)
+            window.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            spin(0.5)
         }
     }
 
@@ -207,6 +304,7 @@ enum Spike {
         while Date() < end {
             if let event = NSApp.nextEvent(matching: .any, until: Date().addingTimeInterval(0.01),
                                            inMode: .default, dequeue: true) {
+                noticeOutsideInput(event)
                 NSApp.sendEvent(event)
             }
         }
@@ -280,12 +378,12 @@ enum Spike {
         check("page reports ready", until(10) { host.isReady })
         check("queued load reached the page", until { same(js("window.imarkEditor.__spike.slice()"), "# Spike\n\nhello\n") })
 
-        stylesUnderCSP()
-        randomEdits()
-        resyncHeals()
-        staleGenerations()
-        commandZ()
-        inputMethod()
+        guarded("(a) styles under the CSP") { stylesUnderCSP() }
+        guarded("(b) random edits") { randomEdits() }
+        guarded("resync") { resyncHeals() }
+        guarded("(c) stale generation") { staleGenerations() }
+        guarded("(d) ⌘Z") { commandZ() }
+        guarded("(e) IME") { inputMethod() }
 
         window.close()
         print(failures == 0 ? "\nall good" : "\n\(failures) failing")
@@ -543,7 +641,7 @@ enum Spike {
                 timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
                 context: nil, characters: characters, charactersIgnoringModifiers: characters,
                 isARepeat: false, keyCode: code)!
-            NSApp.sendEvent(event)
+            NSApp.sendEvent(sent(event))
         }
     }
 
@@ -563,6 +661,9 @@ enum Spike {
         let pageFocus = js("document.hasFocus() && window.imarkEditor.__spike.view.hasFocus") as? Bool ?? false
         let responder = window.firstResponder.map { String(describing: type(of: $0)) } ?? "nil"
         note("key window \(window.isKeyWindow), app active \(NSApp.isActive), first responder \(responder), page focus \(pageFocus)")
+        if !(window.isKeyWindow && pageFocus) {
+            noticeFocusLost("the window could not be given focus (key \(window.isKeyWindow), page \(pageFocus))")
+        }
         return window.isKeyWindow && pageFocus
     }
 
@@ -667,6 +768,8 @@ enum Spike {
             timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
             context: nil, characters: characters, charactersIgnoringModifiers: characters,
             isARepeat: false, keyCode: code)!
+        _ = sent(down)
+        _ = sent(up)
         var route: String
         if NSApp.isActive {
             NSApp.sendEvent(down)
@@ -773,6 +876,7 @@ enum Spike {
             check("(e) \(label): window key and editor focused", focusEditor())
             spin(0.2)
             check("(e) \(label): the adjacent `**` are showing before composing", (js(shown) as? Bool) == true)
+            js("window.__composition = []")
 
             for (marked, sel) in [("z", 1), ("zhong wen", 9), ("中文", 2)] {
                 client.setMarkedText(marked, selectedRange: NSRange(location: sel, length: 0), replacementRange: none)
@@ -791,6 +895,7 @@ enum Spike {
             }
             spin(0.5)
             let final = js("window.imarkEditor.__spike.slice()") as? String ?? ""
+            note("(e) \(label): events \(js("JSON.stringify(window.__composition)") as? String ?? "")")
             check("(e) \(label): text exact", final == expected, "\(final.debugDescription) expected \(expected.debugDescription)")
             check("(e) \(label): composition ended", !(js("window.imarkEditor.__spike.view.compositionStarted") as? Bool ?? true))
             check("(e) \(label): the `**` hide after catch-up", (js(shown) as? Bool) == false)
