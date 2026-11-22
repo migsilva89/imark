@@ -1,4 +1,4 @@
-// Tests for the Live editor's changed-lines gutter (docs/LIVE-PREVIEW.md §5, M4):
+// Tests for the Live editor's changed-lines gutter:
 // which lines differ from the saved text, measured the way the source editor's
 // `MarkdownEditorView.modifiedLines` measures them — a real line diff, so one
 // inserted line marks that line and not everything under it, and a deleted line

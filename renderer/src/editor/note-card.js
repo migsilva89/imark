@@ -1,6 +1,5 @@
-// `<!-- imark … -->` comment blocks in the Live Preview (docs/LIVE-PREVIEW.md §4,
-// M3): each drawn as a small card — who wrote it and the start of what they
-// said — that the caret steps over as one piece.
+// `<!-- imark … -->` comment blocks in the Live Preview: each drawn as a small
+// card — who wrote it and the start of what they said — that the caret steps over as one piece.
 //
 // Read-only in v1: notes are written in the reading view, where they can be
 // anchored to what they are about. Here a note can only be deleted, whole, with

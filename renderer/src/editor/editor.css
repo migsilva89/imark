@@ -1,4 +1,4 @@
-/* The Live editor page. M1: the document as highlighted Markdown source, in the
+/* The Live editor page: the document in the
    preview's own colours, text size and column width — the tokens are shared
    (tokens.css), and Swift sets the same `data-theme` / `data-width` / text size
    on this page as on the preview, from the same settings. */
@@ -193,8 +193,8 @@ html[data-theme] {
   line-height: 1;
 }
 
-/* Source left as source in M2 — images, comments, HTML, reference definitions,
-   task markers, table rules — dimmed, as the preview dims what is not prose. */
+/* What the inline pass leaves as source — images, comments, HTML, reference
+   definitions, task markers, table rules, until a block draws them — dimmed, as the preview dims what is not prose. */
 #editor .cm-live-dim {
   color: var(--secondary);
 }
@@ -206,7 +206,7 @@ html[data-theme] {
   color: var(--secondary);
 }
 
-/* ---------------------------------------------------------- block widgets (M3) */
+/* ---------------------------------------------------------- block widgets */
 
 /* A task box: the preview's look (accent tint, pointer), inline in the line. The
    preview pulls its box into the margin where the bullet would be; here the

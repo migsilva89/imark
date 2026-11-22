@@ -1,4 +1,4 @@
-// GFM tables in the Live Preview (docs/LIVE-PREVIEW.md §4, M3): the whole table
+// GFM tables in the Live Preview: the whole table
 // drawn as the preview draws it, until the caret comes onto any of its lines.
 //
 // Not parsed here: the source goes through the preview's markdown-it, so the

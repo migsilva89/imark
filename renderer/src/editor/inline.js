@@ -4,7 +4,7 @@
 // `[^1]` footnote references (markdown-it-footnote). The Live editor can only
 // hide and style what the tree names, so each gets a node here, parsed by the
 // same rules as its preview plugin — otherwise a construct would be styled in
-// one view and plain text in the other (docs/LIVE-PREVIEW.md §4).
+// one view and plain text in the other.
 //
 // Plain MarkdownConfig objects, nothing imported: node names are strings, so this
 // file needs no direct dependency on @lezer/markdown.

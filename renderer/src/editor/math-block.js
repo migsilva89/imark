@@ -1,4 +1,4 @@
-// Formulas in the Live Preview (docs/LIVE-PREVIEW.md §4, M3): `$$…$$` standing
+// Formulas in the Live Preview: `$$…$$` standing
 // on lines of its own is drawn as a block, `$…$` inside a sentence as a piece of
 // the line. Both go through the preview's markdown-it and so through math.js and
 // KaTeX; a formula KaTeX cannot read comes out as the red message the preview

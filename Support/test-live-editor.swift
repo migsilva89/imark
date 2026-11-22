@@ -1,4 +1,4 @@
-// Tests for the Live editor (docs/LIVE-PREVIEW.md §7, M1), through the window
+// Tests for the Live editor, through the window
 // people actually use: DocumentWindowController, its ContentViewController and
 // the CodeMirror page in a real WKWebView, mirrored into Swift.
 //
@@ -433,7 +433,7 @@ enum LiveEditorTest {
         (js(window, "return window.imarkEditor.__spike.generation") as? Int) ?? -1
     }
 
-    /// §3.2: the mirror outlives the page. Kill the web content process, and the
+    /// The mirror outlives the page. Kill the web content process, and the
     /// page comes back with the buffer, still unsaved, still editable.
     static func aCrashKeepsTheBuffer() throws {
         print("▸ a dead web process keeps the buffer")
@@ -566,7 +566,7 @@ enum LiveEditorTest {
         finish(window)
     }
 
-    /// Invariant 2, for task boxes (§4, M3): a click on a box in Live is an edit
+    /// Nothing writes the file under an open buffer, for task boxes: a click on a box in Live is an edit
     /// to the buffer — one character, unsaved until ⌘S — and never the reading
     /// view's path, which writes the file through Comments.setTask.
     static func aTaskBoxTicksTheBufferNotTheFile() throws {

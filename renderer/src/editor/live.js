@@ -1,9 +1,9 @@
 // The Live Preview: which Markdown marks to hide, and which text to style, for
-// the part of the document on screen (docs/LIVE-PREVIEW.md §4, M2).
+// the part of the document on screen.
 //
 // Display only. Every decoration here is a replace, a mark or a line class, so
 // the document, the selection and the mirror in Swift never see any of it — the
-// invariant in §1 is that saving what was opened gives back the same bytes, and
+// first rule is that saving what was opened gives back the same bytes, and
 // nothing in this file can break it.
 //
 // Two halves. `liveDecorations(state, ranges)` is pure: it reads the syntax tree
@@ -11,7 +11,7 @@
 // The ViewPlugin below turns that data into Decorations and decides when to
 // recompute.
 //
-// The block widgets of M3 — task boxes, comment cards, and the rest to come —
+// The block widgets — task boxes, comment cards, tables, formulas and the rest —
 // live in blocks.js and come in through `livePreview()`. Two of them do edit,
 // and each says so where it does: always as a transaction on the buffer.
 
@@ -249,12 +249,12 @@ export function liveDecorations(state, ranges) {
             return // The text may hold emphasis, code, and so on.
           }
 
-          // An image stays source in M2, and the `[` inside `![` is not a link.
+          // An image is left to blocks.js, and the `[` inside `![` is not a link.
           case 'Image':
             add(from, to, 'mark', 'cm-live-dim')
             return false
 
-          // Left as source in M2, but dimmed or coloured so they do not read as
+          // Left as source here, but dimmed or coloured so they do not read as
           // prose: the default highlight style that used to do this is off in
           // Live mode. Classes rather than a HighlightStyle, so they are data
           // here too and need no direct dependency on @lezer/highlight.
@@ -496,7 +496,7 @@ const live = ViewPlugin.fromClass(
       const view = update.view
       // Hiding or showing marks beside text being composed re-renders that
       // line under the input method, which loses the candidate window or
-      // duplicates characters (§5). The old decorations are kept, moved with
+      // duplicates characters. The old decorations are kept, moved with
       // the edit, until the composition is committed.
       if (view.compositionStarted || this.holding) {
         if (update.docChanged) this.decorations = this.decorations.map(update.changes)

@@ -1,4 +1,4 @@
-// M0 spike for the Live editor (docs/LIVE-PREVIEW.md §7): CodeMirror 6 in a real
+// The spike that proved the Live editor: CodeMirror 6 in a real
 // WKWebView, behind the app's scheme handler and CSP, mirrored into Swift.
 //
 //   (cd renderer && npm install && npm run build)
@@ -67,7 +67,7 @@ final class EditorHost: NSObject, WKScriptMessageHandler {
         webView.load(URLRequest(url: URL(string: "imark://app/editor.html")!))
     }
 
-    // The load in §3.2: the mirror is right at once; the page catches up.
+    // The load: the mirror is right at once; the page catches up.
     func load(_ fileText: String) {
         guard let separator = LiveMirror.lineSeparator(of: fileText) else {
             fatalError("mixed line breaks do not go to the Live editor")

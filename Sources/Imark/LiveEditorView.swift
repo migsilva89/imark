@@ -2,8 +2,8 @@ import AppKit
 import WebKit
 import ImarkRender
 
-/// The document in CodeMirror, for editing in the preview's own type and colours
-/// (docs/LIVE-PREVIEW.md). M1: highlighted Markdown source, nothing hidden yet.
+/// The document in CodeMirror, for editing in the preview's own type and
+/// colours: Markdown drawn styled, with the source shown where the caret is.
 ///
 /// The page runs in its own web view, not the preview's: the preview is shared
 /// with Quick Look and owns the comment rail and the selection logic, and this
@@ -55,7 +55,7 @@ final class LiveEditorView: NSView, DocumentEditor {
     static let page = URL(string: "imark://app/editor.html")!
 
     /// Above this many bytes a file is edited in the source editor instead,
-    /// whatever the setting says (docs/LIVE-PREVIEW.md §5). Picked by one rule:
+    /// whatever the setting says. Picked by one rule:
     /// a keystroke, through to the mirror, has to fit in two frames (33 ms).
     /// Measured with `IMARK_TIMINGS=1` in `Support/test-live-editor.swift`, on
     /// generated Markdown with headings, lists, tables and code, a keystroke

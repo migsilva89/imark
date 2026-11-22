@@ -246,9 +246,8 @@ final class ContentViewController: NSViewController {
 
     /// Says why the editor is not the one the setting asked for. The Live
     /// editor writes a file back exactly as it read it, and a file mixing
-    /// `\r\n` with lone `\n`, or using a bare `\r`, is one it cannot
-    /// (docs/LIVE-PREVIEW.md §6); a file past `largeFileThreshold` is one it
-    /// would edit too slowly (§5).
+    /// `\r\n` with lone `\n`, or using a bare `\r`, is one it cannot; a file
+    /// past `largeFileThreshold` is one it would edit too slowly.
     private func note(_ refusal: LiveRefusal) {
         switch refusal {
         case .mixedBreaks: flash("Mixed line endings · editing as source")

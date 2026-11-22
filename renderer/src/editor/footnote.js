@@ -1,4 +1,4 @@
-// Footnote references in the Live Preview (docs/LIVE-PREVIEW.md §4, M3): `[^1]`
+// Footnote references in the Live Preview: `[^1]`
 // drawn as a small raised number, numbered as the preview numbers them — in the
 // order the notes are first used, which only the whole document knows. So the
 // number comes out of `ctx.env().footnotes`, the same parse the reading view

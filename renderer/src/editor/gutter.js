@@ -1,5 +1,5 @@
 // The bar beside every line that differs from the file as saved, as the source
-// editor's `LineGutter` draws it (docs/LIVE-PREVIEW.md §5, M4): two pixels of the
+// editor's `LineGutter` draws it: two pixels of the
 // accent, at the window's left edge, inset a little from the line's top and
 // bottom. No line numbers — the Live editor is the page, not the source.
 //

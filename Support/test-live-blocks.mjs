@@ -1,4 +1,4 @@
-// Tests for the Live Preview's block widgets (docs/LIVE-PREVIEW.md §4, M3):
+// Tests for the Live Preview's block widgets:
 // where each one sits, when it gives way to its source, and the two that edit —
 // a task box ticks one character, a comment block goes as one undoable piece.
 // No DOM: `blockRanges` reads an EditorState and returns data, and the edits are
@@ -6,7 +6,7 @@
 //
 //   node Support/test-live-blocks.mjs
 //
-// The rule above all (§1): nothing here writes anything but a transaction on the
+// The rule above all: nothing here writes anything but a transaction on the
 // buffer, and nothing that only moves the selection changes a byte.
 
 import { EditorState, EditorSelection } from '../renderer/node_modules/@codemirror/state/dist/index.js'
