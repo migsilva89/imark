@@ -108,10 +108,13 @@ printf 'APPL????' > "$APP/Contents/PkgInfo"
 if [ -d "$ROOT/Resources" ]; then
 	cp -R "$ROOT/Resources/." "$APP/Contents/Resources/"
 fi
-# The one file the window is useless without, checked in the assembled bundle
-# rather than in the tree it was copied from.
-[ -f "$APP/Contents/Resources/bundle.js" ] \
-	|| { echo "error: the bundle is not in the app — the renderer did not build" >&2; exit 1; }
+# The files the window is useless without, checked in the assembled bundle
+# rather than in the tree it was copied from. mermaid.js is its own file, loaded
+# before bundle.js, and without it no diagram is drawn.
+for file in bundle.js mermaid.js; do
+	[ -f "$APP/Contents/Resources/$file" ] \
+		|| { echo "error: $file is not in the app — the renderer did not build" >&2; exit 1; }
+done
 if [ -f "$ROOT/Support/AppIcon.icns" ]; then
 	cp "$ROOT/Support/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
 else
@@ -170,9 +173,10 @@ fi
 mkdir -p "$APPEX/Contents/Resources"
 if [ -d "$ROOT/Resources" ]; then
 	cp -R "$ROOT/Resources/." "$APPEX/Contents/Resources/"
-	# The Live editor (editor.html/js/css, and editor-diagrams.js, its Mermaid)
+	# The Live editor (editor.html/js/css, and editor-diagrams.js, its diagrams)
 	# is the app's alone: Quick Look only previews, and has no reason to carry
 	# CodeMirror. `editor.*` does not match `editor-diagrams.js`, hence both.
+	# mermaid.js stays: the reading page loads it before bundle.js.
 	rm -f "$APPEX/Contents/Resources/"editor.* "$APPEX/Contents/Resources/"editor-*
 fi
 

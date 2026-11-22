@@ -18,9 +18,10 @@
 // view's full-window viewer (zoom.js, `openDiagram`, unchanged); a double-click,
 // or the caret arriving by keyboard, shows the source as it does for any block.
 //
-// Mermaid is not in editor.js. The drawing lives in editor-diagrams.js
-// (build.mjs; `window.imarkDiagrams`), a script this file adds to the page the
-// first time a diagram is wanted, so a document without one never fetches it.
+// Mermaid is not in editor.js. It is mermaid.js, the reading page's own copy,
+// and the drawing around it is editor-diagrams.js (build.mjs;
+// `window.imarkDiagrams`). This file adds both to the page the first time a
+// diagram is wanted, so a document without one never fetches either.
 
 import { BlockWidget, registerBlock } from './blocks.js'
 import { lastLineEnd } from './rendered.js'
@@ -30,25 +31,32 @@ import { fenceLanguage } from './diff-block.js'
 // for Mermaid, and a test with no DOM can load this file. The script is the
 // page's own (imark://app, which its CSP allows), and a failed load is tried
 // again with the next diagram.
+const MERMAID_SCRIPT = 'imark://app/mermaid.js'
 const DIAGRAMS_SCRIPT = 'imark://app/editor-diagrams.js'
-let diagrams = null
-const load = () =>
-  (diagrams ??= new Promise((resolve, reject) => {
-    const ready = () => {
-      const module = window.imarkDiagrams
-      if (!module) return reject(new Error('editor-diagrams.js defines nothing'))
-      resolve(module)
-    }
-    if (window.imarkDiagrams) return ready()
+
+/// Adds a script of the page's own and settles when it has run, or failed.
+const addScript = (src) =>
+  new Promise((resolve, reject) => {
     const script = document.createElement('script')
-    script.src = DIAGRAMS_SCRIPT
-    script.onload = ready
+    script.src = src
+    script.onload = resolve
     script.onerror = () => {
       script.remove()
-      reject(new Error('editor-diagrams.js did not load'))
+      reject(new Error(`${src} did not load`))
     }
     document.head.append(script)
-  })).catch((error) => {
+  })
+
+let diagrams = null
+const load = () =>
+  (diagrams ??= (async () => {
+    // In order: editor-diagrams.js reads Mermaid from its global as it starts.
+    if (!window.imarkMermaid) await addScript(MERMAID_SCRIPT)
+    if (!window.imarkMermaid) throw new Error('mermaid.js defines nothing')
+    if (!window.imarkDiagrams) await addScript(DIAGRAMS_SCRIPT)
+    if (!window.imarkDiagrams) throw new Error('editor-diagrams.js defines nothing')
+    return window.imarkDiagrams
+  })()).catch((error) => {
     diagrams = null
     throw error
   })

@@ -771,8 +771,9 @@ enum LiveEditorTest {
         finish(window)
     }
 
-    /// Mermaid is a script of its own (editor-diagrams.js): a document without a
-    /// diagram never fetches it, and one with a diagram does.
+    /// Mermaid (mermaid.js, shared with the reading page) and the drawing around
+    /// it (editor-diagrams.js) are scripts of their own: a document without a
+    /// diagram never fetches them, and one with a diagram does.
     static func diagramsLoadOnlyWhenADocumentHasOne() throws {
         print("▸ editor-diagrams.js loads on the first diagram, not before")
         let original = "# Plain\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\nInline $x^2$.\n"
@@ -782,9 +783,9 @@ enum LiveEditorTest {
         js(window, "const v = window.imarkEditor.__spike.view; v.dispatch({selection: {anchor: v.state.doc.length}}); return 0")
         let loaded = { () -> Bool in
             (js(window, """
-                return window.imarkDiagrams !== undefined
-                  || document.querySelector('script[src$="editor-diagrams.js"]') !== null
-                  || performance.getEntriesByType('resource').some((e) => e.name.endsWith('editor-diagrams.js'))
+                return window.imarkDiagrams !== undefined || window.imarkMermaid !== undefined
+                  || document.querySelector('script[src$="editor-diagrams.js"], script[src$="mermaid.js"]') !== null
+                  || performance.getEntriesByType('resource').some((e) => e.name.endsWith('editor-diagrams.js') || e.name.endsWith('/mermaid.js'))
                 """) as? Bool) == true
         }
         check("the table is drawn", until { (js(window, "return document.querySelectorAll('.cm-live-table table').length") as? Int) == 1 })
