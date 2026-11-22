@@ -42,6 +42,7 @@ node Support/test-export.mjs
 node Support/test-math.mjs
 node Support/test-live-decorations.mjs
 node Support/test-live-blocks.mjs
+node Support/test-live-gutter.mjs
 swift Support/test-plus.swift
 swift Support/test-text-size.swift
 swift Support/test-pieces.swift

@@ -82,6 +82,9 @@ if [ "${1:-}" != "--force" ]; then
 	node Support/test-notes.mjs >/dev/null 2>&1 || die "the note anchoring tests failed"
 	node Support/test-invocation.mjs >/dev/null 2>&1 || die "the plugin invocation tests failed"
 	node Support/test-math.mjs >/dev/null 2>&1 || die "the math tests failed"
+	node Support/test-live-decorations.mjs >/dev/null 2>&1 || die "the Live Preview styling tests failed"
+	node Support/test-live-blocks.mjs >/dev/null 2>&1 || die "the Live Preview block tests failed"
+	node Support/test-live-gutter.mjs >/dev/null 2>&1 || die "the Live Preview gutter tests failed"
 	Support/test-tap.sh >/dev/null 2>&1 || die "the Homebrew cask tests failed"
 	swift build >/dev/null 2>&1
 	TEST_BIN="$(swift build --show-bin-path)"
@@ -138,6 +141,21 @@ if [ "${1:-}" != "--force" ]; then
 			$(find Sources/ImarkRender -name '*.swift') \
 			Support/test-selection.swift -o /tmp/imark-release-selection/run >/dev/null 2>&1 \
 		&& /tmp/imark-release-selection/run >/dev/null || die "the selection tests failed"
+	# The Live Preview editor, through the real window and its page. In a folder
+	# of its own: it puts the renderer beside itself to serve it.
+	mkdir -p /tmp/imark-release-live
+	swiftc -parse-as-library -I "$TEST_BIN" -I "$TEST_BIN/Modules" -F "$TEST_BIN" \
+			-Xlinker -rpath -Xlinker "$TEST_BIN" \
+			$(find Sources/Imark -name '*.swift' ! -name main.swift) \
+			$(find Sources/ImarkRender -name '*.swift') \
+			Support/test-live-editor.swift -o /tmp/imark-release-live/run >/dev/null 2>&1 \
+		&& /tmp/imark-release-live/run >/dev/null || die "the Live Preview editor tests failed"
+	# Its page's mirror, undo routing and input-method composition.
+	mkdir -p /tmp/imark-release-spike-live
+	swiftc -parse-as-library Sources/Imark/LiveMirror.swift \
+			Sources/ImarkRender/SchemeHandler.swift Support/spike-live-editor.swift \
+			-o /tmp/imark-release-spike-live/run >/dev/null 2>&1 \
+		&& /tmp/imark-release-spike-live/run >/dev/null || die "the Live Preview page tests failed"
 	# test-setup.sh needs an assembled app, so it runs after the build instead.
 
 	echo "clean tree, on main, in sync, tests pass"
