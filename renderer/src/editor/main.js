@@ -142,8 +142,10 @@ const mirror = EditorView.updateListener.of((update) => {
   // top line is read from the layout on the update CodeMirror makes once it
   // has measured the edit (`geometryChanged` is true for any edit as well,
   // which is why the edit is asked about first).
+  if (update.docChanged) letPlaceGo()
   if (update.docChanged || update.selectionSet) reportPlace(update.view, placed.line)
   else if (update.geometryChanged || update.viewportChanged) reportPlace(update.view)
+  if (wanted && (update.geometryChanged || update.viewportChanged || update.heightChanged)) holdPlace(update.view)
 })
 
 // --- Where the reader is (`topLine`). Swift asks synchronously, on the way
@@ -167,7 +169,7 @@ function topLineOf(view) {
 
 function reportPlace(view, knownTop) {
   const next = {
-    line: knownTop >= 0 ? knownTop : topLineOf(view),
+    line: wanted ? wanted.line : knownTop >= 0 ? knownTop : topLineOf(view),
     caret: view.state.doc.lineAt(view.state.selection.main.head).number - 1,
   }
   if (next.line === placed.line && next.caret === placed.caret) return
@@ -181,10 +183,59 @@ function reportPlace(view, knownTop) {
 function scrollToLine(line, caret = line) {
   const doc = view.state.doc
   const lineAt = (n) => doc.line(Math.min(Math.max(0, Math.trunc(n) || 0), doc.lines - 1) + 1)
+  const top = lineAt(line)
+  wanted = { line: top.number - 1, tries: 0, agreed: 0, until: Date.now() + HOLD_MS }
   view.dispatch({
     selection: { anchor: lineAt(caret).from },
-    effects: EditorView.scrollIntoView(lineAt(line).from, { y: 'start', yMargin: 0 }),
+    effects: EditorView.scrollIntoView(top.from, { y: 'start', yMargin: 0 }),
   })
+  holdPlace(view)
+}
+
+// The top line asked for by `scrollToLine`, held until the layout agrees with
+// it. CodeMirror scrolls by its estimate of the height of every line it has not
+// drawn yet, and after `setState` (a reload that keeps the place) that is every
+// line above the target. Once the lines on screen are measured those estimates
+// change, and the target moves with them: two lines up, in about half the
+// reloads of a long document, after a detour thirty lines up on the way. So the
+// line is asked for again after each measure until two measures in a row agree,
+// and until then it is the line the page reports, never one of the detours.
+// Anything the reader does (a key, a click, the wheel) lets it go at once.
+const HOLD_MS = 1500
+let wanted = null
+
+function holdPlace(view) {
+  if (!wanted) return
+  view.requestMeasure({
+    key: holdPlace,
+    read: (v) => topLineOf(v),
+    write: (top, v) => {
+      if (!wanted) return
+      if (top === wanted.line) {
+        wanted.agreed += 1
+      } else {
+        wanted.agreed = 0
+        wanted.tries += 1
+        const line = v.state.doc.line(wanted.line + 1)
+        // Not from inside a measure: CodeMirror takes no transaction there.
+        setTimeout(() => {
+          if (wanted) v.dispatch({ effects: EditorView.scrollIntoView(line.from, { y: 'start', yMargin: 0 }) })
+        })
+      }
+      if (wanted.agreed >= 2 || wanted.tries > 10 || Date.now() > wanted.until) {
+        wanted = null
+        reportPlace(v)
+      } else {
+        // Asked again on the next frame even if nothing else moves, so a hold
+        // whose last measure agreed is confirmed rather than left open.
+        requestAnimationFrame(() => holdPlace(v))
+      }
+    },
+  })
+}
+
+function letPlaceGo() {
+  wanted = null
 }
 
 // --- Find. The app's own find bar drives this, the same bar the preview
@@ -320,6 +371,10 @@ const view = new EditorView({
 // Scrolling alone is not an update CodeMirror reports, so the top line is
 // watched from the scroller as well. Only a line that moved is posted.
 view.scrollDOM.addEventListener('scroll', () => reportPlace(view), { passive: true })
+// The reader taking over ends any hold on the top line (`scrollToLine`).
+for (const type of ['wheel', 'mousedown', 'keydown', 'touchstart']) {
+  view.dom.addEventListener(type, letPlaceGo, { passive: true, capture: true })
+}
 
 // WebKit keeps its own undo stack for the contenteditable. CodeMirror's history
 // is the only one that may act, so a native undo/redo (from WebKit's own ⌘Z
@@ -384,7 +439,7 @@ function load(args) {
   // caret stays on its line and the view on its top line, rather than both going
   // back to the start of the document every time the file is saved elsewhere.
   const kept = args.keepLine === true
-    ? { line: topLineOf(view), caret: view.state.doc.lineAt(view.state.selection.main.head).number - 1 }
+    ? { line: wanted ? wanted.line : topLineOf(view), caret: view.state.doc.lineAt(view.state.selection.main.head).number - 1 }
     : null
   generation = args.generation
   seq = 0
