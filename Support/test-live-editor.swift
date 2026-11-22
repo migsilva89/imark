@@ -435,6 +435,12 @@ enum LiveEditorTest {
 
     /// The mirror outlives the page. Kill the web content process, and the
     /// page comes back with the buffer, still unsaved, still editable.
+    ///
+    /// Killed the way a crash kills it, with SIGKILL to its pid. WebKit's own
+    /// `_killWebContentProcess` is not a crash: it ends the process "as the
+    /// client asked", and on macOS 26 that no longer reaches
+    /// `webViewWebContentProcessDidTerminate`, so the page never came back and
+    /// the test failed while the app was fine.
     static func aCrashKeepsTheBuffer() throws {
         print("▸ a dead web process keeps the buffer")
         let url = fixture("before the crash\n", named: "crash.md")
@@ -444,12 +450,12 @@ enum LiveEditorTest {
         edit(window, from: 0, insert: "unsaved, ")
         _ = until { window.content.editor.isDirty }
 
-        let kill = NSSelectorFromString("_killWebContentProcess")
-        guard web.responds(to: kill) else {
-            check("this WebKit can be told to kill its process", false)
+        let pid = (web.value(forKey: "_webProcessIdentifier") as? NSNumber)?.int32Value ?? 0
+        guard pid > 0 else {
+            check("this WebKit says which process is the page's", false)
             return finish(window)
         }
-        web.perform(kill)
+        check("the page's process is killed", Darwin.kill(pid, SIGKILL) == 0)
         check("the page came back with the buffer",
               until(10) { samePage(window, "unsaved, before the crash\n") }, pageText(window) ?? "nil")
         check("and it is still unsaved", window.content.editor.isDirty)
@@ -766,7 +772,7 @@ enum LiveEditorTest {
             return 0
             """)
         check("broken TeX shows the preview's error styling", until { toEnd(); return count(".cm-live-math .katex-error") == 1 }, "\(count(".katex-error"))")
-        check("an invalid diagram shows the localized error box",
+        check("an invalid diagram shows the error box",
               until(15) { toEnd(); return count(".cm-live-diagram .diagram-error") == 1 }, "\(count(".diagram-error"))")
         finish(window)
     }
