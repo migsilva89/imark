@@ -1,4 +1,4 @@
-// Images in the Live Preview (docs/LIVE-PREVIEW.md §4, M3): `![alt](path)` drawn
+// Images in the Live Preview: `![alt](path)` drawn
 // as the picture, in the line, until the caret touches it.
 //
 // The path is resolved as the preview resolves it — relative to the document's

@@ -1,4 +1,4 @@
-// ```diff fences in the Live Preview (docs/LIVE-PREVIEW.md §4, M3): a diff
+// ```diff fences in the Live Preview: a diff
 // drawn as the preview draws one — each row tinted, the old and new line numbers
 // down the side — by `renderDiff`, through the same markdown-it as the reading
 // view. Top level only, and the caret on any line of the fence shows the source.

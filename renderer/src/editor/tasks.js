@@ -1,4 +1,4 @@
-// Task boxes in the Live Preview (docs/LIVE-PREVIEW.md §4, M3): the `[ ]` or
+// Task boxes in the Live Preview: the `[ ]` or
 // `[x]` of a task item drawn as a real checkbox, ticked with a click.
 //
 // A tick here is an edit like any other: one transaction that changes the one
@@ -6,7 +6,7 @@
 // history, and reaches Swift as an ordinary `changes` message. The preview's
 // way — posting `task` for Swift to write the file through Comments.setTask —
 // would write under an open buffer and move the stamp the stale-save check
-// relies on (§1, invariant 2). This page has no message that writes anything.
+// relies on. This page has no message that writes anything.
 //
 // The box shows even with the caret on its line, as in Obsidian; only the caret
 // in or right beside the `[ ]` itself turns it back into source. The tree finds

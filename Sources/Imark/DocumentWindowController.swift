@@ -498,7 +498,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
     /// Starts a note about the document rather than about anything in it.
     func beginFileNote() {
         // A note is written straight into the file, and with a buffer open the
-        // file is the buffer's to write (docs/LIVE-PREVIEW.md §1, invariant 2).
+        // file is the buffer's to write.
         guard !editMode else { return NSSound.beep() }
         selection = nil
         editingNote = nil

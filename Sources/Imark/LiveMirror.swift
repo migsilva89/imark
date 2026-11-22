@@ -1,8 +1,8 @@
 import Foundation
 
 /// Swift's copy of the document in the Live editor, kept in step with
-/// CodeMirror by the `changes` messages the page posts (docs/LIVE-PREVIEW.md
-/// §3.2). It exists so `text` and `isDirty` can be answered synchronously —
+/// CodeMirror by the `changes` messages the page posts. It exists so `text`
+/// and `isDirty` can be answered synchronously —
 /// closing a window, switching documents and the file watcher's dirty guard all
 /// ask from code that cannot wait for a web view to reply.
 ///
@@ -77,7 +77,7 @@ final class LiveMirror {
     // MARK: - Driving
 
     /// The line break a file uses, or nil if it mixes them or has a bare `\r`,
-    /// which the mirror cannot convert back faithfully (§6). A file with no line
+    /// which the mirror cannot convert back faithfully. A file with no line
     /// break at all is LF.
     static func lineSeparator(of text: String) -> String? {
         let units = Array(text.utf16)

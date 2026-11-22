@@ -1,6 +1,6 @@
 // Which lines of a document differ from the text it was saved as: the Live
-// editor's version of the source editor's `MarkdownEditorView.modifiedLines`
-// (docs/LIVE-PREVIEW.md §5). A real line diff rather than a positional compare,
+// editor's version of the source editor's `MarkdownEditorView.modifiedLines`.
+// A real line diff rather than a positional compare,
 // so one inserted line marks that line and not everything below it, and a line
 // that was deleted marks nothing — there is no line left to mark.
 //

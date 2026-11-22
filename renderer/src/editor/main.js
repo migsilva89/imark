@@ -3,9 +3,9 @@
 //
 // Separate from the preview (src/main.js) on purpose: the preview is shared with
 // Quick Look and owns the comment rail and selection logic; this page owns a
-// contenteditable. See docs/LIVE-PREVIEW.md §2 and §3.
+// contenteditable.
 //
-// The mirror protocol (§3.2). Swift keeps a copy of the document in CodeMirror's
+// The mirror protocol. Swift keeps a copy of the document in CodeMirror's
 // own coordinates — every line break is one position and is written `\n` — so
 // it can answer `text` and `isDirty` synchronously. After every transaction that
 // changes the document this page posts
@@ -146,7 +146,7 @@ const mirror = EditorView.updateListener.of((update) => {
   else if (update.geometryChanged || update.viewportChanged) reportPlace(update.view)
 })
 
-// --- Where the reader is (§3.3 `topLine`). Swift asks synchronously, on the way
+// --- Where the reader is (`topLine`). Swift asks synchronously, on the way
 // back to the preview and on ⇧⌘E, so the page tells it whenever either line
 // moves rather than waiting to be asked: the first line showing at the top of
 // the editor, and the line the caret is on. Both count the file's lines from
@@ -187,7 +187,7 @@ function scrollToLine(line, caret = line) {
   })
 }
 
-// --- Find (§3.4). The app's own find bar drives this, the same bar the preview
+// --- Find. The app's own find bar drives this, the same bar the preview
 // uses, so CodeMirror's search panel never opens. Its highlighter only paints
 // while that panel is open, which is why the matches are decorated here: a plain,
 // case-insensitive search for the literal text, counted the way the preview
@@ -282,7 +282,7 @@ function findClear() {
 }
 
 // --- The Live Preview (live.js, inline.js). In a compartment so the harness can
-// switch it off: off is the M1 look, the Markdown source highlighted in full,
+// switch it off: off is the plain look, the Markdown source highlighted in full,
 // which is also what the default highlight style gives the marks the Live
 // Preview hides and restyles itself.
 const livePreviewOn = livePreview({ openLink: (target) => post('openLink', target) })

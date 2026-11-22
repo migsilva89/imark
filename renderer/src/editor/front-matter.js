@@ -1,4 +1,4 @@
-// The front-matter card in the Live Preview (docs/LIVE-PREVIEW.md §4, M3): the
+// The front-matter card in the Live Preview: the
 // `---` … `---` block at the top, drawn as the preview's card (`renderFrontMatter`)
 // until the caret comes onto one of its lines.
 //

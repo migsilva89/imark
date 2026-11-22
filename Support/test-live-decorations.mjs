@@ -1,4 +1,4 @@
-// Tests for the Live Preview's decisions (docs/LIVE-PREVIEW.md §4, M2): which
+// Tests for the Live Preview's decisions: which
 // Markdown marks are hidden and which text is styled, for a given document and
 // selection. No DOM — `liveDecorations` reads an EditorState and returns data.
 //

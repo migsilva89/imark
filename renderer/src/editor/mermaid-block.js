@@ -1,4 +1,4 @@
-// ```mermaid fences in the Live Preview (docs/LIVE-PREVIEW.md §4, M3): the
+// ```mermaid fences in the Live Preview: the
 // diagram, drawn by shared/diagrams.js — the preview's own drawing, palette and
 // cache — in place of the fence until the caret comes onto it.
 //

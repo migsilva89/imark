@@ -1,4 +1,4 @@
-// Block widgets for the Live Preview (docs/LIVE-PREVIEW.md §4, M3): the pieces of
+// Block widgets for the Live Preview: the pieces of
 // a document drawn as something other than their source — a task box, a comment
 // card, and after them tables, formulas, diagrams, images, footnotes and front
 // matter. This file is the frame they plug into; each kind registers itself.
@@ -25,7 +25,7 @@
 // Display, as in live.js, with two exceptions that are edits and say so: a click
 // on a task box (tasks.js) and Backspace/Delete beside an atomic block. Both are
 // transactions on the buffer, which Swift mirrors and ⌘S saves — never a write
-// to the file (§1, invariant 2).
+// to the file.
 
 import { EditorState, StateField, StateEffect, RangeSet, Prec } from '@codemirror/state'
 import { Decoration, EditorView, ViewPlugin, WidgetType, keymap } from '@codemirror/view'
@@ -81,7 +81,7 @@ export function registerBlock(definition) {
 // --- The render context: the whole document through markdown-it, once
 
 // A slice rendered on its own loses what is defined elsewhere in the file — the
-// target of `[x][ref]`, the number of `[^1]` (§4). So a widget renders with the
+// target of `[x][ref]`, the number of `[^1]`. So a widget renders with the
 // `env` the whole document was parsed into. Parsing a long document on every
 // key would be the slowest thing on the page, hence once per version of the
 // text, and only when some widget asks.
@@ -304,8 +304,8 @@ export const blockField = StateField.define({
     }
     if (restyled) epoch += 1
     // During a composition the set is kept, moved with the text, exactly as the
-    // M2 plugin keeps its marks: redrawing a widget beside text the input method
-    // owns loses its candidate window (§5). Caught up on the next transaction
+    // inline plugin (live.js) keeps its marks: redrawing a widget beside text the input method
+    // owns loses its candidate window. Caught up on the next transaction
     // after it, which the plugin dispatches.
     if (composition.holding || tr.isUserEvent('input.type.compose')) {
       if (!tr.docChanged && forced === value.forced) return value.stale ? value : { ...value, stale: true }

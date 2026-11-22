@@ -5,7 +5,7 @@ import AppKit
 /// (`LiveEditorView`, CodeMirror in a web view). Pulled out of what the source
 /// editor already offered, so `DocumentWindowController` asks the same questions
 /// of both and none of its saving, reverting or leaving changed meaning when the
-/// second editor arrived (docs/LIVE-PREVIEW.md §3.1).
+/// second editor arrived.
 ///
 /// `text` and `isDirty` are synchronous on purpose. Closing a window, opening
 /// another document in it and the file watcher's dirty guard all ask from code
