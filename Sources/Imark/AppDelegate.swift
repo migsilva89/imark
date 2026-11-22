@@ -9,6 +9,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var cascadePoint = NSPoint.zero
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // First, before anything writes a default: it tells an update from a
+        // fresh install by whether earlier preferences exist.
+        StarPrompt.noteLaunch()
         Menu.install()
         Settings.applyThemeToApp()
         MenuBarItem.shared.sync()
@@ -182,6 +185,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.controllers.removeAll { $0 === controller }
         }
         controllers.append(controller)
+        defer { StarPrompt.documentOpened(in: controller.content.view) }
 
         // Added to the group before it is shown: ordering it front first makes
         // it a window for an instant, and it keeps that window's shadow and
