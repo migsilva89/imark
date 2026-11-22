@@ -7,6 +7,14 @@
 	<true/>
 	<key>com.apple.security.files.user-selected.read-only</key>
 	<true/>
+	<!-- Quick Look only grants the extension the previewed file itself, so the
+	     sandbox refused every image a document shows, even one beside it
+	     (#78). Read-only access lets those images load; the scheme handler
+	     still serves nothing but images to the page. -->
+	<key>com.apple.security.temporary-exception.files.absolute-path.read-only</key>
+	<array>
+		<string>/</string>
+	</array>
 	<!-- WebKit refuses to spin up its WebContent process without this, even
 	     for content served entirely from a custom local scheme. -->
 	<key>com.apple.security.network.client</key>
