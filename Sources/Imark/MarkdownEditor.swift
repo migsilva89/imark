@@ -15,6 +15,7 @@ final class MarkdownEditorView: NSView, DocumentEditor {
     var onEdit: (() -> Void)?
     /// ⌘S from inside the text view, which owns the keyboard while it has focus.
     var onSave: (() -> Void)?
+    var onScroll: (() -> Void)?
 
     private let scroll = NSScrollView()
     private let textView = NSTextView()
@@ -88,7 +89,10 @@ final class MarkdownEditorView: NSView, DocumentEditor {
             forName: NSView.boundsDidChangeNotification,
             object: scroll.contentView,
             queue: .main
-        ) { [weak self] _ in self?.gutter.needsDisplay = true }
+        ) { [weak self] _ in
+            self?.gutter.needsDisplay = true
+            self?.onScroll?()
+        }
     }
 
     @available(*, unavailable)

@@ -20,6 +20,7 @@ import ImarkRender
 final class LiveEditorView: NSView, DocumentEditor {
     var onEdit: (() -> Void)?
     var onSave: (() -> Void)?
+    var onScroll: (() -> Void)?
     /// ⌘F. The page has no find bar of its own; the app's is in the content
     /// controller, which this view has no reference to.
     var onShowFind: (() -> Void)?
@@ -352,6 +353,7 @@ final class LiveEditorView: NSView, DocumentEditor {
         case "topLine":
             if let top = (body["line"] as? NSNumber)?.intValue, let caret = (body["caret"] as? NSNumber)?.intValue {
                 place = (top, caret)
+                onScroll?()
             }
 
         case "save":

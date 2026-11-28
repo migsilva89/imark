@@ -17,6 +17,9 @@ protocol DocumentEditor: NSView {
     var onEdit: (() -> Void)? { get set }
     /// ⌘S from inside the editor, which owns the keyboard while it has focus.
     var onSave: (() -> Void)? { get set }
+    /// Called when the view may have moved, so the outline can follow the line
+    /// at the top while editing.
+    var onScroll: (() -> Void)? { get set }
 
     /// The document as it would be written.
     var text: String { get }

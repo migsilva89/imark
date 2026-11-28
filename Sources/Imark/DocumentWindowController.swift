@@ -166,9 +166,17 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         // While editing, the page is hidden and its anchors go nowhere: the
         // heading's line goes to whichever editor is on screen instead.
         sidebar.onSelectHeading = { [weak self] entry in
-            guard let content = self?.content else { return }
-            if content.isEditing { content.revealInEditor(entry) } else { content.renderer.scrollTo(anchor: entry.id) }
+            guard let self else { return }
+            if content.isEditing {
+                content.revealInEditor(entry)
+                sidebar.setActive(entry.id)
+            } else {
+                content.renderer.scrollTo(anchor: entry.id)
+            }
         }
+        // The page says which heading is current as it scrolls; while editing
+        // the page is hidden, and the editor's top line says it instead.
+        content.onEditorScroll = { [weak self] in self?.followEditor() }
         sidebar.onSelectFile = { [weak self] url in self?.show(url, pushingHistory: true) }
         sidebar.onOpenFileInTab = { [weak self] url in
             guard let window = self?.window else { return }
@@ -317,14 +325,26 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
         sidebar.update(files: markdown, current: url, recents: Array(recents))
     }
 
+    /// The outline as the page last reported it, for following the editor.
+    private var toc: [TocEntry] = []
+
+    private func followEditor() {
+        if let id = content.activeHeading(in: toc) { sidebar.setActive(id) }
+    }
+
     // MARK: - Messages
 
     private func handle(_ message: RendererMessage) {
         switch message {
         case .toc(let entries):
+            toc = entries
             sidebar.update(toc: entries)
+            if content.isEditing { followEditor() }
 
         case .active(let id):
+            // The hidden page, re-rendered after a save, is not where the
+            // reader is while editing.
+            guard !content.isEditing else { break }
             sidebar.setActive(id)
 
         case .meta(let words, let minutes):
