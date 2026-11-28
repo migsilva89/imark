@@ -88,6 +88,16 @@ public struct TocEntry: Identifiable, Equatable {
     public let id: String
     public let level: Int
     public let title: String
+    /// The heading's first line in the file, counted from zero as `data-line`
+    /// counts it: what an editor scrolls to, since it has no anchors.
+    public let line: Int?
+
+    public init(id: String, level: Int, title: String, line: Int? = nil) {
+        self.id = id
+        self.level = level
+        self.title = title
+        self.line = line
+    }
 }
 
 public final class RendererView: NSView {
@@ -395,7 +405,7 @@ public final class RendererView: NSView {
                     guard let id = item["id"] as? String,
                           let level = item["level"] as? Int,
                           let title = item["title"] as? String else { return nil }
-                    return TocEntry(id: id, level: level, title: title)
+                    return TocEntry(id: id, level: level, title: title, line: item["line"] as? Int)
                 }
                 owner.onMessage?(.toc(items))
 

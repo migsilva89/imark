@@ -126,6 +126,11 @@ function setFrontMatter(shown) {
 
 /* ------------------------------------------------------------------- toc */
 
+function lineOf(heading) {
+  const line = Number.parseInt(heading.dataset.line ?? '', 10)
+  return Number.isFinite(line) ? line : null
+}
+
 function buildToc(root) {
   const headings = [...root.querySelectorAll('h1, h2, h3, h4, h5, h6')].filter((h) => h.id)
   bridge({
@@ -134,6 +139,8 @@ function buildToc(root) {
       id: h.id,
       level: Number(h.tagName.slice(1)),
       title: h.textContent.trim(),
+      // The file's line, for the editors, which have no anchors to scroll to.
+      line: lineOf(h),
     })),
   })
   return headings

@@ -37,6 +37,8 @@ final class ContentViewController: NSViewController {
     /// Wired once by the window, for both editors — including the one that does
     /// not exist yet.
     var onEditorEdit: (() -> Void)?
+    /// The editor on screen may have scrolled.
+    var onEditorScroll: (() -> Void)?
     var onEditorSave: (() -> Void)?
 
     var onMessage: ((RendererMessage) -> Void)?
@@ -75,7 +77,8 @@ final class ContentViewController: NSViewController {
         self.status = status
 
         sourceEditor.isHidden = true
-        sourceEditor.onEdit = { [weak self] in self?.onEditorEdit?() }
+        sourceEditor.onEdit = { [weak self] in self?.bufferHeadings = nil; self?.onEditorEdit?() }
+        sourceEditor.onScroll = { [weak self] in self?.reportEditorScroll(from: self?.sourceEditor) }
         sourceEditor.onSave = { [weak self] in self?.onEditorSave?() }
 
         header.material = .headerView
@@ -155,6 +158,121 @@ final class ContentViewController: NSViewController {
         if on { editor.focus() } else { renderer.focus() }
     }
 
+    // MARK: - The outline, while editing
+
+    /// The headings in the editor's buffer, found again after an edit. Only
+    /// needed while there are unsaved changes, when the outline's lines, read
+    /// from the file, may no longer be where the headings are.
+    private var bufferHeadings: [(line: Int, text: String)]?
+
+    /// Only the editor on screen speaks for the window: the hidden one keeps
+    /// its own place, and a scroll there is not the reader moving.
+    private func reportEditorScroll(from source: DocumentEditor?) {
+        guard isEditing, let source, source === editor else { return }
+        onEditorScroll?()
+    }
+
+    /// An outline click while editing: the editors have no anchors, so the
+    /// heading's line goes to the top. With unsaved changes the heading may
+    /// have moved since the file was read, and the nearest heading line with
+    /// that title wins, the file's own line standing in when there is none.
+    func revealInEditor(_ entry: TocEntry) {
+        guard let saved = entry.line else { return }
+        var line = saved
+        if editor.isDirty,
+           let moved = Self.nearest(Self.title(entry.title), to: saved, in: currentHeadings()) {
+            line = moved
+        }
+        editor.scrollTo(line: line, caret: line)
+        editor.focus()
+    }
+
+    /// The outline entry for the line at the top of the editor: the last
+    /// heading at or above it, or the first heading above them all.
+    func activeHeading(in entries: [TocEntry]) -> String? {
+        guard let first = entries.first else { return nil }
+        let top = editor.topLine
+        var lines = entries.map(\.line)
+        // Unsaved changes: the buffer's own headings, when they still line up
+        // one for one with the outline's. Otherwise the file's lines, which are
+        // at worst a few lines out.
+        if editor.isDirty {
+            let found = currentHeadings()
+            if found.count == entries.count { lines = found.map(\.line) }
+        }
+        var active = first.id
+        for (entry, line) in zip(entries, lines) {
+            guard let line, line <= top else { break }
+            active = entry.id
+        }
+        return active
+    }
+
+    private func currentHeadings() -> [(line: Int, text: String)] {
+        if let bufferHeadings { return bufferHeadings }
+        let found = Self.headings(in: editor.text)
+        bufferHeadings = found
+        return found
+    }
+
+    /// Letters and digits alone: the outline has a heading as read, with its
+    /// emphasis, code marks and link targets gone.
+    static func title(_ text: String) -> String {
+        String(String.UnicodeScalarView(text.unicodeScalars.filter(CharacterSet.alphanumerics.contains)))
+    }
+
+    /// The line of the heading nearest `target` whose text carries `title`.
+    static func nearest(_ title: String, to target: Int, in headings: [(line: Int, text: String)]) -> Int? {
+        guard !title.isEmpty else { return nil }
+        return headings.filter { $0.text.contains(title) }.map(\.line)
+            .min { abs($0 - target) < abs($1 - target) }
+    }
+
+    static func headingLine(titled title: String, near target: Int, in text: String) -> Int? {
+        nearest(Self.title(title), to: target, in: headings(in: text))
+    }
+
+    /// Every ATX and setext heading, outside fenced code, with its line counted
+    /// as `data-line` counts them (`\r\n` one break) and its text reduced as
+    /// `title(_:)` reduces the outline's.
+    static func headings(in text: String) -> [(line: Int, text: String)] {
+        var lines: [Substring] = []
+        text.enumerateLines { line, _ in lines.append(Substring(line)) }
+        func isUnderline(_ line: Substring) -> Bool {
+            let body = line.trimmingCharacters(in: .whitespaces)
+            return !body.isEmpty && (body.allSatisfy { $0 == "=" } || body.allSatisfy { $0 == "-" })
+        }
+        // A link's target is not part of the heading as read.
+        let linkTarget = try! NSRegularExpression(pattern: #"\]\([^)]*\)"#)
+        var found: [(line: Int, text: String)] = []
+        var fence: Character?
+        // Front matter, as the page strips it: its closing `---` is no heading.
+        var skip = 0
+        if lines.first?.trimmingCharacters(in: .whitespaces) == "---",
+           let close = lines.dropFirst().firstIndex(where: { ["---", "..."].contains($0.trimmingCharacters(in: .whitespaces)) }) {
+            skip = close + 1
+        }
+        for (index, line) in lines.enumerated() where index >= skip {
+            let body = line.drop(while: { $0 == " " || $0 == ">" })
+            // Nothing inside a fenced block is a heading.
+            if let mark = body.first, mark == "`" || mark == "~", body.prefix(3).allSatisfy({ $0 == mark }) {
+                if fence == nil { fence = mark } else if fence == mark { fence = nil }
+                continue
+            }
+            if fence != nil { continue }
+            let hashes = body.prefix(while: { $0 == "#" }).count
+            let atx = (1...6).contains(hashes) && (body.count == hashes || body.dropFirst(hashes).first == " ")
+            let setext = !atx && !body.trimmingCharacters(in: .whitespaces).isEmpty
+                && !isUnderline(body)
+                && index + 1 < lines.count && isUnderline(lines[index + 1])
+            guard atx || setext else { continue }
+            let read = linkTarget.stringByReplacingMatches(
+                in: String(body), range: NSRange(body.startIndex..., in: body), withTemplate: "]")
+            found.append((index, title(read)))
+        }
+        return found
+    }
+
     // MARK: - Which editor
 
     /// Editing starts: the style comes from the setting, and the file goes into
@@ -230,6 +348,7 @@ final class ContentViewController: NSViewController {
     }
 
     private func place(_ text: String, saved: String) {
+        bufferHeadings = nil
         let refusal = prefersLive && LiveEditorView.isAvailable ? liveRefusal(text) : nil
         let live = prefersLive && LiveEditorView.isAvailable && refusal == nil
         if let refusal { note(refusal) }
@@ -264,7 +383,8 @@ final class ContentViewController: NSViewController {
         // editor: added on top, it would cover the find bar it is searched from.
         view.addSubview(live, positioned: .below, relativeTo: header)
         pin(live)
-        live.onEdit = { [weak self] in self?.onEditorEdit?() }
+        live.onEdit = { [weak self] in self?.bufferHeadings = nil; self?.onEditorEdit?() }
+        live.onScroll = { [weak self, weak live] in self?.reportEditorScroll(from: live) }
         live.onSave = { [weak self] in self?.onEditorSave?() }
         live.onShowFind = { [weak self] in self?.showFind() }
         live.onFind = { [weak self] count, index in self?.updateCounter(count: count, index: index) }
