@@ -155,6 +155,61 @@ final class ContentViewController: NSViewController {
         if on { editor.focus() } else { renderer.focus() }
     }
 
+    // MARK: - The outline, while editing
+
+    /// An outline click while editing: the editors have no anchors, so the
+    /// heading's line goes to the top. The outline is the page's, which shows
+    /// the file as last read; with unsaved changes the heading may have moved,
+    /// and the nearest heading line with that title wins, the file's own line
+    /// standing in when there is none.
+    func revealInEditor(_ entry: TocEntry) {
+        guard let saved = entry.line else { return }
+        var line = saved
+        if editor.isDirty, let moved = Self.headingLine(titled: entry.title, near: saved, in: editor.text) {
+            line = moved
+        }
+        editor.scrollTo(line: line, caret: line)
+        editor.focus()
+    }
+
+    /// The line, counted as `data-line` counts them (`\r\n` one break), of the
+    /// ATX or setext heading nearest `target` whose text carries `title`.
+    /// Compared on letters and digits alone: the outline has the heading as
+    /// read, with its emphasis, code marks and link targets gone.
+    static func headingLine(titled title: String, near target: Int, in text: String) -> Int? {
+        let bare = { (s: Substring) in String(String.UnicodeScalarView(s.unicodeScalars.filter(CharacterSet.alphanumerics.contains))) }
+        let wanted = bare(Substring(title))
+        guard !wanted.isEmpty else { return nil }
+        var lines: [Substring] = []
+        text.enumerateLines { line, _ in lines.append(Substring(line)) }
+        func isUnderline(_ line: Substring) -> Bool {
+            let body = line.drop(while: { $0 == " " }).trimmingCharacters(in: .whitespaces)
+            return !body.isEmpty && (body.allSatisfy { $0 == "=" } || body.allSatisfy { $0 == "-" })
+        }
+        // A link's target is not part of the heading as read.
+        let linkTarget = try! NSRegularExpression(pattern: #"\]\([^)]*\)"#)
+        var best: Int?
+        var fence: Character?
+        for (index, line) in lines.enumerated() {
+            let body = line.drop(while: { $0 == " " || $0 == ">" })
+            // Nothing inside a fenced block is a heading.
+            if let mark = body.first, mark == "`" || mark == "~", body.prefix(3).allSatisfy({ $0 == mark }) {
+                if fence == nil { fence = mark } else if fence == mark { fence = nil }
+                continue
+            }
+            if fence != nil { continue }
+            let hashes = body.prefix(while: { $0 == "#" }).count
+            let atx = (1...6).contains(hashes) && (body.count == hashes || body.dropFirst(hashes).first == " ")
+            let setext = !atx && !body.trimmingCharacters(in: .whitespaces).isEmpty
+                && index + 1 < lines.count && isUnderline(lines[index + 1])
+            let read = linkTarget.stringByReplacingMatches(
+                in: String(body), range: NSRange(body.startIndex..., in: body), withTemplate: "]")
+            guard atx || setext, bare(Substring(read)).contains(wanted) else { continue }
+            if best.map({ abs(index - target) < abs($0 - target) }) ?? true { best = index }
+        }
+        return best
+    }
+
     // MARK: - Which editor
 
     /// Editing starts: the style comes from the setting, and the file goes into

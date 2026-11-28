@@ -163,7 +163,12 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate {
             self?.content.renderer.revealNote(index)
         }
 
-        sidebar.onSelectHeading = { [weak self] id in self?.content.renderer.scrollTo(anchor: id) }
+        // While editing, the page is hidden and its anchors go nowhere: the
+        // heading's line goes to whichever editor is on screen instead.
+        sidebar.onSelectHeading = { [weak self] entry in
+            guard let content = self?.content else { return }
+            if content.isEditing { content.revealInEditor(entry) } else { content.renderer.scrollTo(anchor: entry.id) }
+        }
         sidebar.onSelectFile = { [weak self] url in self?.show(url, pushingHistory: true) }
         sidebar.onOpenFileInTab = { [weak self] url in
             guard let window = self?.window else { return }

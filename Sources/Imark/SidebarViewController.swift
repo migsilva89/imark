@@ -13,7 +13,7 @@ final class SidebarViewController: NSViewController {
         case file(URL)
     }
 
-    var onSelectHeading: ((String) -> Void)?
+    var onSelectHeading: ((TocEntry) -> Void)?
     var onSelectFile: ((URL) -> Void)?
     /// ⌘-click, the way the Finder and Safari open a thing beside the thing you
     /// already have. Without it the only way to get a second tab is to leave the
@@ -215,7 +215,7 @@ final class SidebarViewController: NSViewController {
         guard rows.indices.contains(row) else { return }
         switch rows[row] {
         case .header: break
-        case .heading(let entry, _, _): onSelectHeading?(entry.id)
+        case .heading(let entry, _, _): onSelectHeading?(entry)
         case .file(let url): onSelectFile?(url)
         }
     }
